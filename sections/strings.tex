@@ -1,0 +1,19 @@
+\section{Strings}
+\begin{DefinePIOP}{Prefix Check}{prefix-check}{
+$\Oracle{d},\Oracle{b}, \mathsf{prefix}$
+}{    \begin{enumerate}
+        \item $\Prover$ and $\Verifier$ parse $\mathsf{prefix}$ of length $k$ into $k$ field elements $p_1,\ldots,p_k$.
+        \item For $i=1$ to $k$:
+            \begin{itemize}
+                \item $\Prover$ sends $\Oracle{s_i}$ to $\Verifier$.
+                \item $\Prover$ and $\Verifier$ invoke booleanity check on $\Oracle{s_i}$.
+                \item $\Prover$ and $\Verifier$ invoke zerocheck on $s_i \cdot(d - p_i)=0$.
+            \end{itemize}
+        \item For $i=1$ to $k$:
+            \begin{itemize}
+                \item $\Prover$ sends $\Oracle{u_i}$ to $\Verifier$.
+                \item $\Prover$ and $\Verifier$ invoke booleanity check on $\Oracle{u_i}$.
+                \item $\Prover$ and $\Verifier$ invoke zerocheck on $u_i \cdot(d - p_i)=0$.
+            \end{itemize} 
+    \end{enumerate}}
+\end{DefinePIOP}

@@ -14,3 +14,46 @@
 \newcommand{\DoQuote}[1]{``#1''}
 \newcommand{\defemph}[1]{\textbf{\emph{#1}}}
 \newcommand{\keywords}[1]{\bigskip\par\noindent{\footnotesize\textbf{Keywords\/}: #1}}
+
+
+
+\newcounter{piopnum}
+\setcounter{piopnum}{0}
+\crefname{PIOP}{PIOP}{PIOPs}
+
+\makeatletter
+\NewDocumentEnvironment{DefinePIOP}{mmm}{%
+  \begin{mdframed}[nobreak=true]
+    \small
+    \begin{center}
+      \refstepcounter{piopnum}%
+      \textbf{PIOP \thepiopnum: #1}%
+      \protected@edef\@currentlabelname{#1}%
+      \label[PIOP]{piop:#2}%
+    \end{center}
+    \vspace{0.5em}
+    \noindent
+    Inputs: #3
+    \vspace{-0.5em}
+
+    \noindent
+    \rule{\dimexpr\linewidth-\fboxsep-\fboxrule\relax}{0.4pt}
+
+    \noindent
+}{%
+  \end{mdframed}
+}
+\makeatother
+
+
+
+
+%%%%%%% 
+\newcommand{\Prover}{\mathbf{P}}
+\newcommand{\Verifier}{\mathbf{V}}
+
+
+
+%%%%%%%
+\DeclarePairedDelimiter\DoubleBrackets{\llbracket}{\rrbracket}
+\newcommand{\Oracle}[1]{\DoubleBrackets{#1}}
