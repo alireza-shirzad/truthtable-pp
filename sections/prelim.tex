@@ -1,3 +1,52 @@
-% !TEX root = paper.tex
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Preliminaries}
+\label{sec:prelims}
 
+We introduce notation and cryptographic background required to understand \papername{}'s protocols.
+
+\parhead{Boolean hypercube} The $\mu$-dimensional Boolean hypercube $\BoolHCube{\mu}$ is the set
+${\{0,1\}^\mu}$. It has size $n = 2^\mu$.
+We will commonly interpret elements of $\BoolHCube{\mu}$ as integers in the range $[0, n-1]$.
+
+\parhead{Polynomials}
+We write $p \in \F^{\le d}[X_1,\dots,X_\mu]$ (or, concisely, $p \in \F^{\le d}[\mathbf{X}]$) to denote a polynomial in $\mu$ variables over the field $\F$, where each variable has degree at most $d$. 
+
+
+\parhead{Multilinear extensions}
+Let $v \in \F^{N}$ be a vector of field elements with $N = 2^\mu$ for some $\mu \in \mathbb{N}$.
+The \emph{multilinear extension} $\tilde{v}$ of $v$ is the unique multilinear polynomial whose evaluations at the $i$-th point in the $\mu$-dimensional boolean hypercube equal the $i$-th element of $v$.
+We now recall some useful multivariate polynomials.
+\begin{itemize}[nosep]
+    \item The \emph{index polynomial} 
+        $ \idx_{\mu}(X) \;:=\; \sum_{i=1}^{\mu} 2^{i-1} X_i
+        $
+        maps the $i$-th point in $\BoolHCube{\mu}$ to the value $i - 1$.
+    \item The \emph{equality} polynomial 
+        $
+          \eqPoly(X, Y) \;:=\; \prod_{i=1}^{\mu} ((1- X_i)(1- Y_i) + X_i Y_i)
+        $
+        satisfies the property that, for $x, y \in \BoolHCube{\mu}$, $\eqPoly(x, y)$ equals $1$ if $x = y$, and equals $0$ otherwise.
+    \item The \emph{s-contiguous} polynomial
+        $
+        \contigmus(X) \;:=\; \sum_{i=1}^{\mu} s_i(1 - X_i) \prod_{j=1}^{i-1} \left(s_jX_j + (1 - s_j)(1 - X_j)\right)   
+        $ is $1$ for the first $s$ points in $\BoolHCube{\mu}$ and $0$ elsewhere. Here, $s_i$ is the $i$-th most significant bit of $s$. We provide a derivation of this polynomial in \cref{sec:contigmus-derivation}.
+\end{itemize}
+
+\parhead{Polynomial oracles}
+Algorithms with \emph{oracle} access to a polynomial $p$ (denoted $\Oracle{p})$ can query $p$ at any point $x \in \F^{\mu}$ to obtain the evaluation $p(x)$.
+
+\parhead{Polynomial commitments} A polynomial commitment scheme is a cryptographic primitive that allows one to generate a succinct commitment $\Commitment_p$ to a polynomial $p$, and later reveal its evaluation at specific points, along with a proof that the evaluation is correct~\cite{KateZG10}. 
+
+\parhead{SNARKs via polynomials}
+\papername{} follows the now-standard methodology for constructing SNARKs by combining \emph{Polynomial Interactive Oracle Proofs} (PIOPs) with \emph{Polynomial Commitment} (PC) schemes~\cite{BunzFS20,ChiesaHMMVW20}. A PIOP is an idealized interactive proof between a prover $\PIOPProver$ and a verifier $\PIOPVerifier$, in which the prover sends polynomial oracles and the verifier queries these oracles before deciding acceptance. 
+
+All protocol design in \papername{} occurs at the PIOP layer. We build PIOPs that prove correct execution of relational operators over database tables, and build these protocols compositionally using polynomial interactive oracle \emph{reductions}~\cite{BenSassonCGGRS19,BunzMNW25b,BawejaMMS25}, which interactively reduce complex claims to simpler algebraic subclaims. As shown in \cref{sec:logical-toolbox}, each operator-level protocol ultimately reduces to a small collection of low-level algebraic claims, which are proven using standard PIOPs from the literature. For completeness, we briefly recall the three protocols frequently used in \papername{}, deferring formal definitions to \cref{sec:low-level-piops-deferred}.
+
+\begin{itemize}[noitemsep]
+    \item \textbf{\hyperref[{piop:sumcheck}]{Sumcheck}} proves claims of the form $\sum_{x \in \BoolHCube{\mu}} p(x) = s$ for a polynomial $p$ and field element $s$.
+    \item \textbf{\hyperref[{piop:zerocheck}]{Zerocheck}} proves that a polynomial $p$ vanishes on the Boolean hypercube, i.e., $p(x) = 0$ for all $x \in \BoolHCube{\mu}$.
+    \item \textbf{\hyperref[{piop:ratsumcheck}]{Rational Sumcheck}} proves claims of the form $\sum_{x \in \BoolHCube{\mu}} \frac{p(x)}{q(x)} = s$ for polynomials $p,q$, under the promise that $q(x) \neq 0$ for all $x \in \BoolHCube{\mu}$.
+\end{itemize}
+
+To obtain a SNARK, we compile these PIOPs using a polynomial commitment scheme~\cite{ChiesaHMMVW20,BunzFS20}. Intuitively, this compilation emulates the polynomial oracles in the PIOP model: each polynomial oracle sent by the prover is replaced by a \emph{polynomial commitment}, and each oracle query is replaced by a proof that the committed polynomial evaluates to the claimed value at the verifier’s chosen point~\cite{ChiesaHMMVW20,GabizonWC19}. Since this compilation applies generically, we treat it as a black box and focus exclusively on designing efficient PIOPs for relational operators; the resulting SNARK inherits its efficiency and soundness directly from the underlying PIOPs and commitment scheme.

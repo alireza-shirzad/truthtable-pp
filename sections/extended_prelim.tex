@@ -1,0 +1,73 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\doclearpage
+\section{Extended Preliminaries}
+\label{sec:extended_preliminaries}
+
+
+\subsection{s-Contiguous Polynomial Identity}
+\label{sec:contigmus-derivation}
+
+Here we show that the s-contiguous polynomial, defined in \cref{sec:prelims} as:
+
+$$\contigmus(X) \;:=\; \sum_{i=1}^{\mu} s_i(1 - X_i) \prod_{j=1}^{i-1} \left(s_jX_j + (1 - s_j)(1 - X_j)\right)$$
+
+is $1$ for the first $s$ points in $\BoolHCube{\mu}$ and $0$ elsewhere. Here, $s_i = \lfloor \frac{s}{2^{\mu - i}} \rfloor \bmod 2$ is the $i$-th most significant bit of $s$.  Equivalently, $\contigmus(X) = 1$ if and only if $\idx_\mu(X) < s$, and $\contigmus(X) = 0$ otherwise. Here, we will provide a short derivation of this identity.
+
+Observe that the condition $\idx_\mu(X) < s$ is satisfied if and only if there is some position $i$ such that:
+\begin{enumerate}[nosep]
+    \item \textbf{Prefix Match:} For all indices $j < i$ (bits more significant than $i$), the bit $X_j$ is identical to $s_j$.
+    \item \textbf{Current Bit Lower:} At index $i$, the bit $X_i$ is strictly less than $s_i$. Since $X_i, s_i \in \{0,1\}$, this forces $s_i = 1$ and $X_i = 0$.
+\end{enumerate}
+
+The polynomial captures this logic by summing over all possible positions $i$ where this divergence could occur. The inner product, $\prod_{j=1}^{i-1} (s_jX_j + (1 - s_j)(1 - X_j))$, acts as an equality indicator for the prefix, evaluating to $1$ if and only if $X_j = s_j$ for all $j < i$. The term $s_i(1 - X_i)$ enforces the strict inequality at the current bit. Because the ``first position of difference'' is unique for any distinct pair of integers, these conditions are mutually exclusive across different $i$. Thus, the summation yields exactly $1$ if such an $i$ exists and $0$ otherwise.
+
+
+\subsection{Deferred Low-Level PIOPs}
+\label{sec:low-level-piops-deferred}
+
+\parhead{Sumcheck}
+The idea of sumcheck is to reduce an exponential sum to a sequence of univariate sums, each involving one fewer variable. At each step, the prover sends a univariate polynomial that partially sums over the remaining variables. The verifier checks consistency between rounds by evaluating each polynomial at a random point and verifying that the sum matches the previous claim. After reducing to a single point, the verifier queries the original oracle to confirm the final value.
+
+% \begin{BharathPIOPNew}{Sumcheck}{sumcheck}{$\Oracle{\Polynomial}, s$}
+%   \begin{nosepenumerate}
+% 	    \item $\PIOPProver$ sends to $\PIOPVerifier$ a univariate polynomial oracle $p_1$ such that $
+% 	      p_1(\X_1) = \sum_{\{x_2, \dots, x_\mu\} \in \BoolHCube{\mu-1}} \Polynomial(\X_1, x_2, \dots, x_\mu)$.
+%     \item $\PIOPVerifier$ checks that the degree of $ p_1(x_1) $ is at most the degree of $ p $ in $ x_1 $. It computes $ s_1 = p_1(0) + p_1(1) $ and checks that $ s_1 = s $. If not, $\PIOPVerifier$ rejects. It then picks a random $ r_1 \in \F $ and sends it to the Prover ($\PIOPProver$).
+
+
+%     \item For each $ i $ from 2 to $ \mu $ (subsequent rounds).
+%     \begin{enumerate}[noitemsep, topsep=0pt]
+% 	      \item $\PIOPProver$ sends to   $\PIOPVerifier$ the univariate polynomial
+% 	            $p_i(x_i) = \sum_{\{x_{i+1}, \dots, x_\mu\} \in \BoolHCube{\mu-i}} \Polynomial(r_1, \dots, r_{i-1}, x_i, \dots, x_\mu)$.
+%       \item $\PIOPVerifier$ checks that the degree of $ p_i(x_i) $ is at most the degree of $ p $ in $ x_i $. It computes $ s_i = p_i(0) + p_i(1) $ and checks that $ s_i = p_{i-1}(r_{i-1}) $. If not, $\PIOPVerifier$ rejects. It picks a random $ r_i \in \F $ and sends it to $\PIOPProver$.
+%     \end{enumerate}
+
+%     \item $\PIOPProver$ sends the value $ \Polynomial(r_1, r_2, \dots, r_{\mu-1}, r_\mu) $ for the random values $ r_1, r_2, \dots, r_\mu $ chosen by $\PIOPVerifier$.
+%     \item $\PIOPVerifier$ checks that this value is correct by querying $\Polynomial$ at $(r_1, r_2, \dots, r_{\mu-1}, r_\mu)$.
+%   \end{nosepenumerate}
+% \end{BharathPIOPNew}
+
+
+\parhead{Zerocheck}
+By the Schwartz--Zippel lemma, it suffices for the prover to convince the verifier that $p$ is zero on a random point. This check is executed via a sumcheck over the polynomial $p(x) \eqPoly{}(x, r)$. Throughout this paper we use this style of PIOP composition, enabling us to reason about more complex polynomial properties while growing our toolbox.
+% \begin{BharathPIOPNew}{Zerocheck}{zerocheck}{$\Oracle{\Polynomial}$}
+%   \begin{nosepenumerate}
+%     \item $\PIOPVerifier$ samples a vector $r \samples \F^\mu$ and sends it to $\PIOPProver$.
+%     \item $\PIOPProver$ and $\PIOPVerifier$ invoke the \hyperref[{piop:sumcheck}]{Sumcheck} PIOP for the claim that $\sum_{x \in \BoolHCube{\mu}} \Polynomial(x) \mult \eqPoly{}(x, r) = 0$.
+%   \end{nosepenumerate}
+% \end{BharathPIOPNew}
+
+
+
+\parhead{Rational Sumcheck}
+ The prover constructs a polynomial $h(x)$ that equals $p(x)/q(x)$ on the $\BoolHCube{\mu}$ and sends its oracle to the verifier, who can then be convinced that $h$ behaves like the intended rational function via a \hyperref[{piop:zerocheck}]{Zerocheck}. With a verified $h$ in hand, the parties reduce the problem to a standard \hyperref[{piop:sumcheck}]{Sumcheck} over $h$.
+% \begin{BharathPIOPNew}{RatSumcheck}{ratsumcheck}{$\Oracle{\Polynomial}, \Oracle{\Polynomialtwo}, s$}
+%   \begin{nosepenumerate}
+%     \item $\PIOPProver$ constructs the polynomial $h$ such that for all $x \in \BoolHCube{\mu}$, $h(x) = \frac{p(x)}{q(x)}$.
+%     \item $\PIOPProver$ sends $|\Polynomialtwo|$ to $\PIOPVerifier$.
+%     \item $\PIOPProver$ and $\PIOPVerifier$ invoke \hyperref[{piop:zerocheck}]{Zerocheck} for the claim that $\forall x \in \BoolHCube{\mu}$, $h(x)\Polynomialtwo(x) - \Polynomial(x) = 0$.
+%     \item $\PIOPProver$ and $\PIOPVerifier$ invoke \hyperref[{piop:sumcheck}]{Sumcheck} for the claim $\sum_{x\in\BoolHCube{\mu}}h(x) = s$.
+%   \end{nosepenumerate}
+% \end{BharathPIOPNew}

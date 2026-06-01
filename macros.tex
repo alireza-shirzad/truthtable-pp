@@ -14,31 +14,31 @@
 \newcommand{\DoQuote}[1]{``#1''}
 \newcommand{\defemph}[1]{\textbf{\emph{#1}}}
 \newcommand{\keywords}[1]{\bigskip\par\noindent{\footnotesize\textbf{Keywords\/}: #1}}
+\providecommand{\CryptoEprint}[1]{Cryptology ePrint Archive, Report}
 
 
 
 \newcounter{piopnum}
 \setcounter{piopnum}{0}
 \crefname{PIOP}{PIOP}{PIOPs}
+\crefformat{PIOP}{#2#1#3}
+\Crefformat{PIOP}{#2#1#3}
 
 \makeatletter
-\NewDocumentEnvironment{DefinePIOP}{mmm}{%
+\NewDocumentEnvironment{DefinePIOP}{mm}{%
   \begin{mdframed}[nobreak=true]
     \small
     \begin{center}
       \refstepcounter{piopnum}%
       \textbf{PIOP \thepiopnum: #1}%
       \protected@edef\@currentlabelname{#1}%
+      \def\@currentlabel{#1}%
+      \protected@edef\cref@currentlabel{%
+        [piopnum][\arabic{piopnum}][]\unexpanded{#1}}%
+      \let\@currentcounter\@empty
       \label[PIOP]{piop:#2}%
     \end{center}
     \vspace{0.5em}
-    \noindent
-    Inputs: #3
-    \vspace{-0.5em}
-
-    \noindent
-    \rule{\dimexpr\linewidth-\fboxsep-\fboxrule\relax}{0.4pt}
-
     \noindent
 }{%
   \end{mdframed}
@@ -46,14 +46,56 @@
 \makeatother
 
 
-
+%%%%%%%%
+\newcommand{\F}{\mathbb{F}}
+\newcommand{\eqPoly}{\mathsf{Eq}}
+\newcommand{\contig}{\mathcal{C}}
+\newcommand{\contigmus}{\contig_{\mu, s}}
 
 %%%%%%% 
 \newcommand{\Prover}{\mathbf{P}}
 \newcommand{\Verifier}{\mathbf{V}}
+\newcommand{\Vector}[1]{\mathbf{#1}}
 
 
 
 %%%%%%%
 \DeclarePairedDelimiter\DoubleBrackets{\llbracket}{\rrbracket}
 \newcommand{\Oracle}[1]{\DoubleBrackets{#1}}
+
+
+% NP relation = (index, instance, witness)
+\newcommand{\NPRelation}{\mathscr{R}}
+\newcommand{\NPLanguage}{\mathscr{L}}
+\newcommand{\NPParams}{\mathbbm{p}}
+\newcommand{\NPIndex}{\mathbbm{i}}
+\newcommand{\NPInstance}{\mathbbm{x}}
+\newcommand{\NPInstancey}{\mathbbm{y}}
+\newcommand{\NPInstances}{\bm{x}}
+\newcommand{\NPInstanceSizeBound}{\mathsf{N}}
+\newcommand{\NPRelationWithSizeBound}{\NPRelation_{\NPInstanceSizeBound}}
+\newcommand{\NPWitness}{\mathbbm{w}}
+\newcommand{\ValidNPInstance}{\NPLanguage(\NPRelation)}
+\newcommand{\ValidNPInstanceWithSizeBound}{\NPLanguage(\NPRelationWithSizeBound)}
+\newcommand{\Yes}[1]{#1^{{\scriptscriptstyle\mathrm{YES}}}}
+\newcommand{\No}[1]{#1^{{\scriptscriptstyle\mathrm{NO}}}}
+
+
+\newcommand{\col}{\mathsf{c}}
+\newcommand{\MLE}[1]{\tilde{#1}}
+
+
+
+
+\newcommand{\PIOPProver}{\bf{P}}
+\newcommand{\PIOPVerifier}{\bf{V}}
+\newcommand{\idx}{\mathcal{I}}
+\newcommand{\BoolHCube}[1]{\mathscr{H}_{#1}}
+
+
+
+
+
+
+% Polynomial Commitment Schemes
+\newcommand{\Commitment}{\mathsf{cm}}
