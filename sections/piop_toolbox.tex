@@ -1,5 +1,38 @@
 % !TEX root = paper.tex
 \section{PIOP Toolbox}
+\subsection{Zero Check}
+The \emph{Zero Check} takes a column $\col = (\mathsf{d},\mathsf{a})$ and proves that every active entry of $\col$ is zero. We package this as the relation
+
+\begin{displaymath}
+\NPRelation_{\mathsf{Zero}} = \left\{\,
+  \NPInstance = n,\;
+  \NPInstancey = (\Oracle{\MLE{\col}}),\;
+  \NPWitness = (\col)
+  \;\middle|\;
+    \forall i,\, \mathsf{a}[i] = 1 \implies \col[i] = 0
+\,\right\}.
+\end{displaymath}
+
+\begin{DefinePIOP}{Zero Check}{zero-check}
+    TODO
+\end{DefinePIOP}
+
+\subsection{NoZero Check}
+The \emph{NoZero Check} takes a column $\col = (\mathsf{d},\mathsf{a})$ and proves that every active entry of $\col$ is nonzero. We package this as the relation
+\begin{displaymath}
+\NPRelation_{\mathsf{NoZero}} = \left\{\,
+  \NPInstance = n,\;
+  \NPInstancey = (\Oracle{\MLE{\col}}),\;
+  \NPWitness = (\col)
+  \;\middle|\;
+    \forall i,\, \mathsf{a}[i] = 1 \implies \col[i] \neq 0
+\,\right\}.
+\end{displaymath}
+
+\begin{DefinePIOP}{NoZero Check}{nozero-check}
+    TODO
+\end{DefinePIOP}
+
 \subsection{Limb Reconstruction Check}
 The \emph{Limb Reconstruction Check} takes 1 $n$-bit column $\col$ and $k$ columns $\col_0,\dots,\col_{k-1}$ each with $n/k$ bits and proves that each entry of $\col$ is the concatenation of the corresponding entries in $\col_0,\dots,\col_{k-1}$. We package this as the relation
 \begin{displaymath}
@@ -103,6 +136,50 @@ To convince the verifier that each row of $\col_3$ is the bitwise AND of the cor
             \idx''_n(X_0,\ldots,X_{n-1}) &= \sum_{i=0}^{n-1} 2^{n-1-i} X_{n+i}, \\
             \MLE{\mathsf{and}}(X_0,\ldots,X_{2n-1}) &= \sum_{i=0}^{n-1} 2^{n-1-i} X_iX_{n+i}.
         \end{align*}
+    \end{enumerate}
+\end{DefinePIOP}
+
+\subsection{Keyed Sumcheck}
+The \emph{Keyed Sumcheck} takes two tables $\Left$ and $\Right$, each with a key column $\key$, a value column $\val$, and an activator column $\act$, and proves that for every possible key $\elem \in \F$, the sum of active values in $\Left$ with key $\elem$ equals the sum of active values in $\Right$ with key $\elem$. Define the keyed sums
+\begin{displaymath}
+    S_\Left(\elem) := \sum_{\substack{i \in [|\Left|] \\ \Left.\key[i] = \elem}} \Left.\act[i]\mult\Left.\val[i]
+    \qquad\text{and}\qquad
+    S_\Right(\elem) := \sum_{\substack{j \in [|\Right|] \\ \Right.\key[j] = \elem}} \Right.\act[j]\mult\Right.\val[j].
+\end{displaymath}
+We package this as the relation
+\begin{displaymath}
+\NPRelation_{\mathsf{ksum}} = \left\{\,
+  \NPInstance = \bot,\;
+  \NPInstancey = (\Oracle{\MLE{\Left}}, \Oracle{\MLE{\Right}}),\;
+  \NPWitness = (\Left, \Right)
+  \;\middle|\;
+    \forall\, \elem \in \F : S_\Left(\elem) = S_\Right(\elem)
+\,\right\}.
+\end{displaymath}
+
+\cref{piop:keyedsumcheck} reduces the per-key equality $\forall \elem : S_\Left(\elem) = S_\Right(\elem)$ to a single rational identity. The protocol is a generalization of the LogUp lookup protocol~\cite{Habock22}, and we derive its security from a core lemma about function equality that is implicit in LogUp.
+\begin{ilemma}[function equality~\cite{Habock22}]
+    \label{lemma:func-equality}
+    For any functions $S_1, S_2: \F \to \F$, $S_1(\elem) = S_2(\elem)$ for every $\elem \in \F$ if and only if
+    \begin{displaymath}
+        \sum_{\elem \in \F} \frac{S_1(\elem)}{X - \elem} = \sum_{\elem \in \F} \frac{S_2(\elem)}{X - \elem}
+    \end{displaymath}
+    as rational functions in the formal variable $X$.
+\end{ilemma}
+Applying Lemma~\ref{lemma:func-equality} to $S_\Left$ and $S_\Right$ and collapsing the per-key double sums into single sums over rows (the per-key index sets partition the rows), the property holds if and only if, with $\mu$ and $\nu$ the hypercube dimensions of $\MLE{\Left}$ and $\MLE{\Right}$,
+\begin{equation}
+    \label{eq:keyedsumcheck_rational}
+    \sum_{x \in \BoolHCube{\mu}} \frac{\MLE{\Left}.\act(x) \mult \MLE{\Left}.\val(x)}{X - \MLE{\Left}.\key(x)}
+    \;=\;
+    \sum_{x \in \BoolHCube{\nu}} \frac{\MLE{\Right}.\act(x) \mult \MLE{\Right}.\val(x)}{X - \MLE{\Right}.\key(x)}.
+\end{equation}
+We verify this rational identity by Schwartz--Zippel: the verifier samples a random $r \samples \F$, the prover sends the purported common value $s$ that both sides take at $X = r$, and the parties run \cref{piop:ratsumcheck} twice to confirm that both sides actually evaluate to $s$ at $X = r$.
+\begin{DefinePIOP}{KeyedSumcheck}{keyedsumcheck}
+  \emph{Inputs:} $\Oracle{\MLE{\Left}}, \Oracle{\MLE{\Right}}$.
+    \begin{enumerate}[nosep]
+        \item $\PIOPVerifier$ samples a random point $r \samples \F$ and sends it to $\PIOPProver$.
+        \item $\PIOPProver$ computes and sends $\PIOPVerifier$ the value $s$, the purported evaluation of both sides of \cref{eq:keyedsumcheck_rational} at $X = r$.
+        \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:ratsumcheck} twice to prove that both sides of \cref{eq:keyedsumcheck_rational} evaluate to $s$ at $X = r$.
     \end{enumerate}
 \end{DefinePIOP}
 

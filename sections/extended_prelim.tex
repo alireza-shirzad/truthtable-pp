@@ -30,44 +30,52 @@ The polynomial captures this logic by summing over all possible positions $i$ wh
 \parhead{Sumcheck}
 The idea of sumcheck is to reduce an exponential sum to a sequence of univariate sums, each involving one fewer variable. At each step, the prover sends a univariate polynomial that partially sums over the remaining variables. The verifier checks consistency between rounds by evaluating each polynomial at a random point and verifying that the sum matches the previous claim. After reducing to a single point, the verifier queries the original oracle to confirm the final value.
 
-% \begin{BharathPIOPNew}{Sumcheck}{sumcheck}{$\Oracle{\Polynomial}, s$}
-%   \begin{nosepenumerate}
-% 	    \item $\PIOPProver$ sends to $\PIOPVerifier$ a univariate polynomial oracle $p_1$ such that $
-% 	      p_1(\X_1) = \sum_{\{x_2, \dots, x_\mu\} \in \BoolHCube{\mu-1}} \Polynomial(\X_1, x_2, \dots, x_\mu)$.
-%     \item $\PIOPVerifier$ checks that the degree of $ p_1(x_1) $ is at most the degree of $ p $ in $ x_1 $. It computes $ s_1 = p_1(0) + p_1(1) $ and checks that $ s_1 = s $. If not, $\PIOPVerifier$ rejects. It then picks a random $ r_1 \in \F $ and sends it to the Prover ($\PIOPProver$).
-
-
-%     \item For each $ i $ from 2 to $ \mu $ (subsequent rounds).
-%     \begin{enumerate}[noitemsep, topsep=0pt]
-% 	      \item $\PIOPProver$ sends to   $\PIOPVerifier$ the univariate polynomial
-% 	            $p_i(x_i) = \sum_{\{x_{i+1}, \dots, x_\mu\} \in \BoolHCube{\mu-i}} \Polynomial(r_1, \dots, r_{i-1}, x_i, \dots, x_\mu)$.
-%       \item $\PIOPVerifier$ checks that the degree of $ p_i(x_i) $ is at most the degree of $ p $ in $ x_i $. It computes $ s_i = p_i(0) + p_i(1) $ and checks that $ s_i = p_{i-1}(r_{i-1}) $. If not, $\PIOPVerifier$ rejects. It picks a random $ r_i \in \F $ and sends it to $\PIOPProver$.
-%     \end{enumerate}
-
-%     \item $\PIOPProver$ sends the value $ \Polynomial(r_1, r_2, \dots, r_{\mu-1}, r_\mu) $ for the random values $ r_1, r_2, \dots, r_\mu $ chosen by $\PIOPVerifier$.
-%     \item $\PIOPVerifier$ checks that this value is correct by querying $\Polynomial$ at $(r_1, r_2, \dots, r_{\mu-1}, r_\mu)$.
-%   \end{nosepenumerate}
-% \end{BharathPIOPNew}
+\begin{DefinePIOP}{Sumcheck}{sumcheck}
+  \emph{Inputs:} $\Oracle{p}, s$.
+  \begin{enumerate}[nosep]
+	    \item $\PIOPProver$ sends to $\PIOPVerifier$ a univariate polynomial oracle $p_1$ such that $
+	      p_1(X_1) = \sum_{\{x_2, \dots, x_\mu\} \in \BoolHCube{\mu-1}} p(X_1, x_2, \dots, x_\mu)$.
+    \item $\PIOPVerifier$ checks that the degree of $ p_1(x_1) $ is at most the degree of $ p $ in $ x_1 $. It computes $ s_1 = p_1(0) + p_1(1) $ and checks that $ s_1 = s $. If not, $\PIOPVerifier$ rejects. It then picks a random $ r_1 \in \F $ and sends it to $\PIOPProver$.
+    \item For each $ i $ from 2 to $ \mu $ (subsequent rounds):
+    \begin{enumerate}[noitemsep, topsep=0pt]
+	      \item $\PIOPProver$ sends to $\PIOPVerifier$ the univariate polynomial
+	            $p_i(x_i) = \sum_{\{x_{i+1}, \dots, x_\mu\} \in \BoolHCube{\mu-i}} p(r_1, \dots, r_{i-1}, x_i, \dots, x_\mu)$.
+      \item $\PIOPVerifier$ checks that the degree of $ p_i(x_i) $ is at most the degree of $ p $ in $ x_i $. It computes $ s_i = p_i(0) + p_i(1) $ and checks that $ s_i = p_{i-1}(r_{i-1}) $. If not, $\PIOPVerifier$ rejects. It picks a random $ r_i \in \F $ and sends it to $\PIOPProver$.
+    \end{enumerate}
+    \item $\PIOPProver$ sends the value $ p(r_1, \dots, r_\mu) $ for the random values $ r_1, \dots, r_\mu $ chosen by $\PIOPVerifier$.
+    \item $\PIOPVerifier$ checks that this value is correct by querying $p$ at $(r_1, \dots, r_\mu)$.
+  \end{enumerate}
+\end{DefinePIOP}
 
 
 \parhead{Zerocheck}
 By the Schwartz--Zippel lemma, it suffices for the prover to convince the verifier that $p$ is zero on a random point. This check is executed via a sumcheck over the polynomial $p(x) \eqPoly{}(x, r)$. Throughout this paper we use this style of PIOP composition, enabling us to reason about more complex polynomial properties while growing our toolbox.
-% \begin{BharathPIOPNew}{Zerocheck}{zerocheck}{$\Oracle{\Polynomial}$}
-%   \begin{nosepenumerate}
-%     \item $\PIOPVerifier$ samples a vector $r \samples \F^\mu$ and sends it to $\PIOPProver$.
-%     \item $\PIOPProver$ and $\PIOPVerifier$ invoke the \hyperref[{piop:sumcheck}]{Sumcheck} PIOP for the claim that $\sum_{x \in \BoolHCube{\mu}} \Polynomial(x) \mult \eqPoly{}(x, r) = 0$.
-%   \end{nosepenumerate}
-% \end{BharathPIOPNew}
-
+\begin{DefinePIOP}{Zerocheck}{zerocheck}
+  \emph{Inputs:} $\Oracle{p}$.
+  \begin{enumerate}[nosep]
+    \item $\PIOPVerifier$ samples a vector $r \samples \F^\mu$ and sends it to $\PIOPProver$.
+    \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:sumcheck} for the claim that $\sum_{x \in \BoolHCube{\mu}} p(x) \mult \eqPoly{}(x, r) = 0$.
+  \end{enumerate}
+\end{DefinePIOP}
 
 
 \parhead{Rational Sumcheck}
- The prover constructs a polynomial $h(x)$ that equals $p(x)/q(x)$ on the $\BoolHCube{\mu}$ and sends its oracle to the verifier, who can then be convinced that $h$ behaves like the intended rational function via a \hyperref[{piop:zerocheck}]{Zerocheck}. With a verified $h$ in hand, the parties reduce the problem to a standard \hyperref[{piop:sumcheck}]{Sumcheck} over $h$.
-% \begin{BharathPIOPNew}{RatSumcheck}{ratsumcheck}{$\Oracle{\Polynomial}, \Oracle{\Polynomialtwo}, s$}
-%   \begin{nosepenumerate}
-%     \item $\PIOPProver$ constructs the polynomial $h$ such that for all $x \in \BoolHCube{\mu}$, $h(x) = \frac{p(x)}{q(x)}$.
-%     \item $\PIOPProver$ sends $|\Polynomialtwo|$ to $\PIOPVerifier$.
-%     \item $\PIOPProver$ and $\PIOPVerifier$ invoke \hyperref[{piop:zerocheck}]{Zerocheck} for the claim that $\forall x \in \BoolHCube{\mu}$, $h(x)\Polynomialtwo(x) - \Polynomial(x) = 0$.
-%     \item $\PIOPProver$ and $\PIOPVerifier$ invoke \hyperref[{piop:sumcheck}]{Sumcheck} for the claim $\sum_{x\in\BoolHCube{\mu}}h(x) = s$.
-%   \end{nosepenumerate}
-% \end{BharathPIOPNew}
+The \emph{rational sumcheck} takes two columns $p,q$ and a claimed sum $s$, and proves that $\sum_{x \in \BoolHCube{\mu}} p(x)/q(x) = s$ under the promise that $q(x) \neq 0$ for all $x \in \BoolHCube{\mu}$. We package this as the relation
+\begin{displaymath}
+\NPRelation_{\mathsf{RatSum}} = \left\{\,
+  \NPInstance = (\mu, s),\;
+  \NPInstancey = (\Oracle{\MLE{p}}, \Oracle{\MLE{q}}),\;
+  \NPWitness = (p, q)
+  \;\middle|\;
+    \sum_{x \in \BoolHCube{\mu}} \frac{p(x)}{q(x)} = s
+\,\right\}.
+\end{displaymath}
+The prover constructs a polynomial $h(x)$ that equals $p(x)/q(x)$ on $\BoolHCube{\mu}$ and sends its oracle to the verifier, who can then be convinced that $h$ behaves like the intended rational function via a \cref{piop:zerocheck}. With a verified $h$ in hand, the parties reduce the problem to a standard \cref{piop:sumcheck} over $h$.
+\begin{DefinePIOP}{RatSumcheck}{ratsumcheck}
+  \emph{Inputs:} $\Oracle{p}, \Oracle{q}, s$.
+  \begin{enumerate}[nosep]
+    \item $\PIOPProver$ constructs the polynomial $h$ such that for all $x \in \BoolHCube{\mu}$, $h(x) = \frac{p(x)}{q(x)}$, and sends its oracle $\Oracle{h}$ to $\PIOPVerifier$.
+    \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:zerocheck} for the claim that $\forall x \in \BoolHCube{\mu}$, $h(x)\,q(x) - p(x) = 0$.
+    \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:sumcheck} for the claim $\sum_{x\in\BoolHCube{\mu}}h(x) = s$.
+  \end{enumerate}
+\end{DefinePIOP}
