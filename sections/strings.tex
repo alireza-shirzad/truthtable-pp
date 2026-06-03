@@ -1,290 +1,68 @@
-\section{Strings}
-\begin{table}[h]
-\centering
-\small
-\begin{tabular}{p{3.8cm}p{4.5cm}p{5cm}}
-\toprule
-\textbf{SQL String Operator} & \textbf{Approx. Filtering Applicable?} & \textbf{Used in TPC-H?} \\
-\midrule
-\texttt{LIKE '\%pat\%'} (substring)
-  & Yes --- canonical case; character/$n$-gram features are monotone
-  & Yes: Q9, Q13 (negated), Q14, Q16 (negated) \\
-\addlinespace
-\texttt{LIKE 'pat\%'} (prefix)
-  & Yes --- with anchored/positional features (or sortedness)
-  & Yes: Q2, Q20 \\
-\addlinespace
-\texttt{LIKE '\%pat'} (suffix)
-  & Yes --- with end-anchored features
-  & No \\
-\addlinespace
-\texttt{LIKE 'pat'} (exact, no wildcards)
-  & Trivially yes, but equality is usually faster directly
-  & No (TPC-H uses \texttt{=} instead) \\
-\addlinespace
-\texttt{LIKE 'p\_t'} (single-char wildcard)
-  & Partial --- anchor what you can; treat \texttt{\_} as unknown
-  & No \\
-\addlinespace
-\texttt{LIKE '\%a\%b\%'} (multi-fragment)
-  & Yes --- filter on each required fragment, AND the results
-  & Yes: Q13 \\
-\addlinespace
-\texttt{NOT LIKE}
-  & No directly --- monotonicity runs the wrong way; filter the positive form and complement
-  & Yes: Q13, Q16 \\
-\addlinespace
-\texttt{=} (exact equality)
-  & Trivially yes, but direct comparison or hashing wins
-  & Pervasive \\
-\addlinespace
-\texttt{<}, \texttt{>}, \texttt{<=}, \texttt{>=} (lex.)
-  & Partial --- works with order-preserving features; not the technique's strength
-  & No (used on numeric/date columns only) \\
-\addlinespace
-\texttt{IN (lit1, lit2, ...)} (string set)
-  & Yes --- disjunction over members; equivalent to multiple equality filters
-  & Yes: Q19, Q22 \\
-\addlinespace
-\texttt{NOT IN} (string set)
-  & No directly --- same issue as \texttt{NOT LIKE}
-  & Yes: Q16 \\
-\addlinespace
-\texttt{BETWEEN} (lex.)
-  & Partial --- same caveats as \texttt{<}/\texttt{>} on strings
-  & No (numeric/date use in TPC-H) \\
-\addlinespace
-\texttt{SUBSTRING} / \texttt{SUBSTR} extract
-  & N/A as a predicate; filter the enclosing \texttt{=} or \texttt{LIKE}
-  & Yes: Q22 (\texttt{SUBSTRING(c\_phone FROM 1 FOR 2)}) \\
-\addlinespace
-\texttt{CONCAT} / \texttt{||}
-  & N/A --- not a predicate
-  & No (in \texttt{WHERE} clauses) \\
-\addlinespace
-Regex (\texttt{SIMILAR TO}, \texttt{\textasciitilde})
-  & Partial --- works when required literal fragments can be extracted
-  & No \\
-\bottomrule
-\end{tabular}
-\caption{Applicability of approximate filtering to SQL string operators, and their occurrence in TPC-H queries.}
-\label{tab:sql-ops-filter}
-\end{table}
-\subsection{Fingerprinting}
-
-A string fingerprint can be understood as the answer vector to a small
-collection of yes/no questions asked of a string. In the most precise
-form one could imagine, there would be one such question per
-\emph{atomic feature} of interest---for instance, ``does this string
-contain the letter \texttt{a}?'', ``does it contain the bigram
-\texttt{th}?'', ``does it start with a digit?'', or any other Boolean
-property one cares to evaluate. Evaluating every atomic feature gives a
-lossless, but potentially very large, summary of the string.
-
-The fingerprint trades this precision for size. Instead of storing one
-bit per atomic feature, we partition the features into $n$ groups and
-\emph{or}~them together: a single bit fires whenever \emph{any} of its
-constituent features fires. Each bit of the fingerprint is therefore
-not a single feature but the disjunction of many features. This
-compression is what makes fingerprints small and fast to evaluate---and
-also what makes them lossy. The design problem is then twofold: choose
-the family of atomic features to draw from, and choose how to group
-them into bits.
-
-Let $\mathcal{F} = \{f_1, f_2, \dots, f_m\}$ be a finite family of
-\emph{atomic features}, where each $f_i$ is a Boolean function on
-strings:
-\begin{equation*}
-  f_i : \Sigma^{*} \to \{0,1\}.
-\end{equation*}
-We make no assumption about what each $f_i$ computes; it may test for
-the presence of a character, the presence of an $n$-gram, a positional
-condition, the output of a hash function, or any other property.
-
-A fingerprint of bitwidth $n$ is induced by a partition
-$\{B_1, \dots, B_n\}$ of $\mathcal{F}$. The $j$-th bit of the
-fingerprint of a string $s$ is the disjunction of the features assigned
-to bin $B_j$:
-\begin{equation}
-  \Vector{f}_s[j] \;=\; \bigvee_{f \in B_j} f(s).
-  \label{eq:bit-as-or}
-\end{equation}
-The full fingerprint $\Vector{f}_s \in \{0,1\}^n$ is the vector of these
-disjunctions.
-
-\paragraph{Example.} Let $\Sigma = \{a, e, h, l, n, t, u\}$ and take
-the family $\mathcal{F} = \{f_a, f_e, f_h, f_l, f_n, f_t, f_u,
-g_{\text{th}}, g_{\text{ut}}\}$, where $f_c(s) = \mathbb{1}[c \in s]$
-and $g_{xy}(s) = \mathbb{1}[xy \text{ occurs in } s]$. With bitwidth
-$n = 3$ and partition $B_1 = \{f_a, f_l, f_u\}$, $B_2 = \{f_e, f_h,
-f_n, f_t\}$, $B_3 = \{g_{\text{th}}, g_{\text{ut}}\}$, the
-fingerprints of a few strings are:
-\begin{center}
-  \begin{tabular}{lccc}
-    \toprule
-    String & $\Vector{f}[1]$ & $\Vector{f}[2]$ & $\Vector{f}[3]$ \\
-    \midrule
-    \texttt{utn}   & 1 & 1 & 1 \\
-    \texttt{lute}  & 1 & 1 & 1 \\
-    \texttt{heat}  & 1 & 1 & 0 \\
-    \texttt{ten}   & 0 & 1 & 0 \\
-    \bottomrule
-  \end{tabular}
-\end{center}
-For instance, \texttt{lute} sets $\Vector{f}[3] = 1$ via the bigram \texttt{ut};
-the fingerprint records that \emph{some} feature in $B_3$ fired, but
-not which.
+\section{PIOPs for Strings}
 
 
-\subsection{Approximate Filtering}
 
-Fingerprints become useful when we want to quickly decide whether a
-candidate string $s$ could possibly contain a pattern $\zeta$, without
-performing the full containment test.
+    \subsubsection{Prefix and Suffix Check} A prefix/suffix check applies an anchored, fixed-string pattern filter --- either a prefix filter $\mathsf{str}\%$ or a suffix filter $\%\mathsf{str}$, with $\mathsf{str}$ of length $k$ --- to a string column. The verifier is given a tuple $( \mathsf{h},\mathsf{b},\mathsf{l},\mathsf{a_h^{old}}, \mathsf{d}, \mathsf{src}, \mathsf{a_d^{old}}, \mathsf{s_b})$ and new activators $\mathsf{a_h^{new}}$ and $\mathsf{a_d^{new}}$. The prover convinces the verifier that the tuple $( \mathsf{h},\mathsf{b},\mathsf{l},\mathsf{a_h^{new}}, \mathsf{d}, \mathsf{src}, \mathsf{a_d^{new}}, \mathsf{s_b})$ is the result of applying the filter to the original tuple.
 
-\paragraph{The pruning rule.} For a pattern $\zeta$ and a candidate string
-$s$, the fingerprint check accepts $s$ iff
-\begin{equation}
-  \Vector{f}_\zeta \subseteq \Vector{f}_s
-  \;\;\Longleftrightarrow\;\;
-  \forall j \in [n]:\; \Vector{f}_\zeta[j] = 1 \Rightarrow \Vector{f}_s[j] = 1.
-  \label{eq:subset-check}
-\end{equation}
-For this check to be a sound filter---never rejecting a true
-match---the feature family $\mathcal{F}$ must satisfy a
-\emph{monotonicity} condition: whenever $\zeta$ is contained in $s$ in the
-sense the query intends, every feature satisfied by $\zeta$ must also be
-satisfied by $s$,
-\begin{equation}
-  \zeta \sqsubseteq s \;\;\Longrightarrow\;\; \forall f \in \mathcal{F}:\;
-  f(\zeta) \le f(s).
-  \label{eq:monotonicity}
-\end{equation}
-Under~\eqref{eq:monotonicity}, the subset
-check~\eqref{eq:subset-check} cannot produce false negatives.
-
-\paragraph{Where false positives come from.} The converse of the
-subset check fails because of the \emph{or}-compression
-in~\eqref{eq:bit-as-or}. A string $s$ may light bit $j$ via a feature
-$f \in B_j$ unrelated to those the pattern requires; the fingerprint
-cannot tell which feature of $B_j$ caused the bit to fire. Two design
-choices govern how often this happens:
-\begin{enumerate}
-  \item The \textbf{feature family} $\mathcal{F}$. Richer families
-  (e.g., $n$-grams, positional features) carry more information per
-  atomic feature and therefore tolerate coarser bin assignments, at
-  the cost of a larger $|\mathcal{F}|$ and a more expensive
-  partition-selection problem.
-  \item The \textbf{partition} $\{B_1, \dots, B_n\}$. Grouping
-  features the workload needs to \emph{distinguish} into the same bin
-  destroys that information; grouping interchangeable features wastes
-  little.
-\end{enumerate}
-
-\paragraph{Example.} Reusing the setup from above, take pattern $\zeta =
-\texttt{utn}$ with $\Vector{f}_\zeta = (1, 1, 1)$. Then \texttt{lute} passes the
-filter as a false positive (its $\Vector{f}[3]$ bit is lit by \texttt{ut} rather
-than by \texttt{utn}), while \texttt{heat} is correctly rejected on
-$\Vector{f}[3]$ and \texttt{ten} on $\Vector{f}[1]$. Replacing $B_3$ with another
-character bin would weaken the filter on \texttt{heat}; merging
-\texttt{u} and \texttt{t} into one bin would weaken it on
-\texttt{ten}.
-
-
-Now building on this tool, we design a PIOP where 
-
-\begin{DefinePIOP}{Approximate Filtering Check}{approx-filer}
-    \begin{enumerate}[nosep]
-        \item $\PIOPProver$ and $\PIOPVerifier$ compute the fingerprint of the pattern $\zeta$ as $\Vector{f}_\zeta$ and the field element encoding of the fingerprint as $f_\zeta=\sum_{j=0}^{n-1} 2^j \Vector{f}_\zeta[j]$.
-        \item $\PIOPProver$ divides the fingerprint col
-    \end{enumerate}
-\end{DefinePIOP}
-
-\subsection{Exact Filtering}
-
-Let $\col$ be a string column in the database. We encode $\col$ in as a tuple of $8$ columns, $( \mathsf{h},\mathsf{b},\mathsf{l},\mathsf{a_{hb}}, \mathsf{d}, \mathsf{src}, \mathsf{a_d}, \mathsf{s_b})$, with the following semantics:
-\begin{itemize}[nosep]
-    \item Hash column $\mathsf{h}$ is of the same length as $\col$ containing the hash of each string in $\col$.
-    \item Length column $\mathsf{l}$ is of the same length as $\col$, with $\mathsf{l}[i]$ being the length $|\col[i]|$ of the $i$-th string in $\col$.
-    \item Data column $\mathsf{d}$ is of the size $\sum_{s \in \col} |s|$, containing the concatenation of all strings in $\col$.
-    \item Source column $\mathsf{src}$ is of the same length as $\mathsf{d}$, with $\mathsf{src}[j]$ being the index $i$ of the string in $\col$ that the $j$-th character of $\mathsf{d}$ belongs to.
-    \item Boundary column $\mathsf{b}$ is a column of the same length as $\col$ with $\mathsf{b}[i]$ being the index of the first character of the $i$-th string in $\col$ in the data column $\mathsf{d}$.
-    \item The data activator column $\mathsf{a_d}$ is of the same length as $\mathsf{d}$, with $\mathsf{a_d}[i]$ being $1$ if the $i$-th character in $\mathsf{d}$ is an active chatacter of the column $\col$.
-    \item The hash/boundry activator column $\mathsf{a_{hb}}$ is of the same length as $\col$, with $\mathsf{a_{hb}}[i]$ being $1$ if the $i$-th string in $\col$ is active.
-    \item The boundary selector column $\mathsf{s_b}$ is of the same length as $\mathsf{b}$, with $\mathsf{s_b}[i]$ being $1$ if the $i$-th boundary in $\mathsf{b}$ is active.
-    \end{itemize}
-
-\subsubsection{Activator Consistency Check}
-The \emph{Activator Consistency Check} takes the source column $\mathsf{src}$, the data activator $\mathsf{a_d}$, the length column $\mathsf{l}$, and the string activator $\mathsf{a_h}$, and proves that $\mathsf{a_d}$ and $\mathsf{a_h}$ are consistent: for every string, the number of its active characters equals its length when the string is active, and is $0$ otherwise. Equivalently, for every string index $i$,
+The prefix and suffix cases differ only in which end of each string the comparison is anchored to. Let $\rho_t(\cdot)$ denote rotation of a column by $t$ positions (a $1$ at index $p$ moves to index $p+t$), and let $\epsilon := +1$ for a prefix filter and $\epsilon := -1$ for a suffix filter. Define the \emph{anchor selector}
 \begin{displaymath}
-  \mathsf{a_h}[i]\cdot\mathsf{l}[i] \;=\; \sum_{j:\,\mathsf{src}[j]=i} \mathsf{a_d}[j].
+  \mathsf{s_a} := \begin{cases} \mathsf{s_b} & \text{prefix},\\[2pt] \rho_{-1}(\mathsf{s_b}) & \text{suffix,}\end{cases}
 \end{displaymath}
-We package this as the relation
+which marks the first (resp.\ last) character of every string; the suffix anchor is $\mathsf{s_b}$ rotated one step backwards, landing on the character just before each boundary. For $i=0,\ldots,k-1$, the $i$-th anchored selector and the pattern character the filter requires there are
 \begin{displaymath}
-\NPRelation_{\mathsf{ActCons}} = \left\{\,
-  \NPInstance = \bot,\;
-  \NPInstancey = (\Oracle{\MLE{\mathsf{src}}}, \Oracle{\MLE{\mathsf{a_d}}}, \Oracle{\MLE{\mathsf{l}}}, \Oracle{\MLE{\mathsf{a_h}}}),\;
-  \NPWitness = (\mathsf{src}, \mathsf{a_d}, \mathsf{l}, \mathsf{a_h})
-  \;\middle|\;
-  \forall i,\; \mathsf{a_h}[i]\cdot\mathsf{l}[i] = \!\!\!\sum_{j:\,\mathsf{src}[j]=i}\!\!\! \mathsf{a_d}[j]
-\,\right\}.
+  \mathsf{s_a^i} := \rho_{\epsilon i}(\mathsf{s_a}), \qquad \mathsf{str}[\pi(i)], \quad \pi(i) := \tfrac{(k-1)(1-\epsilon)}{2} + \epsilon\, i,
 \end{displaymath}
-The check is exactly a group-by-sum: grouping the rows $(\mathsf{src}, \mathsf{a_d})$ by $\mathsf{src}$ and summing $\mathsf{a_d}$ within each group must reproduce $\mathsf{l}$ on the active strings (those marked by $\mathsf{a_h}$). Treating $(\mathsf{src}, \mathsf{a_d})$ as an input table grouped by its key and $(\mathsf{ind}, \mathsf{l})$ with activator $\mathsf{a_h}$ as the grouped output, this is discharged by a single \cref{piop:keyedsumcheck}.
-\begin{DefinePIOP}{Activator Consistency Check}{act-cons}
-  \emph{Inputs:} $\Oracle{\MLE{\mathsf{src}}}, \Oracle{\MLE{\mathsf{a_d}}}, \Oracle{\MLE{\mathsf{l}}}, \Oracle{\MLE{\mathsf{a_h}}}$.
-  \begin{enumerate}[nosep]
-    \item $\PIOPProver$ and $\PIOPVerifier$ locally form the input table $\Left$ with key column $\Left.\key = \mathsf{src}$, value column $\Left.\val = \mathbf{1}$, and activator $\Left.\act = \mathsf{a_d}$ (so the keyed sum counts the active characters of each string).
-    \item $\PIOPProver$ and $\PIOPVerifier$ locally form the output table $\Right$ with key column $\Right.\key = \mathsf{ind}$ (the index column, $\mathsf{ind}[i] = i$), value column $\Right.\val = \mathsf{l}$, and activator $\Right.\act = \mathsf{a_h}$.
-    \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:keyedsumcheck} on $\Left$ and $\Right$, which forces $\sum_{j:\,\mathsf{src}[j]=i}\mathsf{a_d}[j] = \mathsf{a_h}[i]\cdot\mathsf{l}[i]$ for every key $i$.
-  \end{enumerate}
-\end{DefinePIOP}
+so $\pi(i)=i$ for a prefix and $\pi(i)=k-1-i$ for a suffix. The prefix case recovers $\mathsf{s_a}=\mathsf{s_b}$ and $\mathsf{s_a^i}=\mathsf{s_b^i}$.
 
-    \subsubsection{Prefix Check} In a prefix check protocol, the verifier is given a tuple of the form $( \mathsf{h},\mathsf{b},\mathsf{l},\mathsf{a_h^{old}}, \mathsf{d}, \mathsf{src}, \mathsf{a_d^{old}}, \mathsf{s_b})$  and new activators $\mathsf{a_h^{new}}$ and $\mathsf{a_d^{new}}$. The prover needs to convince the verfier that the tuple $( \mathsf{h},\mathsf{b},\mathsf{l},\mathsf{a_h^{new}}, \mathsf{d}, \mathsf{src}, \mathsf{a_d^{new}}, \mathsf{s_b})$ is the result of applying a prefix filter $\mathsf{str}\%$ on the original tuple where $\mathsf{str}$ is the prefix string of length $k$.
+At a high level the check has five parts, which we explain in turn before presenting the protocol.
 
-   \begin{DefinePIOP}{Prefix Check}{prefix-check}
+\parhead{Filtering by length} A string shorter than $k$ can never match a length-$k$ pattern, and if left in place its anchored selectors would, once rotated, spill into the character slots of neighboring strings and corrupt the comparison. The prover therefore flags every short string up front by sending two masks: $\mathsf{m_h}$, which is $1$ on each string of length less than $k$, and $\mathsf{m_d}$, which is $1$ on every character of such a string. Running activator consistency on the masks forces them to agree---a string is flagged by $\mathsf{m_h}$ exactly when all of its characters are flagged by $\mathsf{m_d}$---and a non-negativity check certifies that the flagged strings really do have length below $k$. The masked old activators $\mathsf{a_d^{msk}}$ and $\mathsf{a_h^{msk}}$ then switch these short strings off, so that every subsequent step ranges only over strings long enough to be candidate matches.
+
+\parhead{Activator consistency} The prover claims that $\mathsf{a_h^{new}}$ and $\mathsf{a_d^{new}}$ are the activators of the filtered column. Before trusting them, the verifier checks that they are internally consistent with one another and with the lengths: a string is marked active by $\mathsf{a_h^{new}}$ exactly when its characters are marked active by $\mathsf{a_d^{new}}$, and the active-character count of each string equals its length. This prevents the prover from later exploiting a malformed pair of activators.
+
+\parhead{False positives} A string that \emph{survives} the filter must genuinely match the pattern. A string survives when it is active under both the new activator $\mathsf{a_d^{new}}$ and the masked old activator $\mathsf{a_d^{msk}}$. For each pattern position $i$, the zero-check forces the data to equal the required pattern character $\mathsf{str}[\pi(i)]$ at every surviving, anchored character slot marked by $\mathsf{s_a^i}$. Passing all $k$ checks guarantees that every surviving string matches the pattern in full, so the filter keeps no string it should have rejected.
+
+\parhead{False negatives} Conversely, a string that the prover \emph{drops} must truly fail the pattern; otherwise a legitimate match would be silently discarded. The prover first commits, for each position $i$, an equality predicate $\mathsf{p}_i$ that marks the character slots where the data matches $\mathsf{str}[\pi(i)]$ at an active, anchored position. Two checks pin $\mathsf{p}_i$ to the truth: a zero-check forces $\mathsf{p}_i$ to vanish wherever the characters disagree, and a no-zero check forces it to be nonzero wherever an active anchored slot does agree, so $\mathsf{p}_i$ marks precisely the positional matches. To test whether a string matches at \emph{every} one of the $k$ positions, these predicates---which live at $k$ different anchored offsets---are rotated back onto the common anchor by $\mathsf{p}_i' := \rho_{-\epsilon i}(\mathsf{p}_i)$, with each rotation certified by a rotation check, so that their product $\prod_i \mathsf{p}_i'$ is $1$ exactly at the anchor of a string matching the entire pattern.
+
+\parhead{Dropped strings really fail} Finally, the dropped-anchor selector $\mathsf{s_a'} := (1-\mathsf{a_d^{new}})\cdot\mathsf{a_d^{msk}}\cdot\mathsf{s_a}$ marks the anchor of every string that was active before the filter but dropped after it. A single zero-check on $(\prod_i \mathsf{p}_i',\, \mathsf{s_a'})$ forces $\prod_i\mathsf{p}_i'$ to vanish at each dropped anchor, certifying that no dropped string matched the full pattern. Together with the false-positive check, this pins the new activators to keep exactly the strings that match the filter.
+
+   \begin{DefinePIOP}{Prefix/Suffix Check}{prefix-check}
     \begin{enumerate}[nosep]
-        \item $\PIOPProver$ sends two masks: a per-string mask $\mathsf{m_h}$ and a per-character mask $\mathsf{m_d}$, where $\mathsf{m_h}[i]=1$ iff $\mathsf{l}[i] < k$, and $\mathsf{m_d}[j]=1$ iff the string $\mathsf{src}[j]$ containing the $j$-th character has length less than $k$. These mark exactly the strings too short to admit a prefix of length $k$.
-        \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:act-cons} on $(\mathsf{src}, \mathsf{m_d}, \mathsf{l}, \mathsf{m_h})$, which forces $\mathsf{m_d}$ to be the per-character broadcast of $\mathsf{m_h}$ (so the two masks are consistent).
-        \item $\PIOPProver$ and $\PIOPVerifier$ check that every active entry of $\mathsf{m_h}$ marks a short string, i.e.\ $\mathsf{l}[i] < k$ for every $i$ with $\mathsf{m_h}[i]=1$, by a \cref{piop:lookup-check} of the $\mathsf{m_h}$-active entries of $\mathsf{l}$ against the table $\{0,1,\dots,k-1\}$.
-        \item $\PIOPProver$ and $\PIOPVerifier$ define the masked old activators
+        \item  (\textit{Filtering by length}) $\PIOPProver$ sends $\mathsf{m_h}$ and $\mathsf{m_d}$
+        \begin{enumerate}[nosep]
+          \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:act-cons} on $(\mathsf{src}, \mathsf{m_d}, \mathsf{l}, \mathsf{m_h})$.
+        \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:nonneg-check} on the column $(\mathsf{m_h}, \mathsf{l}-k)$.
+                \item $\PIOPProver$ and $\PIOPVerifier$ define the masked old activators
         \begin{align*}
-          \mathsf{a_d^{mid}} := \mathsf{a_d^{old}}\cdot(1-\mathsf{m_d}), \qquad
-          \mathsf{a_h^{mid}} := \mathsf{a_h^{old}}\cdot(1-\mathsf{m_h}),
+          \mathsf{a_d^{msk}} := \mathsf{a_d^{old}}\cdot(1-\mathsf{m_d}), \qquad
+          \mathsf{a_h^{msk}} := \mathsf{a_h^{old}}\cdot(1-\mathsf{m_h}),
         \end{align*}
-        which deactivate every string of length less than $k$. \emph{In all subsequent steps, $\mathsf{a_d^{mid}}$ and $\mathsf{a_h^{mid}}$ are used in place of $\mathsf{a_d^{old}}$ and $\mathsf{a_h^{old}}$.}
-        \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:act-cons} on $(\mathsf{src}, \mathsf{a_d^{new}}, \mathsf{l}, \mathsf{a_h^{new}})$ to check that the new activators are consistent.
-        \item $\PIOPProver$ and $\PIOPVerifier$ compute perform $k$ instances of  \cref{piop:zero-check} on the following columns:
-        \begin{align*}
-          \left[(\mathsf{d}-\mathsf{str}[i],\mathsf{s_b^i}\cdot \mathsf{a_d^{new}}\mathsf{a_d^{old}})\right]_{i=0}^{k-1}
-        \end{align*}
-        \item $\PIOPProver$ computes the all active predicate columns $[\mathsf{p}_i]_{i=0}^{k-1}$ such that 
+        \end{enumerate}
+        \item (\textit{Activator Consistency}) $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:act-cons} on $(\mathsf{src}, \mathsf{a_d^{new}}, \mathsf{l}, \mathsf{a_h^{new}})$.
+        \item (\textit{False Positive Check}) For $i=0,\ldots,k-1$, $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:zerocheck} on the column $(\mathsf{d}-\mathsf{str}[\pi(i)],\;\mathsf{s_a^i}\cdot \mathsf{a_d^{new}}\mathsf{a_d^{msk}})$.
+        \item (\textit{False Negative Check}) $\PIOPProver$ and $\PIOPVerifier$ proceed as follows:
+        \begin{enumerate}
+          \item (\textit{k independent equality expressions}) For $i=0,\ldots,k-1$, $\PIOPProver$ computes the equality predicate vector $\mathsf{p}_i$ such that
        \begin{align*}
         \mathsf{p}_i[j]= \begin{cases}
-        1 & \text{if } \mathsf{d}[j]=\mathsf{str}[i] \text{ and } \mathsf{s_b^i}[j]=1 \text{ and } \mathsf{a_d^{new}}[j]=1 \text{ and } \mathsf{a_d^{old}}[j]=1\\
-        0 & \text{otherwise} 
+        1 & \text{if } \mathsf{d}[j]=\mathsf{str}[\pi(i)] \text{ and } \mathsf{s_a^i}[j]=1 \text{ and } \mathsf{a_d^{new}}[j]=1 \text{ and } \mathsf{a_d^{msk}}[j]=1\\
+        0 & \text{otherwise}
         \end{cases}
-       \end{align*} 
-       \item $\PIOPProver$ and $\PIOPVerifier$ perform $k$ instances of \cref{piop:zero-check} on the following columns:
-       \begin{align*}
-          \left[(\mathsf{d}-\mathsf{str[i]},\mathsf{p}_i)\right]_{i=0}^{k-1}
-        \end{align*}
-        \item $\PIOPProver$ and $\PIOPVerifier$ perform $k$ instances of \cref{piop:nozero-check} on the following columns:
-       \begin{align*}
-          \left[(\mathsf{d}-\mathsf{str[i]},(1-\mathsf{p}_i)\cdot \mathsf{s_b^i} \cdot \mathsf{a_d^{new}}\mathsf{a_d^{old}})\right]_{i=0}^{k-1}
-        \end{align*}
-        \item For $i=1,\ldots,k-1$, $\PIOPProver$ rotates $\mathsf{p}_i$ by $i$, denotes the rotated column as $\mathsf{p}_i'$, and sends $\mathsf{p}_i'$ to $\PIOPVerifier$. Index $0$ needs no rotation, so $\mathsf{p}_0'=\mathsf{p}_0$.
-        \item $\PIOPProver$ and $\PIOPVerifier$ define the dropped-boundary selector
-        \begin{align*}
-          \mathsf{s_b'} \;:=\; (1-\mathsf{a_d^{new}})\cdot \mathsf{a_d^{old}}\cdot \mathsf{s_b}
-        \end{align*}
-        and perform a zerocheck on the following column:
-        \begin{align*}
-          \left(\prod_{i=0}^{k-1}\mathsf{p}_i',\;\mathsf{s_b'}\right)
-        \end{align*}
+       \end{align*}
+       \begin{enumerate}[nosep]
+       \item For $i=0,\ldots,k-1$, $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:zerocheck} on the column $(\mathsf{d}-\mathsf{str}[\pi(i)],\;\mathsf{p}_i)$.
+        \item For $i=0,\ldots,k-1$, $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:nozero-check} on the column $(\mathsf{d}-\mathsf{str}[\pi(i)],\;(1-\mathsf{p}_i)\cdot \mathsf{s_a^i} \cdot \mathsf{a_d^{new}}\mathsf{a_d^{msk}})$.
+        \item For $i=1,\ldots,k-1$, $\PIOPProver$ aligns each predicate back onto the anchor by setting $\mathsf{p}_i' := \rho_{-\epsilon i}(\mathsf{p}_i)$ and sends it to $\PIOPVerifier$; the parties then invoke \cref{piop:rotcheck} on $(\mathsf{p}_i, \mathsf{p}_i', -\epsilon i)$ to certify the rotation was performed correctly. Index $0$ needs no rotation, so $\mathsf{p}_0'=\mathsf{p}_0$.
+        \end{enumerate}
+        \item $\PIOPProver$ and $\PIOPVerifier$ define the dropped-anchor selector
+          $\mathsf{s_a'} \;:=\; (1-\mathsf{a_d^{new}})\cdot \mathsf{a_d^{msk}}\cdot \mathsf{s_a}$
+        and perform a \cref{piop:zerocheck} on the following column:
+          $\prod_{i=0}^{k-1}\mathsf{p}_i',\;\mathsf{s_a'}$
+        \end{enumerate}
     \end{enumerate}
 \end{DefinePIOP}
 
-\begin{figure}[h]
+\begin{figure}[h!]
 \centering
 \resizebox{\textwidth}{!}{%
 \begin{tikzpicture}[
@@ -300,12 +78,12 @@ The check is exactly a group-by-sum: grouping the rows $(\mathsf{src}, \mathsf{a
   \node[hd] at (4.0,7.6) {$\mathsf{l}$};
   \node[hd] at (5.0,7.6) {$\mathsf{m_h}$};
   \node[hd] at (6.3,7.6) {$\mathsf{a_h^{old}}$};
-  \node[hd] at (7.6,7.6) {$\mathsf{a_h^{mid}}$};
+  \node[hd] at (7.6,7.6) {$\mathsf{a_h^{msk}}$};
   \node[hd] at (8.9,7.6) {$\mathsf{a_h^{new}}$};
 
   % rows 0..6 are real strings (row 3 = the length-2 string "to" that gets masked);
   % row 7 pads the column up to size 8.
-  % i / string / boundary / length / m_h / a_h_old / a_h_mid / a_h_new
+  % i / string / boundary / length / m_h / a_h_old / a_h_msk / a_h_new
   \foreach \i/\s/\bb/\ll/\mh/\ao/\amid/\an in
     {0/age/0/3/0/1/1/0, 1/truth/3/5/0/0/0/0, 2/trip/8/4/0/1/1/0,
      3/to/12/2/1/1/0/0, 4/run/14/3/0/1/1/0, 5/arch/17/4/0/1/1/0,
@@ -339,7 +117,7 @@ The check is exactly a group-by-sum: grouping the rows $(\mathsf{src}, \mathsf{a
   \node[rowlab] at (-0.5,-1.24){$\mathsf{s_b}$};
   \node[rowlab] at (-0.5,-1.86){$\mathsf{m_d}$};
   \node[rowlab] at (-0.5,-2.48){$\mathsf{a_d^{old}}$};
-  \node[rowlab] at (-0.5,-3.10){$\mathsf{a_d^{mid}}$};
+  \node[rowlab] at (-0.5,-3.10){$\mathsf{a_d^{msk}}$};
   \node[rowlab] at (-0.5,-3.72){$\mathsf{a_d^{new}}$};
   \node[rowlab] at (-0.5,-4.34){$\mathsf{p}_0$};
   \node[rowlab] at (-0.5,-4.96){$\mathsf{p}_1$};
@@ -349,12 +127,12 @@ The check is exactly a group-by-sum: grouping the rows $(\mathsf{src}, \mathsf{a
   \node[rowlab, font=\scriptsize] at (-0.5,-7.60){$\prod_i \mathsf{p}_i'$};
   \node[rowlab] at (-0.5,-8.30){$\mathsf{s_b'}$};
 
-  % pos / char / src / s_b / m_d / a_d_old / a_d_mid / a_d_new / p0 / p1 / p2 / p1' / p2' / pr / sp
+  % pos / char / src / s_b / m_d / a_d_old / a_d_msk / a_d_new / p0 / p1 / p2 / p1' / p2' / pr / sp
   % src[j] = index of the source string. The length-2 string "to" (src 3, pos 12-13)
-  % is flagged by m_d and masked out of a_d_mid, so it never enters s_b'.
+  % is flagged by m_d and masked out of a_d_msk, so it never enters s_b'.
   % str = tru: p0 tests t, p1 tests r, p2 tests u. They fire only in survivor "trust":
   % p0@21, p1@22, p2@23; rotated p1'@21, p2'@21 align onto the boundary.
-  % sp = s_b' = (1-a_d_new) a_d_mid s_b : boundaries of strings dropped by the filter.
+  % sp = s_b' = (1-a_d_new) a_d_msk s_b : boundaries of strings dropped by the filter.
   \foreach \x/\c/\sr/\sb/\md/\ao/\am/\an/\pa/\pb/\pc/\pd/\pe/\pr/\sp in {
      0/a/0/1/0/1/1/0/0/0/0/0/0/0/1,  1/g/0/0/0/1/1/0/0/0/0/0/0/0/0,  2/e/0/0/0/1/1/0/0/0/0/0/0/0/0,
      3/t/1/1/0/0/0/0/0/0/0/0/0/0/0,  4/r/1/0/0/0/0/0/0/0/0/0/0/0/0,  5/u/1/0/0/0/0/0/0/0/0/0/0/0/0,  6/t/1/0/0/0/0/0/0/0/0/0/0/0/0,  7/h/1/0/0/0/0/0/0/0/0/0/0/0/0,
@@ -432,15 +210,171 @@ The check is exactly a group-by-sum: grouping the rows $(\mathsf{src}, \mathsf{a
 
 \end{tikzpicture}%
 }
-\caption{Prefix check for \texttt{tru\%} ($\mathsf{str}=\texttt{tru}$, $k=3$).
+\caption{Prefix instance ($\epsilon=+1$, $\mathsf{s_a}=\mathsf{s_b}$) of the
+check for \texttt{tru\%} ($\mathsf{str}=\texttt{tru}$, $k=3$).
 The length-$2$ string \texttt{to} (dotted) is too short for a $3$-character prefix:
 the masks $\mathsf{m_h},\mathsf{m_d}$ flag it, and the masked activators
-$\mathsf{a_h^{mid}}=\mathsf{a_h^{old}}(1-\mathsf{m_h})$,
-$\mathsf{a_d^{mid}}=\mathsf{a_d^{old}}(1-\mathsf{m_d})$ deactivate it, so it never
+$\mathsf{a_h^{msk}}=\mathsf{a_h^{old}}(1-\mathsf{m_h})$,
+$\mathsf{a_d^{msk}}=\mathsf{a_d^{old}}(1-\mathsf{m_d})$ deactivate it, so it never
 enters $\mathsf{s_b'}$. \texttt{truth} matches the prefix but is inactive (dashed),
 so only \texttt{trust} (solid) survives: $\prod_i\mathsf{p}_i'=1$ at its boundary,
-checked against $\mathsf{s_b'}=(1-\mathsf{a_d^{new}})\,\mathsf{a_d^{mid}}\,\mathsf{s_b}$.}
+checked against $\mathsf{s_b'}=(1-\mathsf{a_d^{new}})\,\mathsf{a_d^{msk}}\,\mathsf{s_b}$.}
 \label{fig:prefix-check}
+\end{figure}
+
+\begin{figure}[h!]
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[
+    cell/.style={draw, minimum size=6mm, inner sep=0pt, font=\small},
+    rowlab/.style={font=\small\itshape, anchor=east},
+    hd/.style={font=\small\bfseries}
+  ]
+
+  %==================== Panel 1: string-level columns ====================
+  \node[hd] at (0,7.6)   {$\col$};
+  \node[hd] at (2.0,7.6) {$\mathsf{h}$};
+  \node[hd] at (3.0,7.6) {$\mathsf{b}$};
+  \node[hd] at (4.0,7.6) {$\mathsf{l}$};
+  \node[hd] at (5.0,7.6) {$\mathsf{m_h}$};
+  \node[hd] at (6.3,7.6) {$\mathsf{a_h^{old}}$};
+  \node[hd] at (7.6,7.6) {$\mathsf{a_h^{msk}}$};
+  \node[hd] at (8.9,7.6) {$\mathsf{a_h^{new}}$};
+
+  % row 1 = dust (matched but inactive); row 3 = the length-2 string "to" (masked);
+  % row 7 pads the column up to size 8.
+  % i / string / boundary / length / m_h / a_h_old / a_h_msk / a_h_new
+  \foreach \i/\s/\bb/\ll/\mh/\ao/\amid/\an in
+    {0/age/0/3/0/1/1/0, 1/dust/3/4/0/0/0/0, 2/trip/7/4/0/1/1/0,
+     3/to/11/2/1/1/0/0, 4/run/13/3/0/1/1/0, 5/arch/16/4/0/1/1/0,
+     6/trust/20/5/0/1/1/1, 7/{$\perp$}/25/0/0/0/0/0}{
+    \pgfmathsetmacro{\yy}{7.0 - \i*0.6}
+    \edef\pf{\ifnum\i>6 gray!12\else white\fi}
+    \edef\mhf{\ifnum\mh=1 red!40\else gray!12\fi}
+    \edef\fa{\ifnum\ao=1 green!30\else gray!12\fi}
+    \edef\fc{\ifnum\amid=1 green!30\else gray!12\fi}
+    \edef\fb{\ifnum\an=1 green!30\else gray!12\fi}
+    \node[font=\small\ttfamily, anchor=west] at (-0.4,\yy) {\s};
+    \node[cell, fill=\pf]  at (2.0,\yy) {\ifnum\i>6 0\else$h_{\i}$\fi};
+    \node[cell, fill=\pf]  at (3.0,\yy) {\bb};
+    \node[cell, fill=\pf]  at (4.0,\yy) {\ll};
+    \node[cell, fill=\mhf] at (5.0,\yy) {\mh};
+    \node[cell, fill=\fa]  at (6.3,\yy) {\ao};
+    \node[cell, fill=\fc]  at (7.6,\yy) {\amid};
+    \node[cell, fill=\fb]  at (8.9,\yy) {\an};
+  }
+
+  %==================== Panel 2: data-level columns ====================
+  % group (string) labels above the data row
+  \foreach \cx/\nm in {1/age, 4.5/dust, 8.5/trip, 11.5/to, 14/run, 17.5/arch, 22/trust}{
+    \node[font=\small\ttfamily] at (\cx*0.6, 1.35) {\nm};
+  }
+
+  % row labels
+  \node[rowlab] at (-0.5, 0.62){pos};
+  \node[rowlab] at (-0.5, 0.00){$\mathsf{d}$};
+  \node[rowlab] at (-0.5,-0.62){$\mathsf{src}$};
+  \node[rowlab] at (-0.5,-1.24){$\mathsf{s_b}$};
+  \node[rowlab] at (-0.5,-1.86){$\mathsf{s_a}$};
+  \node[rowlab] at (-0.5,-2.48){$\mathsf{m_d}$};
+  \node[rowlab] at (-0.5,-3.10){$\mathsf{a_d^{old}}$};
+  \node[rowlab] at (-0.5,-3.72){$\mathsf{a_d^{msk}}$};
+  \node[rowlab] at (-0.5,-4.34){$\mathsf{a_d^{new}}$};
+  \node[rowlab] at (-0.5,-4.96){$\mathsf{p}_0$};
+  \node[rowlab] at (-0.5,-5.58){$\mathsf{p}_1$};
+  \node[rowlab] at (-0.5,-6.20){$\mathsf{p}_2$};
+  \node[rowlab] at (-0.5,-6.90){$\mathsf{p}_1'$};
+  \node[rowlab] at (-0.5,-7.52){$\mathsf{p}_2'$};
+  \node[rowlab, font=\scriptsize] at (-0.5,-8.22){$\prod_i \mathsf{p}_i'$};
+  \node[rowlab] at (-0.5,-8.92){$\mathsf{s_a'}$};
+
+  % suffix filter %ust, str = ust, k=3, epsilon = -1.
+  % s_a = rho_{-1}(s_b) marks each string's LAST character {2,6,10,12,15,19,24}.
+  % p0 tests str[2]=t, p1 tests str[1]=s, p2 tests str[0]=u; they fire in survivor
+  % "trust": p0@24, p1@23, p2@22. Rotated forward: p1'@24, p2'@24 land on the anchor.
+  % sp = s_a' = (1-a_d_new) a_d_msk s_a : last chars of strings dropped by the filter.
+  % pos / char / src / s_b / s_a / m_d / a_d_old / a_d_msk / a_d_new / p0 / p1 / p2 / p1' / p2' / pr / sp
+  \foreach \x/\c/\sr/\sb/\sa/\md/\ao/\am/\an/\pa/\pb/\pc/\pd/\pe/\pr/\sp in {
+     0/a/0/1/0/0/1/1/0/0/0/0/0/0/0/0,  1/g/0/0/0/0/1/1/0/0/0/0/0/0/0/0,  2/e/0/0/1/0/1/1/0/0/0/0/0/0/0/1,
+     3/d/1/1/0/0/0/0/0/0/0/0/0/0/0/0,  4/u/1/0/0/0/0/0/0/0/0/0/0/0/0/0,  5/s/1/0/0/0/0/0/0/0/0/0/0/0/0/0,  6/t/1/0/1/0/0/0/0/0/0/0/0/0/0/0,
+     7/t/2/1/0/0/1/1/0/0/0/0/0/0/0/0,  8/r/2/0/0/0/1/1/0/0/0/0/0/0/0/0,  9/i/2/0/0/0/1/1/0/0/0/0/0/0/0/0, 10/p/2/0/1/0/1/1/0/0/0/0/0/0/0/1,
+    11/t/3/1/0/1/1/0/0/0/0/0/0/0/0/0, 12/o/3/0/1/1/1/0/0/0/0/0/0/0/0/0,
+    13/r/4/1/0/0/1/1/0/0/0/0/0/0/0/0, 14/u/4/0/0/0/1/1/0/0/0/0/0/0/0/0, 15/n/4/0/1/0/1/1/0/0/0/0/0/0/0/1,
+    16/a/5/1/0/0/1/1/0/0/0/0/0/0/0/0, 17/r/5/0/0/0/1/1/0/0/0/0/0/0/0/0, 18/c/5/0/0/0/1/1/0/0/0/0/0/0/0/0, 19/h/5/0/1/0/1/1/0/0/0/0/0/0/0/1,
+    20/t/6/1/0/0/1/1/1/0/0/0/0/0/0/0, 21/r/6/0/0/0/1/1/1/0/0/0/0/0/0/0, 22/u/6/0/0/0/1/1/1/0/0/1/0/0/0/0, 23/s/6/0/0/0/1/1/1/0/1/0/0/0/0/0, 24/t/6/0/1/0/1/1/1/1/0/0/1/1/1/0}{
+    \pgfmathsetmacro{\px}{\x*0.6}
+    \edef\gc{\ifcase\sr blue!15\or purple!18\or green!22\or red!30\or
+                       orange!25\or cyan!22\or teal!28\or gray!18\fi}
+    \edef\sbf{\ifnum\sb=1 yellow!55\else white\fi}
+    \edef\saf{\ifnum\sa=1 cyan!35\else white\fi}
+    \edef\mdf{\ifnum\md=1 red!40\else gray!12\fi}
+    \edef\aof{\ifnum\ao=1 green!30\else gray!12\fi}
+    \edef\amf{\ifnum\am=1 green!30\else gray!12\fi}
+    \edef\anf{\ifnum\an=1 green!30\else gray!12\fi}
+    \edef\paf{\ifnum\pa=1 red!35\else gray!12\fi}
+    \edef\pbf{\ifnum\pb=1 red!35\else gray!12\fi}
+    \edef\pcf{\ifnum\pc=1 red!35\else gray!12\fi}
+    \edef\pdf{\ifnum\pd=1 red!35\else gray!12\fi}
+    \edef\pef{\ifnum\pe=1 red!35\else gray!12\fi}
+    \edef\prf{\ifnum\pr=1 orange!50\else gray!12\fi}
+    \edef\spf{\ifnum\sp=1 orange!50\else gray!12\fi}
+    \node[font=\scriptsize, gray] at (\px,0.62) {\x};
+    \node[cell, fill=\gc]  at (\px, 0.00) {\texttt{\c}};
+    \node[cell, fill=\gc]  at (\px,-0.62) {\sr};
+    \node[cell, fill=\sbf] at (\px,-1.24) {\sb};
+    \node[cell, fill=\saf] at (\px,-1.86) {\sa};
+    \node[cell, fill=\mdf] at (\px,-2.48) {\md};
+    \node[cell, fill=\aof] at (\px,-3.10) {\ao};
+    \node[cell, fill=\amf] at (\px,-3.72) {\am};
+    \node[cell, fill=\anf] at (\px,-4.34) {\an};
+    \node[cell, fill=\paf] at (\px,-4.96) {\pa};
+    \node[cell, fill=\pbf] at (\px,-5.58) {\pb};
+    \node[cell, fill=\pcf] at (\px,-6.20) {\pc};
+    \node[cell, fill=\pdf] at (\px,-6.90) {\pd};
+    \node[cell, fill=\pef] at (\px,-7.52) {\pe};
+    \node[cell, fill=\prf] at (\px,-8.22) {\pr};
+    \node[cell, fill=\spf] at (\px,-8.92) {\sp};
+  }
+  % rotation arrows: p1 hit at pos 23 moves to anchor 24; p2 hit at pos 22 to 24.
+  \draw[->, red, thick, shorten <=2pt, shorten >=2pt]
+    (23*0.6,-5.58) to[out=-60,in=100] (24*0.6,-6.90);
+  \draw[->, red, thick, shorten <=2pt, shorten >=2pt]
+    (22*0.6,-6.20) to[out=-60,in=100] (24*0.6,-7.52);
+
+  % padding tail: render pos 25 and a far pos 35, with an ellipsis between.
+  \foreach \x/\slot in {25/0, 35/2}{
+    \pgfmathsetmacro{\px}{(25 + \slot)*0.6}
+    \node[font=\scriptsize, gray] at (\px,0.62) {\x};
+    \node[cell, fill=gray!18]  at (\px, 0.00) {0};
+    \node[cell, fill=gray!18]  at (\px,-0.62) {7};
+    \foreach \yy in {-1.24,-1.86,-2.48,-3.10,-3.72,-4.34,-4.96,-5.58,-6.20,-6.90,-7.52,-8.22,-8.92}{
+      \node[cell, fill=gray!12] at (\px,\yy) {0};
+    }
+  }
+  \pgfmathsetmacro{\dx}{26*0.6}
+  \foreach \y in {0.00,-0.62,-1.24,-1.86,-2.48,-3.10,-3.72,-4.34,-4.96,-5.58,-6.20,-6.90,-7.52,-8.22,-8.92}{
+    \node at (\dx,\y) {$\cdots$};
+  }
+
+  % highlights: survivor "trust" solid (u,s,t); "dust" dashed (matched but inactive);
+  % short string "to" dotted (length 2 < k=3, masked out).
+  \draw[red, thick]         (22*0.6-0.32,0.32) rectangle (24*0.6+0.32,-0.32);
+  \draw[red, thick, dashed] ( 4*0.6-0.32,0.32) rectangle ( 6*0.6+0.32,-0.32);
+  \draw[red, thick, dotted] (11*0.6-0.32,0.32) rectangle (12*0.6+0.32,-0.32);
+
+\end{tikzpicture}%
+}
+\caption{Suffix instance ($\epsilon=-1$) of the check for \texttt{\%ust}
+($\mathsf{str}=\texttt{ust}$, $k=3$). The anchor selector
+$\mathsf{s_a}=\rho_{-1}(\mathsf{s_b})$ marks each string's \emph{last} character.
+The length-$2$ string \texttt{to} (dotted) is masked out by $\mathsf{m_h},\mathsf{m_d}$
+and never enters $\mathsf{s_a'}$. \texttt{dust} ends in \texttt{ust} but is inactive
+(dashed), so only \texttt{trust} (solid) survives: the predicates
+$\mathsf{p}_0,\mathsf{p}_1,\mathsf{p}_2$ test \texttt{t},\texttt{s},\texttt{u} from the
+end, and the forward-rotated $\mathsf{p}_1',\mathsf{p}_2'$ give $\prod_i\mathsf{p}_i'=1$
+at \texttt{trust}'s last character, checked against
+$\mathsf{s_a'}=(1-\mathsf{a_d^{new}})\,\mathsf{a_d^{msk}}\,\mathsf{s_a}$.}
+\label{fig:suffix-check}
 \end{figure}
 
 

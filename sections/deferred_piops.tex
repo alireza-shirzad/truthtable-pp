@@ -1,0 +1,208 @@
+% !TEX root = paper.tex
+\section{Deferred PIOPs}
+\label{sec:deferred-piops}
+This appendix collects the low-level PIOPs and relations used throughout \papername{}. These are standard or lightly adapted from prior work, and are deferred here so that the main text can focus on the string-filtering protocols.
+
+\subsection{NoZero Check}
+The \emph{NoZero Check} takes a column $\col = (\mathsf{d},\mathsf{a})$ and proves that every active entry of $\col$ is nonzero. We package this as the relation
+\begin{displaymath}
+\NPRelation_{\mathsf{NoZero}} = \left\{\,
+  \NPInstance = n,\;
+  \NPInstancey = (\Oracle{\MLE{\col}}),\;
+  \NPWitness = (\col)
+  \;\middle|\;
+    \forall i,\, \mathsf{a}[i] = 1 \implies \col[i] \neq 0
+\,\right\}.
+\end{displaymath}
+
+\begin{DefinePIOP}{NoZero Check}{nozero-check}
+    TODO
+\end{DefinePIOP}
+
+\subsection{Limb Reconstruction Check}
+The \emph{Limb Reconstruction Check} takes 1 $n$-bit column $\col$ and $k$ columns $\col_0,\dots,\col_{k-1}$ each with $n/k$ bits and proves that each entry of $\col$ is the concatenation of the corresponding entries in $\col_0,\dots,\col_{k-1}$. We package this as the relation
+\begin{displaymath}
+\NPRelation_{\mathsf{Limb}} = \left\{\,
+  \NPInstance = n,\;
+  \NPInstancey = (\Oracle{\MLE{\col}}, \Oracle{\MLE{\col_0}}, \dots, \Oracle{\MLE{\col_{k-1}}}),\;
+  \NPWitness = (\col, \col_0, \dots, \col_{k-1})
+  \;\middle|\;
+    \forall i,\, \col[i] = \sum_{j=0}^{k-1} 2^{(k-1-j)n/k} \col_j[i]
+\,\right\}.
+\end{displaymath}
+
+
+\begin{DefinePIOP}{Limb Reconstruction Check}{limb-check}
+    TODO
+\end{DefinePIOP}
+
+\subsection{Lookup Check}
+The \emph{Lookup Check} takes two columns $\col_1$ and $\col_2$ and proves that every entry of $\col_1$ can be found in $\col_2$. We package this as the relation
+\begin{displaymath}
+\NPRelation_{\mathsf{Range}} = \left\{\,
+  \NPInstance = n,\;
+  \NPInstancey = (\Oracle{\MLE{\col_1}}),\;
+  \NPWitness = (\col_1)
+  \;\middle|\;
+    \forall i,\, 0\leq \col[i] < 2^n
+\,\right\}.
+\end{displaymath}
+
+
+\begin{DefinePIOP}{Lookup Check}{lookup-check}
+    TODO
+\end{DefinePIOP}
+
+
+\subsection{Range Check}
+The \emph{Range Check} takes a column $\col$ and proves that every entry of $\col$ is within an $n$-bit range. We package this as the relation
+\begin{displaymath}
+\NPRelation_{\mathsf{Range}} = \left\{\,
+  \NPInstance = n,\;
+  \NPInstancey = (\Oracle{\MLE{\col}}),\;
+  \NPWitness = (\col)
+  \;\middle|\;
+    \forall i,\, 0\leq \col[i] < 2^n
+\,\right\}.
+\end{displaymath}
+
+
+\begin{DefinePIOP}{Range Check}{range-check}
+    TODO
+\end{DefinePIOP}
+
+\subsection{Non-negativity Check}
+The \emph{Non-negativity Check} takes a column $\col = (\mathsf{d}, \mathsf{a})$ and a width $\alpha$, and proves that every active entry of $\col$ lies in the power-of-two range $[0, 2^\alpha - 1]$. (This is the non-negative slice of a signed or unsigned integer column type, whose width $\alpha$ is fixed by the declared type.) We package this as the relation
+\begin{displaymath}
+\NPRelation_{\mathsf{NNeg}} = \left\{\,
+  \NPInstance = (n, \alpha),\;
+  \NPInstancey = (\Oracle{\MLE{\col}}),\;
+  \NPWitness = (\col)
+  \;\middle|\;
+    \forall i,\, \mathsf{a}[i] = 1 \implies 0 \leq \mathsf{d}[i] \leq 2^\alpha - 1
+\,\right\}.
+\end{displaymath}
+We assume $\alpha < \log_2 |\F|$, so the range embeds unambiguously into $\F$.
+
+The index polynomial $\idx_\alpha$, evaluated over $\BoolHCube{\alpha}$, takes exactly the values $\{0, 1, \ldots, 2^\alpha - 1\}$. Treating it as the data of an $\alpha$-variable column with the all-ones activator gives a range column $\mathsf{rng}_\alpha := (\mathbf{1}, \idx_\alpha)$ whose value multiset is precisely $[0, 2^\alpha - 1]$, so a single \cref{piop:lookup-check} of $\col$ into $\mathsf{rng}_\alpha$ is already an exact range check. This naive lookup is wasteful when $\alpha$ is large, since $\mathsf{rng}_\alpha$ has $2^\alpha$ rows. We do better by splitting each entry into $16$-bit \emph{limbs} and range-checking each limb against a small index column. Choosing $k$ and $\beta$ with $\alpha = 16k + \beta$ and $\beta \leq 16$, the prover sends limb columns $\mathsf{d}_1, \ldots, \mathsf{d}_{k+1}$ satisfying
+\begin{displaymath}
+  \mathsf{a}(x) \mult \mathsf{d}(x) = \sum_{i=1}^{k+1} 2^{16(i-1)} \mult \mathsf{d}_i(x), \qquad x \in \BoolHCube{\mu},
+\end{displaymath}
+which a single \cref{piop:zerocheck} enforces; the activator on the left collapses inactive rows to zero, so the identity pins down the limb decomposition on active rows and forces the limbs to combine to zero on inactive rows. Range-checking each limb then pins $\mathsf{d}(x) \in [0, 2^\alpha - 1]$ at every active $x$.
+\begin{DefinePIOP}{Non-negativity Check}{nonneg-check}
+  \emph{Inputs:} $\Oracle{\MLE{\col}} = (\Oracle{\MLE{\mathsf{a}}}, \Oracle{\MLE{\mathsf{d}}})$, width $\alpha$.
+  \begin{enumerate}[nosep]
+    \item $\PIOPProver$ and $\PIOPVerifier$ compute $\beta, k$ such that $16k + \beta = \alpha$ and $\beta \leq 16$.
+    \item $\PIOPProver$ constructs and sends the limb oracles $\Oracle{\MLE{\mathsf{d}_1}}, \ldots, \Oracle{\MLE{\mathsf{d}_{k+1}}}$.
+    \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:zerocheck} to prove $\mathsf{a}\mult\mathsf{d} - \sum_{i=1}^{k+1} 2^{16(i-1)}\mult\mathsf{d}_i = 0$.
+    \item For each $i \in [k]$, $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:lookup-check} on $(\mathbf{1}, \mathsf{d}_i)$ and $\mathsf{rng}_{16} := (\mathbf{1}, \idx_{16})$, proving each limb lies in $[0, 2^{16}-1]$.
+    \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:lookup-check} on $(\mathbf{1}, \mathsf{d}_{k+1})$ and $\mathsf{rng}_\beta := (\mathbf{1}, \idx_\beta)$, proving the residual limb lies in $[0, 2^\beta-1]$.
+  \end{enumerate}
+\end{DefinePIOP}
+The \emph{positivity check} narrows the certified range to $[1, 2^\alpha - 1]$ by additionally invoking a single \cref{piop:nozero-check} on $\col$ to rule out zero entries.
+
+\subsection{Keyed Sumcheck}
+The \emph{Keyed Sumcheck} takes two tables $\Left$ and $\Right$, each with a key column $\key$, a value column $\val$, and an activator column $\act$, and proves that for every possible key $\elem \in \F$, the sum of active values in $\Left$ with key $\elem$ equals the sum of active values in $\Right$ with key $\elem$. Define the keyed sums
+\begin{displaymath}
+    S_\Left(\elem) := \sum_{\substack{i \in [|\Left|] \\ \Left.\key[i] = \elem}} \Left.\act[i]\mult\Left.\val[i]
+    \qquad\text{and}\qquad
+    S_\Right(\elem) := \sum_{\substack{j \in [|\Right|] \\ \Right.\key[j] = \elem}} \Right.\act[j]\mult\Right.\val[j].
+\end{displaymath}
+We package this as the relation
+\begin{displaymath}
+\NPRelation_{\mathsf{ksum}} = \left\{\,
+  \NPInstance = \bot,\;
+  \NPInstancey = (\Oracle{\MLE{\Left}}, \Oracle{\MLE{\Right}}),\;
+  \NPWitness = (\Left, \Right)
+  \;\middle|\;
+    \forall\, \elem \in \F : S_\Left(\elem) = S_\Right(\elem)
+\,\right\}.
+\end{displaymath}
+
+\cref{piop:keyedsumcheck} reduces the per-key equality $\forall \elem : S_\Left(\elem) = S_\Right(\elem)$ to a single rational identity. The protocol is a generalization of the LogUp lookup protocol~\cite{Habock22}, and we derive its security from a core lemma about function equality that is implicit in LogUp.
+\begin{ilemma}[function equality~\cite{Habock22}]
+    \label{lemma:func-equality}
+    For any functions $S_1, S_2: \F \to \F$, $S_1(\elem) = S_2(\elem)$ for every $\elem \in \F$ if and only if
+    \begin{displaymath}
+        \sum_{\elem \in \F} \frac{S_1(\elem)}{X - \elem} = \sum_{\elem \in \F} \frac{S_2(\elem)}{X - \elem}
+    \end{displaymath}
+    as rational functions in the formal variable $X$.
+\end{ilemma}
+Applying Lemma~\ref{lemma:func-equality} to $S_\Left$ and $S_\Right$ and collapsing the per-key double sums into single sums over rows (the per-key index sets partition the rows), the property holds if and only if, with $\mu$ and $\nu$ the hypercube dimensions of $\MLE{\Left}$ and $\MLE{\Right}$,
+\begin{equation}
+    \label{eq:keyedsumcheck_rational}
+    \sum_{x \in \BoolHCube{\mu}} \frac{\MLE{\Left}.\act(x) \mult \MLE{\Left}.\val(x)}{X - \MLE{\Left}.\key(x)}
+    \;=\;
+    \sum_{x \in \BoolHCube{\nu}} \frac{\MLE{\Right}.\act(x) \mult \MLE{\Right}.\val(x)}{X - \MLE{\Right}.\key(x)}.
+\end{equation}
+We verify this rational identity by Schwartz--Zippel: the verifier samples a random $r \samples \F$, the prover sends the purported common value $s$ that both sides take at $X = r$, and the parties run \cref{piop:ratsumcheck} twice to confirm that both sides actually evaluate to $s$ at $X = r$.
+\begin{DefinePIOP}{KeyedSumcheck}{keyedsumcheck}
+  \emph{Inputs:} $\Oracle{\MLE{\Left}}, \Oracle{\MLE{\Right}}$.
+    \begin{enumerate}[nosep]
+        \item $\PIOPVerifier$ samples a random point $r \samples \F$ and sends it to $\PIOPProver$.
+        \item $\PIOPProver$ computes and sends $\PIOPVerifier$ the value $s$, the purported evaluation of both sides of \cref{eq:keyedsumcheck_rational} at $X = r$.
+        \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:ratsumcheck} twice to prove that both sides of \cref{eq:keyedsumcheck_rational} evaluate to $s$ at $X = r$.
+    \end{enumerate}
+\end{DefinePIOP}
+
+\subsection{Multiset Equality Check}
+The \emph{Multiset Equality Check} takes two columns $\col_\Left$ and $\col_\Right$ and proves that they hold the same multiset of active values. We package this as the relation
+\begin{displaymath}
+\NPRelation_{\mathsf{mset}} = \left\{\,
+  \NPInstance = \bot,\;
+  \NPInstancey = (\Oracle{\MLE{\col_\Left}}, \Oracle{\MLE{\col_\Right}}),\;
+  \NPWitness = (\col_\Left, \col_\Right)
+  \;\middle|\;
+  \{\!\!\{\, \col_\Left[i] \,\}\!\!\}_i = \{\!\!\{\, \col_\Right[j] \,\}\!\!\}_j
+\,\right\}.
+\end{displaymath}
+Two multisets agree exactly when every value $\elem \in \F$ occurs with the same multiplicity on both sides, i.e.\ $\forall\, \elem \in \F : \sum_{i:\,\col_\Left[i]=\elem} 1 = \sum_{j:\,\col_\Right[j]=\elem} 1$. This is precisely an $\elem$-keyed sum equality between two tables whose key is the column data and whose value is the constant $\mathbf{1}$. The parties locally form the auxiliary tables
+\begin{displaymath}
+    \Left := \bigl(\act = \col_\Left.\act,\; \key = \col_\Left.\mathsf{data},\; \val = \mathbf{1}\bigr)
+    \quad\text{and}\quad
+    \Right := \bigl(\act = \col_\Right.\act,\; \key = \col_\Right.\mathsf{data},\; \val = \mathbf{1}\bigr),
+\end{displaymath}
+and a single \cref{piop:keyedsumcheck} on $\Left$ and $\Right$ closes out the proof, with completeness and soundness inherited from the keyed sumcheck.
+\begin{DefinePIOP}{Multiset Equality Check}{mset}
+  \emph{Inputs:} $\Oracle{\MLE{\col_\Left}}, \Oracle{\MLE{\col_\Right}}$.
+  \begin{enumerate}[nosep]
+    \item $\PIOPProver$ and $\PIOPVerifier$ locally form the tables $\Left$ and $\Right$ as above.
+    \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:keyedsumcheck} on $\Left$ and $\Right$.
+  \end{enumerate}
+\end{DefinePIOP}
+
+\parhead{Handling tables} The foregoing column protocol extends to prove that two \emph{tables} hold the same multiset of \emph{rows}: the parties first fingerprint each table to a single column with a verifier-chosen random linear combination of its data columns, and then invoke the foregoing check on the two fingerprint columns.
+
+\subsection{Rotation Check}
+The \emph{Rotation Check} takes two columns $\col$ and $\col'$ together with a shift $t \in \mathbb{Z}$, and proves that $\col'$ is the cyclic rotation of $\col$ by $t$ positions, written $\col' = \rho_t(\col)$, where $\rho_t$ sends the entry at index $p$ to index $p+t$ modulo the column length $s$. We package this as the relation
+\begin{displaymath}
+\NPRelation_{\mathsf{rot}} = \left\{\,
+  \NPInstance = t,\;
+  \NPInstancey = (\Oracle{\MLE{\col}}, \Oracle{\MLE{\col'}}),\;
+  \NPWitness = (\col, \col')
+  \;\middle|\;
+  \begin{array}{l}
+    |\col| = |\col'| =: s \\[3pt]
+    \forall\, q \in [s] : \col'[q] = \col[(q - t) \bmod s]
+  \end{array}
+\,\right\}.
+\end{displaymath}
+We first adopt the contiguous convention so that the active rows of both columns occupy hypercube indices $0, \ldots, s-1$, which the verifier enforces by asserting $\col.\act = \col'.\act = \contig_{\mu, s}$. We then reduce the rotation condition to a single multiset equality on \emph{position-tagged} columns: tag each entry of $\col$ with its own position, and tag each entry of $\col'$ with the position it should occupy in $\col$. Concretely, the parties locally construct the tagged tables
+\begin{displaymath}
+  \Table := \bigl(\col.\act,\; \col.\mathsf{data},\; \idx_\mu\bigr)
+  \quad\text{and}\quad
+  \Table' := \bigl(\col'.\act,\; \col'.\mathsf{data},\; \idxrot\bigr),
+\end{displaymath}
+where $\idx_\mu$ maps each $x \in \BoolHCube{\mu}$ to its hypercube position and $\idxrot$ is the \emph{shifted} index polynomial sending each active position $q$ to $(q - t) \bmod s$. Writing $t_0 := t \bmod s$, this shift is realized exactly by
+\begin{displaymath}
+  \idxrot(x) := \idx_\mu(x) - t_0 + s\mult\contig_{\mu, t_0}(x),
+\end{displaymath}
+since $\contig_{\mu, t_0}(x) = 1$ precisely when $\idx_\mu(x) < t_0$, supplying the $+s$ wraparound exactly on the positions that underflow. Because $q \mapsto (q - t) \bmod s$ is a bijection on $\{0, \ldots, s-1\}$, the tagged tables agree as multisets of rows if and only if $\col'[q] = \col[(q-t) \bmod s]$ for every $q$, which is exactly the rotation condition. A single \cref{piop:mset} on $\Table$ and $\Table'$ then proves the claim, with completeness and soundness inherited from the multiset equality check.
+\begin{DefinePIOP}{Rotation Check}{rotcheck}
+  \emph{Inputs:} $\Oracle{\MLE{\col}}, \Oracle{\MLE{\col'}}, t$.
+  \begin{enumerate}[nosep]
+    \item $\PIOPProver$ sends $\PIOPVerifier$ the active length $s$, and $\PIOPVerifier$ asserts $\col.\act = \col'.\act = \contig_{\mu, s}$.
+    \item $\PIOPProver$ and $\PIOPVerifier$ locally construct the tagged tables $\Table$ and $\Table'$ as above, using the shifted index polynomial $\idxrot(x) = \idx_\mu(x) - t_0 + s\mult\contig_{\mu, t_0}(x)$ with $t_0 := t \bmod s$.
+    \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:mset} to prove that $\Table$ and $\Table'$ are equal as multisets of rows.
+  \end{enumerate}
+\end{DefinePIOP}

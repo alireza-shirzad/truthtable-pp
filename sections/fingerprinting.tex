@@ -1,0 +1,230 @@
+\section{Fingerprinting}
+A string fingerprint can be understood as the answer vector to a small
+collection of yes/no questions asked of a string. In the most precise
+form one could imagine, there would be one such question per
+\emph{atomic feature} of interest---for instance, ``does this string
+contain the letter \texttt{a}?'', ``does it contain the bigram
+\texttt{th}?'', ``does it start with a digit?'', or any other Boolean
+property one cares to evaluate. Evaluating every atomic feature gives a
+lossless, but potentially very large, summary of the string.
+
+The fingerprint trades this precision for size. Instead of storing one
+bit per atomic feature, we partition the features into $n$ groups and
+\emph{or}~them together: a single bit fires whenever \emph{any} of its
+constituent features fires. Each bit of the fingerprint is therefore
+not a single feature but the disjunction of many features. This
+compression is what makes fingerprints small and fast to evaluate---and
+also what makes them lossy. The design problem is then twofold: choose
+the family of atomic features to draw from, and choose how to group
+them into bits.
+
+Let $\mathcal{F} = \{f_1, f_2, \dots, f_m\}$ be a finite family of
+\emph{atomic features}, where each $f_i$ is a Boolean function on
+strings:
+\begin{equation*}
+  f_i : \Sigma^{*} \to \{0,1\}.
+\end{equation*}
+We make no assumption about what each $f_i$ computes; it may test for
+the presence of a character, the presence of an $n$-gram, a positional
+condition, the output of a hash function, or any other property.
+
+A fingerprint of bitwidth $n$ is induced by a partition
+$\{B_1, \dots, B_n\}$ of $\mathcal{F}$. The $j$-th bit of the
+fingerprint of a string $s$ is the disjunction of the features assigned
+to bin $B_j$:
+\begin{equation}
+  \Vector{f}_s[j] \;=\; \bigvee_{f \in B_j} f(s).
+  \label{eq:bit-as-or}
+\end{equation}
+The full fingerprint $\Vector{f}_s \in \{0,1\}^n$ is the vector of these
+disjunctions.
+
+\paragraph{Example.} Let $\Sigma = \{a, e, h, l, n, t, u\}$ and take
+the family $\mathcal{F} = \{f_a, f_e, f_h, f_l, f_n, f_t, f_u,
+g_{\text{th}}, g_{\text{ut}}\}$, where $f_c(s) = \mathbb{1}[c \in s]$
+and $g_{xy}(s) = \mathbb{1}[xy \text{ occurs in } s]$. With bitwidth
+$n = 3$ and partition $B_1 = \{f_a, f_l, f_u\}$, $B_2 = \{f_e, f_h,
+f_n, f_t\}$, $B_3 = \{g_{\text{th}}, g_{\text{ut}}\}$, the
+fingerprints of a few strings are:
+\begin{center}
+  \begin{tabular}{lccc}
+    \toprule
+    String & $\Vector{f}[1]$ & $\Vector{f}[2]$ & $\Vector{f}[3]$ \\
+    \midrule
+    \texttt{utn}   & 1 & 1 & 1 \\
+    \texttt{lute}  & 1 & 1 & 1 \\
+    \texttt{heat}  & 1 & 1 & 0 \\
+    \texttt{ten}   & 0 & 1 & 0 \\
+    \bottomrule
+  \end{tabular}
+\end{center}
+For instance, \texttt{lute} sets $\Vector{f}[3] = 1$ via the bigram \texttt{ut};
+the fingerprint records that \emph{some} feature in $B_3$ fired, but
+not which.
+
+
+\subsection{Approximate Filtering}
+
+Fingerprints become useful when we want to quickly decide whether a
+candidate string $s$ could possibly contain a pattern $\zeta$, without
+performing the full containment test.
+
+\paragraph{The pruning rule.} For a pattern $\zeta$ and a candidate string
+$s$, the fingerprint check accepts $s$ iff
+\begin{equation}
+  \Vector{f}_\zeta \subseteq \Vector{f}_s
+  \;\;\Longleftrightarrow\;\;
+  \forall j \in [n]:\; \Vector{f}_\zeta[j] = 1 \Rightarrow \Vector{f}_s[j] = 1.
+  \label{eq:subset-check}
+\end{equation}
+For this check to be a sound filter---never rejecting a true
+match---the feature family $\mathcal{F}$ must satisfy a
+\emph{monotonicity} condition: whenever $\zeta$ is contained in $s$ in the
+sense the query intends, every feature satisfied by $\zeta$ must also be
+satisfied by $s$,
+\begin{equation}
+  \zeta \sqsubseteq s \;\;\Longrightarrow\;\; \forall f \in \mathcal{F}:\;
+  f(\zeta) \le f(s).
+  \label{eq:monotonicity}
+\end{equation}
+Under~\eqref{eq:monotonicity}, the subset
+check~\eqref{eq:subset-check} cannot produce false negatives.
+
+\paragraph{Where false positives come from.} The converse of the
+subset check fails because of the \emph{or}-compression
+in~\eqref{eq:bit-as-or}. A string $s$ may light bit $j$ via a feature
+$f \in B_j$ unrelated to those the pattern requires; the fingerprint
+cannot tell which feature of $B_j$ caused the bit to fire. Two design
+choices govern how often this happens:
+\begin{enumerate}
+  \item The \textbf{feature family} $\mathcal{F}$. Richer families
+  (e.g., $n$-grams, positional features) carry more information per
+  atomic feature and therefore tolerate coarser bin assignments, at
+  the cost of a larger $|\mathcal{F}|$ and a more expensive
+  partition-selection problem.
+  \item The \textbf{partition} $\{B_1, \dots, B_n\}$. Grouping
+  features the workload needs to \emph{distinguish} into the same bin
+  destroys that information; grouping interchangeable features wastes
+  little.
+\end{enumerate}
+
+\paragraph{Example.} Reusing the setup from above, take pattern $\zeta =
+\texttt{utn}$ with $\Vector{f}_\zeta = (1, 1, 1)$. Then \texttt{lute} passes the
+filter as a false positive (its $\Vector{f}[3]$ bit is lit by \texttt{ut} rather
+than by \texttt{utn}), while \texttt{heat} is correctly rejected on
+$\Vector{f}[3]$ and \texttt{ten} on $\Vector{f}[1]$. Replacing $B_3$ with another
+character bin would weaken the filter on \texttt{heat}; merging
+\texttt{u} and \texttt{t} into one bin would weaken it on
+\texttt{ten}.
+
+
+Now building on this tool, we design a PIOP where 
+
+\begin{DefinePIOP}{Approximate Filtering Check}{approx-filer}
+    \begin{enumerate}[nosep]
+        \item $\PIOPProver$ and $\PIOPVerifier$ compute the fingerprint of the pattern $\zeta$ as $\Vector{f}_\zeta$ and the field element encoding of the fingerprint as $f_\zeta=\sum_{j=0}^{n-1} 2^j \Vector{f}_\zeta[j]$.
+        \item $\PIOPProver$ divides the fingerprint col
+    \end{enumerate}
+\end{DefinePIOP}
+
+\subsection{Exact Filtering}
+
+
+\subsubsection{Activator Consistency Check}
+The \emph{Activator Consistency Check} takes the source column $\mathsf{src}$, the data activator $\mathsf{a_d}$, the length column $\mathsf{l}$, and the string activator $\mathsf{a_h}$, and proves that $\mathsf{a_d}$ and $\mathsf{a_h}$ are consistent: for every string, the number of its active characters equals its length when the string is active, and is $0$ otherwise. Equivalently, for every string index $i$,
+\begin{displaymath}
+  \mathsf{a_h}[i]\cdot\mathsf{l}[i] \;=\; \sum_{j:\,\mathsf{src}[j]=i} \mathsf{a_d}[j].
+\end{displaymath}
+We package this as the relation
+\begin{displaymath}
+\NPRelation_{\mathsf{ActCons}} = \left\{\,
+  \NPInstance = \bot,\;
+  \NPInstancey = (\Oracle{\MLE{\mathsf{src}}}, \Oracle{\MLE{\mathsf{a_d}}}, \Oracle{\MLE{\mathsf{l}}}, \Oracle{\MLE{\mathsf{a_h}}}),\;
+  \NPWitness = (\mathsf{src}, \mathsf{a_d}, \mathsf{l}, \mathsf{a_h})
+  \;\middle|\;
+  \forall i,\; \mathsf{a_h}[i]\cdot\mathsf{l}[i] = \!\!\!\sum_{j:\,\mathsf{src}[j]=i}\!\!\! \mathsf{a_d}[j]
+\,\right\}.
+\end{displaymath}
+The check is exactly a group-by-sum: grouping the rows $(\mathsf{src}, \mathsf{a_d})$ by $\mathsf{src}$ and summing $\mathsf{a_d}$ within each group must reproduce $\mathsf{l}$ on the active strings (those marked by $\mathsf{a_h}$). Treating $(\mathsf{src}, \mathsf{a_d})$ as an input table grouped by its key and $(\mathsf{ind}, \mathsf{l})$ with activator $\mathsf{a_h}$ as the grouped output, this is discharged by a single \cref{piop:keyedsumcheck}.
+\begin{DefinePIOP}{Activator Consistency Check}{act-cons}
+  \emph{Inputs:} $\Oracle{\MLE{\mathsf{src}}}, \Oracle{\MLE{\mathsf{a_d}}}, \Oracle{\MLE{\mathsf{l}}}, \Oracle{\MLE{\mathsf{a_h}}}$.
+  \begin{enumerate}[nosep]
+    \item $\PIOPProver$ and $\PIOPVerifier$ locally form the input table $\Left$ with key column $\Left.\key = \mathsf{src}$, value column $\Left.\val = \mathbf{1}$, and activator $\Left.\act = \mathsf{a_d}$ (so the keyed sum counts the active characters of each string).
+    \item $\PIOPProver$ and $\PIOPVerifier$ locally form the output table $\Right$ with key column $\Right.\key = \mathsf{ind}$ (the index column, $\mathsf{ind}[i] = i$), value column $\Right.\val = \mathsf{l}$, and activator $\Right.\act = \mathsf{a_h}$.
+    \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:keyedsumcheck} on $\Left$ and $\Right$, which forces $\sum_{j:\,\mathsf{src}[j]=i}\mathsf{a_d}[j] = \mathsf{a_h}[i]\cdot\mathsf{l}[i]$ for every key $i$.
+  \end{enumerate}
+\end{DefinePIOP}
+
+
+
+\begin{table}[h!]
+\centering
+\small
+\begin{tabular}{p{3.8cm}p{4.5cm}p{5cm}}
+\toprule
+\textbf{SQL String Operator} & \textbf{Approx. Filtering Applicable?} & \textbf{Used in TPC-H?} \\
+\midrule
+\texttt{LIKE '\%pat\%'} (substring)
+  & Yes --- canonical case; character/$n$-gram features are monotone
+  & Yes: Q9, Q13 (negated), Q14, Q16 (negated) \\
+\addlinespace
+\texttt{LIKE 'pat\%'} (prefix)
+  & Yes --- with anchored/positional features (or sortedness)
+  & Yes: Q2, Q20 \\
+\addlinespace
+\texttt{LIKE '\%pat'} (suffix)
+  & Yes --- with end-anchored features
+  & No \\
+\addlinespace
+\texttt{LIKE 'pat'} (exact, no wildcards)
+  & Trivially yes, but equality is usually faster directly
+  & No (TPC-H uses \texttt{=} instead) \\
+\addlinespace
+\texttt{LIKE 'p\_t'} (single-char wildcard)
+  & Partial --- anchor what you can; treat \texttt{\_} as unknown
+  & No \\
+\addlinespace
+\texttt{LIKE '\%a\%b\%'} (multi-fragment)
+  & Yes --- filter on each required fragment, AND the results
+  & Yes: Q13 \\
+\addlinespace
+\texttt{NOT LIKE}
+  & No directly --- monotonicity runs the wrong way; filter the positive form and complement
+  & Yes: Q13, Q16 \\
+\addlinespace
+\texttt{=} (exact equality)
+  & Trivially yes, but direct comparison or hashing wins
+  & Pervasive \\
+\addlinespace
+\texttt{<}, \texttt{>}, \texttt{<=}, \texttt{>=} (lex.)
+  & Partial --- works with order-preserving features; not the technique's strength
+  & No (used on numeric/date columns only) \\
+\addlinespace
+\texttt{IN (lit1, lit2, ...)} (string set)
+  & Yes --- disjunction over members; equivalent to multiple equality filters
+  & Yes: Q19, Q22 \\
+\addlinespace
+\texttt{NOT IN} (string set)
+  & No directly --- same issue as \texttt{NOT LIKE}
+  & Yes: Q16 \\
+\addlinespace
+\texttt{BETWEEN} (lex.)
+  & Partial --- same caveats as \texttt{<}/\texttt{>} on strings
+  & No (numeric/date use in TPC-H) \\
+\addlinespace
+\texttt{SUBSTRING} / \texttt{SUBSTR} extract
+  & N/A as a predicate; filter the enclosing \texttt{=} or \texttt{LIKE}
+  & Yes: Q22 (\texttt{SUBSTRING(c\_phone FROM 1 FOR 2)}) \\
+\addlinespace
+\texttt{CONCAT} / \texttt{||}
+  & N/A --- not a predicate
+  & No (in \texttt{WHERE} clauses) \\
+\addlinespace
+Regex (\texttt{SIMILAR TO}, \texttt{\textasciitilde})
+  & Partial --- works when required literal fragments can be extracted
+  & No \\
+\bottomrule
+\end{tabular}
+\caption{Applicability of approximate filtering to SQL string operators, and their occurrence in TPC-H queries.}
+\label{tab:sql-ops-filter}
+\end{table}

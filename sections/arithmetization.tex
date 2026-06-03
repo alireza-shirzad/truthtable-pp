@@ -1,0 +1,13 @@
+% !TEX root = paper.tex
+\section{Arithmetization}
+Let $\col$ be a string column in the database. We encode $\col$ in as a tuple of $8$ columns, $( \mathsf{h},\mathsf{b},\mathsf{l},\mathsf{a_{hb}}, \mathsf{d}, \mathsf{src}, \mathsf{a_d}, \mathsf{s_b})$, with the following semantics:
+\begin{itemize}[nosep]
+    \item Hash column $\mathsf{h}$ is of the same length as $\col$ containing the hash of each string in $\col$.
+    \item Length column $\mathsf{l}$ is of the same length as $\col$, with $\mathsf{l}[i]$ being the length $|\col[i]|$ of the $i$-th string in $\col$.
+    \item Data column $\mathsf{d}$ is of the size $\sum_{s \in \col} |s|$, containing the concatenation of all strings in $\col$.
+    \item Source column $\mathsf{src}$ is of the same length as $\mathsf{d}$, with $\mathsf{src}[j]$ being the index $i$ of the string in $\col$ that the $j$-th character of $\mathsf{d}$ belongs to.
+    \item Boundary column $\mathsf{b}$ is a column of the same length as $\col$ with $\mathsf{b}[i]$ being the index of the first character of the $i$-th string in $\col$ in the data column $\mathsf{d}$.
+    \item The data activator column $\mathsf{a_d}$ is of the same length as $\mathsf{d}$, with $\mathsf{a_d}[i]$ being $1$ if the $i$-th character in $\mathsf{d}$ is an active chatacter of the column $\col$.
+    \item The hash/boundry activator column $\mathsf{a_{hb}}$ is of the same length as $\col$, with $\mathsf{a_{hb}}[i]$ being $1$ if the $i$-th string in $\col$ is active.
+    \item The boundary selector column $\mathsf{s_b}$ is of the same length as $\mathsf{b}$, with $\mathsf{s_b}[i]$ being $1$ if the $i$-th boundary in $\mathsf{b}$ is active.
+    \end{itemize}
