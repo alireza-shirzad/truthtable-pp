@@ -71,35 +71,47 @@ The \emph{Range Check} takes a column $\col$ and proves that every entry of $\co
     TODO
 \end{DefinePIOP}
 
-\subsection{Non-negativity Check}
-The \emph{Non-negativity Check} takes a column $\col = (\mathsf{d}, \mathsf{a})$ and a width $\alpha$, and proves that every active entry of $\col$ lies in the power-of-two range $[0, 2^\alpha - 1]$. (This is the non-negative slice of a signed or unsigned integer column type, whose width $\alpha$ is fixed by the declared type.) We package this as the relation
+\subsection{Sign Check}
+\label{sec:sign-check}
+The \emph{Sign Check} takes a column $\col = (\mathsf{d}, \mathsf{a})$, a width $\alpha$, and a sign mode $\sigma \in \{\mathsf{NonNeg}, \mathsf{Pos}, \mathsf{NonPos}, \mathsf{Neg}\}$, and proves that every active entry of $\col$ lies in the width-$\alpha$ slice of the corresponding sign. Each mode is determined by two parameters: a \emph{direction} $s_\sigma \in \{+1, -1\}$, which is $+1$ for the positive-side modes $\mathsf{NonNeg}, \mathsf{Pos}$ and $-1$ for the negative-side modes $\mathsf{NonPos}, \mathsf{Neg}$; and a lower bound $\ell_\sigma \in \{0, 1\}$, which is $0$ for the non-strict modes $\mathsf{NonNeg}, \mathsf{NonPos}$ and $1$ for the strict modes $\mathsf{Pos}, \mathsf{Neg}$ that exclude zero. Concretely,
+\begin{center}\small
+\begin{tabular}{lcccc}
+\toprule
+$\sigma$ & $\mathsf{NonNeg}$ & $\mathsf{Pos}$ & $\mathsf{NonPos}$ & $\mathsf{Neg}$ \\
+\midrule
+certified range & $[0, 2^\alpha-1]$ & $[1, 2^\alpha-1]$ & $[-(2^\alpha-1), 0]$ & $[-(2^\alpha-1), -1]$ \\
+$(s_\sigma, \ell_\sigma)$ & $(+1, 0)$ & $(+1, 1)$ & $(-1, 0)$ & $(-1, 1)$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+where negative values are taken in $\F$ via the additive inverse. In every mode the certified condition is $s_\sigma\mult\mathsf{d}[i] \in [\ell_\sigma, 2^\alpha-1]$, so we package the check as the relation
 \begin{displaymath}
-\NPRelation_{\mathsf{NNeg}} = \left\{\,
-  \NPInstance = (n, \alpha),\;
+\NPRelation_{\mathsf{Sign}} = \left\{\,
+  \NPInstance = (n, \alpha, \sigma),\;
   \NPInstancey = (\Oracle{\MLE{\col}}),\;
   \NPWitness = (\col)
   \;\middle|\;
-    \forall i,\, \mathsf{a}[i] = 1 \implies 0 \leq \mathsf{d}[i] \leq 2^\alpha - 1
+    \forall i,\, \mathsf{a}[i] = 1 \implies \ell_\sigma \leq s_\sigma\mult\mathsf{d}[i] \leq 2^\alpha - 1
 \,\right\}.
 \end{displaymath}
 We assume $\alpha < \log_2 |\F|$, so the range embeds unambiguously into $\F$.
 
-The index polynomial $\idx_\alpha$, evaluated over $\BoolHCube{\alpha}$, takes exactly the values $\{0, 1, \ldots, 2^\alpha - 1\}$. Treating it as the data of an $\alpha$-variable column with the all-ones activator gives a range column $\mathsf{rng}_\alpha := (\mathbf{1}, \idx_\alpha)$ whose value multiset is precisely $[0, 2^\alpha - 1]$, so a single \cref{piop:lookup-check} of $\col$ into $\mathsf{rng}_\alpha$ is already an exact range check. This naive lookup is wasteful when $\alpha$ is large, since $\mathsf{rng}_\alpha$ has $2^\alpha$ rows. We do better by splitting each entry into $16$-bit \emph{limbs} and range-checking each limb against a small index column. Choosing $k$ and $\beta$ with $\alpha = 16k + \beta$ and $\beta \leq 16$, the prover sends limb columns $\mathsf{d}_1, \ldots, \mathsf{d}_{k+1}$ satisfying
+The whole check reduces to a non-negativity check on the \emph{magnitude} column $\mathsf{m} := s_\sigma\mult\mathsf{d}$, which the verifier obtains by negating the oracle $\MLE{\mathsf{d}}$ in the negative-side modes. The index polynomial $\idx_\alpha$, evaluated over $\BoolHCube{\alpha}$, takes exactly the values $\{0, 1, \ldots, 2^\alpha - 1\}$. Treating it as the data of an $\alpha$-variable column with the all-ones activator gives a range column $\mathsf{rng}_\alpha := (\mathbf{1}, \idx_\alpha)$ whose value multiset is precisely $[0, 2^\alpha - 1]$, so a single \cref{piop:lookup-check} of $\mathsf{m}$ into $\mathsf{rng}_\alpha$ is already an exact range check. This naive lookup is wasteful when $\alpha$ is large, since $\mathsf{rng}_\alpha$ has $2^\alpha$ rows. We do better by splitting each entry into $16$-bit \emph{limbs} and range-checking each limb against a small index column. Choosing $k$ and $\beta$ with $\alpha = 16k + \beta$ and $\beta \leq 16$, the prover sends limb columns $\mathsf{m}_1, \ldots, \mathsf{m}_{k+1}$ satisfying
 \begin{displaymath}
-  \mathsf{a}(x) \mult \mathsf{d}(x) = \sum_{i=1}^{k+1} 2^{16(i-1)} \mult \mathsf{d}_i(x), \qquad x \in \BoolHCube{\mu},
+  \mathsf{a}(x) \mult s_\sigma \mult \mathsf{d}(x) = \sum_{i=1}^{k+1} 2^{16(i-1)} \mult \mathsf{m}_i(x), \qquad x \in \BoolHCube{\mu},
 \end{displaymath}
-which a single \cref{piop:zerocheck} enforces; the activator on the left collapses inactive rows to zero, so the identity pins down the limb decomposition on active rows and forces the limbs to combine to zero on inactive rows. Range-checking each limb then pins $\mathsf{d}(x) \in [0, 2^\alpha - 1]$ at every active $x$.
-\begin{DefinePIOP}{Non-negativity Check}{nonneg-check}
-  \emph{Inputs:} $\Oracle{\MLE{\col}} = (\Oracle{\MLE{\mathsf{a}}}, \Oracle{\MLE{\mathsf{d}}})$, width $\alpha$.
+which a single \cref{piop:zerocheck} enforces; the activator on the left collapses inactive rows to zero, so the identity pins down the limb decomposition on active rows and forces the limbs to combine to zero on inactive rows. Range-checking each limb then pins $s_\sigma\mult\mathsf{d}(x) \in [0, 2^\alpha - 1]$ at every active $x$. In the strict modes $\mathsf{Pos}$ and $\mathsf{Neg}$, a final no-zero check rules out the value $0$, narrowing the certified range to $[1, 2^\alpha - 1]$.
+\begin{DefinePIOP}{Sign Check}{sign-check}
+  \emph{Inputs:} $\Oracle{\MLE{\col}} = (\Oracle{\MLE{\mathsf{a}}}, \Oracle{\MLE{\mathsf{d}}})$, width $\alpha$, sign mode $\sigma \in \{\mathsf{NonNeg}, \mathsf{Pos}, \mathsf{NonPos}, \mathsf{Neg}\}$.
   \begin{enumerate}[nosep]
-    \item $\PIOPProver$ and $\PIOPVerifier$ compute $\beta, k$ such that $16k + \beta = \alpha$ and $\beta \leq 16$.
-    \item $\PIOPProver$ constructs and sends the limb oracles $\Oracle{\MLE{\mathsf{d}_1}}, \ldots, \Oracle{\MLE{\mathsf{d}_{k+1}}}$.
-    \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:zerocheck} to prove $\mathsf{a}\mult\mathsf{d} - \sum_{i=1}^{k+1} 2^{16(i-1)}\mult\mathsf{d}_i = 0$.
-    \item For each $i \in [k]$, $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:lookup-check} on $(\mathbf{1}, \mathsf{d}_i)$ and $\mathsf{rng}_{16} := (\mathbf{1}, \idx_{16})$, proving each limb lies in $[0, 2^{16}-1]$.
-    \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:lookup-check} on $(\mathbf{1}, \mathsf{d}_{k+1})$ and $\mathsf{rng}_\beta := (\mathbf{1}, \idx_\beta)$, proving the residual limb lies in $[0, 2^\beta-1]$.
+    \item $\PIOPProver$ and $\PIOPVerifier$ read off $s_\sigma \in \{+1,-1\}$ and $\ell_\sigma \in \{0,1\}$ from $\sigma$, and compute $\beta, k$ such that $16k + \beta = \alpha$ and $\beta \leq 16$.
+    \item $\PIOPProver$ constructs and sends the limb oracles $\Oracle{\MLE{\mathsf{m}_1}}, \ldots, \Oracle{\MLE{\mathsf{m}_{k+1}}}$ of the magnitude $\mathsf{m} = s_\sigma\mult\mathsf{d}$.
+    \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:zerocheck} to prove $\mathsf{a}\mult s_\sigma\mult\mathsf{d} - \sum_{i=1}^{k+1} 2^{16(i-1)}\mult\mathsf{m}_i = 0$.
+    \item For each $i \in [k]$, $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:lookup-check} on $(\mathbf{1}, \mathsf{m}_i)$ and $\mathsf{rng}_{16} := (\mathbf{1}, \idx_{16})$, proving each limb lies in $[0, 2^{16}-1]$.
+    \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:lookup-check} on $(\mathbf{1}, \mathsf{m}_{k+1})$ and $\mathsf{rng}_\beta := (\mathbf{1}, \idx_\beta)$, proving the residual limb lies in $[0, 2^\beta-1]$.
+    \item If $\ell_\sigma = 1$ (the strict modes $\mathsf{Pos}, \mathsf{Neg}$), $\PIOPProver$ and $\PIOPVerifier$ additionally invoke \cref{piop:nozero-check} on $\col$ to rule out zero entries, narrowing the certified range to $[1, 2^\alpha - 1]$.
   \end{enumerate}
 \end{DefinePIOP}
-The \emph{positivity check} narrows the certified range to $[1, 2^\alpha - 1]$ by additionally invoking a single \cref{piop:nozero-check} on $\col$ to rule out zero entries.
 
 \subsection{Keyed Sumcheck}
 The \emph{Keyed Sumcheck} takes two tables $\Left$ and $\Right$, each with a key column $\key$, a value column $\val$, and an activator column $\act$, and proves that for every possible key $\elem \in \F$, the sum of active values in $\Left$ with key $\elem$ equals the sum of active values in $\Right$ with key $\elem$. Define the keyed sums

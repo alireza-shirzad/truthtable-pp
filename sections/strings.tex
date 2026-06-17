@@ -1,10 +1,132 @@
 \section{PIOPs for Strings}
 
 
+\subsubsection{Activator Consistency Check}
+\label{sec:act-consistency}
+The \emph{Activator Consistency Check} takes the source column $\mathsf{src}$, the data activator $\mathsf{a_d}$, the length column $\mathsf{l}$, and the string activator $\mathsf{a_h}$, and proves that $\mathsf{a_d}$ and $\mathsf{a_h}$ are consistent: for every string, the number of its active characters equals its length when the string is active, and is $0$ otherwise. Equivalently, for every string index $i$,
+\begin{displaymath}
+  \mathsf{a_h}[i]\cdot\mathsf{l}[i] \;=\; \sum_{j:\,\mathsf{src}[j]=i} \mathsf{a_d}[j].
+\end{displaymath}
+We package this as the relation
+\begin{displaymath}
+\NPRelation_{\mathsf{ActCons}} = \left\{\,
+  \NPInstance = \bot,\;
+  \NPInstancey = (\Oracle{\MLE{\mathsf{src}}}, \Oracle{\MLE{\mathsf{a_d}}}, \Oracle{\MLE{\mathsf{l}}}, \Oracle{\MLE{\mathsf{a_h}}}),\;
+  \NPWitness = (\mathsf{src}, \mathsf{a_d}, \mathsf{l}, \mathsf{a_h})
+  \;\middle|\;
+  \forall i,\; \mathsf{a_h}[i]\cdot\mathsf{l}[i] = \!\!\!\sum_{j:\,\mathsf{src}[j]=i}\!\!\! \mathsf{a_d}[j]
+\,\right\}.
+\end{displaymath}
+The check is exactly a group-by-sum: grouping the rows $(\mathsf{src}, \mathsf{a_d})$ by $\mathsf{src}$ and summing $\mathsf{a_d}$ within each group must reproduce $\mathsf{l}$ on the active strings (those marked by $\mathsf{a_h}$). Treating $(\mathsf{src}, \mathsf{a_d})$ as an input table grouped by its key and $(\mathsf{ind}, \mathsf{l})$ with activator $\mathsf{a_h}$ as the grouped output, this is discharged by a single \cref{piop:keyedsumcheck}.
+\begin{DefinePIOP}{Activator Consistency Check}{act-cons}
+  \emph{Inputs:} $\Oracle{\MLE{\mathsf{src}}}, \Oracle{\MLE{\mathsf{a_d}}}, \Oracle{\MLE{\mathsf{l}}}, \Oracle{\MLE{\mathsf{a_h}}}$.
+  \begin{enumerate}[nosep]
+    \item $\PIOPProver$ and $\PIOPVerifier$ locally form the input table $\Left$ with key column $\Left.\key = \mathsf{src}$, value column $\Left.\val = \mathbf{1}$, and activator $\Left.\act = \mathsf{a_d}$ (so the keyed sum counts the active characters of each string).
+    \item $\PIOPProver$ and $\PIOPVerifier$ locally form the output table $\Right$ with key column $\Right.\key = \mathsf{ind}$ (the index column, $\mathsf{ind}[i] = i$), value column $\Right.\val = \mathsf{l}$, and activator $\Right.\act = \mathsf{a_h}$.
+    \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:keyedsumcheck} on $\Left$ and $\Right$, which forces $\sum_{j:\,\mathsf{src}[j]=i}\mathsf{a_d}[j] = \mathsf{a_h}[i]\cdot\mathsf{l}[i]$ for every key $i$.
+  \end{enumerate}
+\end{DefinePIOP}
 
-    \subsubsection{Prefix and Suffix Check} A prefix/suffix check applies an anchored, fixed-string pattern filter --- either a prefix filter $\mathsf{str}\%$ or a suffix filter $\%\mathsf{str}$, with $\mathsf{str}$ of length $k$ --- to a string column. The verifier is given a tuple $( \mathsf{h},\mathsf{b},\mathsf{l},\mathsf{a_h^{old}}, \mathsf{d}, \mathsf{src}, \mathsf{a_d^{old}}, \mathsf{s_b})$ and new activators $\mathsf{a_h^{new}}$ and $\mathsf{a_d^{new}}$. The prover convinces the verifier that the tuple $( \mathsf{h},\mathsf{b},\mathsf{l},\mathsf{a_h^{new}}, \mathsf{d}, \mathsf{src}, \mathsf{a_d^{new}}, \mathsf{s_b})$ is the result of applying the filter to the original tuple.
 
-The prefix and suffix cases differ only in which end of each string the comparison is anchored to. Let $\rho_t(\cdot)$ denote rotation of a column by $t$ positions (a $1$ at index $p$ moves to index $p+t$), and let $\epsilon := +1$ for a prefix filter and $\epsilon := -1$ for a suffix filter. Define the \emph{anchor selector}
+
+\begin{table}[h!]
+\centering
+\small
+\begin{tabular}{p{3.8cm}p{4.5cm}p{5cm}}
+\toprule
+\textbf{SQL String Operator} & \textbf{Approx. Filtering Applicable?} & \textbf{Used in TPC-H?} \\
+\midrule
+\texttt{LIKE '\%pat\%'} (substring)
+  & Yes --- canonical case; character/$n$-gram features are monotone
+  & Yes: Q9, Q13 (negated), Q14, Q16 (negated) \\
+\addlinespace
+\texttt{LIKE 'pat\%'} (prefix)
+  & Yes --- with anchored/positional features (or sortedness)
+  & Yes: Q2, Q20 \\
+\addlinespace
+\texttt{LIKE '\%pat'} (suffix)
+  & Yes --- with end-anchored features
+  & No \\
+\addlinespace
+\texttt{LIKE 'pat'} (exact, no wildcards)
+  & Trivially yes, but equality is usually faster directly
+  & No (TPC-H uses \texttt{=} instead) \\
+\addlinespace
+\texttt{LIKE 'p\_t'} (single-char wildcard)
+  & Partial --- anchor what you can; treat \texttt{\_} as unknown
+  & No \\
+\addlinespace
+\texttt{LIKE '\%a\%b\%'} (multi-fragment)
+  & Yes --- filter on each required fragment, AND the results
+  & Yes: Q13 \\
+\addlinespace
+\texttt{NOT LIKE}
+  & No directly --- monotonicity runs the wrong way; filter the positive form and complement
+  & Yes: Q13, Q16 \\
+\addlinespace
+\texttt{=} (exact equality)
+  & Trivially yes, but direct comparison or hashing wins
+  & Pervasive \\
+\addlinespace
+\texttt{<}, \texttt{>}, \texttt{<=}, \texttt{>=} (lex.)
+  & Partial --- works with order-preserving features; not the technique's strength
+  & No (used on numeric/date columns only) \\
+\addlinespace
+\texttt{IN (lit1, lit2, ...)} (string set)
+  & Yes --- disjunction over members; equivalent to multiple equality filters
+  & Yes: Q19, Q22 \\
+\addlinespace
+\texttt{NOT IN} (string set)
+  & No directly --- same issue as \texttt{NOT LIKE}
+  & Yes: Q16 \\
+\addlinespace
+\texttt{BETWEEN} (lex.)
+  & Partial --- same caveats as \texttt{<}/\texttt{>} on strings
+  & No (numeric/date use in TPC-H) \\
+\addlinespace
+\texttt{SUBSTRING} / \texttt{SUBSTR} extract
+  & N/A as a predicate; filter the enclosing \texttt{=} or \texttt{LIKE}
+  & Yes: Q22 (\texttt{SUBSTRING(c\_phone FROM 1 FOR 2)}) \\
+\addlinespace
+\texttt{CONCAT} / \texttt{||}
+  & N/A --- not a predicate
+  & No (in \texttt{WHERE} clauses) \\
+\addlinespace
+Regex (\texttt{SIMILAR TO}, \texttt{\textasciitilde})
+  & Partial --- works when required literal fragments can be extracted
+  & No \\
+\bottomrule
+\end{tabular}
+\caption{Applicability of approximate filtering to SQL string operators, and their occurrence in TPC-H queries.}
+\label{tab:sql-ops-filter}
+\end{table}
+
+    \subsubsection{Prefix and Suffix Check} A prefix/suffix check keeps the strings in a column that begin or end with a fixed pattern $\mathsf{str}$ of length $k$: a \emph{prefix} filter $\mathsf{str}\%$ keeps strings that start with $\mathsf{str}$ (as in \texttt{LIKE 'str\%'}), and a \emph{suffix} filter $\%\mathsf{str}$ keeps strings that end with it (as in \texttt{LIKE '\%str'}).
+
+    \parhead{What the protocol proves}The verifier is given a tuple $( \mathsf{h},\mathsf{b},\mathsf{l},\mathsf{a_h^{old}}, \mathsf{d}, \mathsf{src}, \mathsf{a_d^{old}}, \mathsf{s_b})$ and new activators $\mathsf{a_h^{new}}$ and $\mathsf{a_d^{new}}$. The prover convinces the verifier that the tuple $( \mathsf{h},\mathsf{b},\mathsf{l},\mathsf{a_h^{new}}, \mathsf{d}, \mathsf{src}, \mathsf{a_d^{new}}, \mathsf{s_b})$ is the result of applying the filter to the original tuple.
+
+
+At a high level the check has five parts, which we explain in turn before presenting the protocol. For concreteness we describe the prefix scenario throughout; afterwards we show how the prefix and suffix protocols can be unified into a single check.
+
+
+\parhead{Activator consistency} The prover claims that $\mathsf{a_h^{new}}$ and $\mathsf{a_d^{new}}$ are the activators of the filtered column. The verifier checks that they are internally consistent with one another and with the lengths: a string is marked active by $\mathsf{a_h^{new}}$ exactly when its characters are marked active by $\mathsf{a_d^{new}}$, and the active-character count of each string equals its length.
+
+\parhead{Filtering by length} A string shorter than $k$ can never match a length-$k$ pattern, and leaving it in place is actively harmful: once the anchored selectors are rotated inward, a short string's selectors run past its own end and spill into the character slots of its neighbors, corrupting the comparison. The first step therefore removes every string of length less than $k$. The prover flags the short strings with two masks: $\mathsf{m_h}$, set to $1$ on each string of length less than $k$, and $\mathsf{m_d}$, set to $1$ on every character of such a string. Afterwards, an activator consistency check (\cref{sec:act-consistency}) ties $\mathsf{m_h}$ and $\mathsf{m_d}$ together, forcing a string to be flagged by $\mathsf{m_h}$ exactly when all of its characters are flagged by $\mathsf{m_d}$. Two sign checks then certify that $\mathsf{m_h}$ flags \emph{exactly} the short strings: a \emph{Negative} sign check over the flagged rows forces every flagged string to satisfy $\mathsf{l}-k<0$, i.e.\ length below $k$, while a \emph{Non-Negative} sign check over the unflagged rows forces every unflagged string to satisfy $\mathsf{l}-k\geq0$, i.e.\ length at least $k$. Together these leave the prover no room to misflag a string in either direction --- it can neither smuggle a long string out of the filter nor hide a short one inside it. With the masks verified, the parties switch the short strings off by defining the masked activators
+\begin{displaymath}
+  \mathsf{a_d^{msk}} := \mathsf{a_d^{old}}\cdot(1-\mathsf{m_d}), \qquad
+  \mathsf{a_h^{msk}} := \mathsf{a_h^{old}}\cdot(1-\mathsf{m_h}),
+\end{displaymath}
+and use these in place of the originals throughout, so that every later step ranges only over strings long enough to be candidate matches.
+
+
+
+\parhead{False positives Check} A string that \emph{survives} the filter must genuinely match the pattern. To enforce this, the prover and verifier walk through the $k$ pattern positions and, at each one, prove that every surviving string holds the required pattern character there.
+
+\parhead{False negatives Check} Conversely, a string that the prover \emph{drops} must truly fail the pattern; otherwise a legitimate match would be silently discarded. The prover first commits, for each position $i$, an equality predicate $\mathsf{p}_i$ that marks the character slots where the data matches $\mathsf{str}[\pi(i)]$ at an active, anchored position. Two checks pin $\mathsf{p}_i$ to the truth: a zero-check forces $\mathsf{p}_i$ to vanish wherever the characters disagree, and a no-zero check forces it to be nonzero wherever an active anchored slot does agree, so $\mathsf{p}_i$ marks precisely the positional matches. To test whether a string matches at \emph{every} one of the $k$ positions, these predicates---which live at $k$ different anchored offsets---are rotated back onto the common anchor by $\mathsf{p}_i' := \rho_{-\epsilon i}(\mathsf{p}_i)$, with each rotation certified by a rotation check, so that their product $\prod_i \mathsf{p}_i'$ is $1$ exactly at the anchor of a string matching the entire pattern.
+
+\parhead{Dropped strings really fail} Finally, the dropped-anchor selector $\mathsf{s_a'} := (1-\mathsf{a_d^{new}})\cdot\mathsf{a_d^{msk}}\cdot\mathsf{s_a}$ marks the anchor of every string that was active before the filter but dropped after it. A single zero-check on $(\prod_i \mathsf{p}_i',\, \mathsf{s_a'})$ forces $\prod_i\mathsf{p}_i'$ to vanish at each dropped anchor, certifying that no dropped string matched the full pattern. Together with the false-positive check, this pins the new activators to keep exactly the strings that match the filter.
+
+\parhead{Unifying prefix and suffix} The prefix and suffix cases differ only in which end of each string the comparison is anchored to. Let $\rho_t(\cdot)$ denote rotation of a column by $t$ positions (a $1$ at index $p$ moves to index $p+t$), and let $\epsilon := +1$ for a prefix filter and $\epsilon := -1$ for a suffix filter. Define the \emph{anchor selector}
 \begin{displaymath}
   \mathsf{s_a} := \begin{cases} \mathsf{s_b} & \text{prefix},\\[2pt] \rho_{-1}(\mathsf{s_b}) & \text{suffix,}\end{cases}
 \end{displaymath}
@@ -14,31 +136,21 @@ which marks the first (resp.\ last) character of every string; the suffix anchor
 \end{displaymath}
 so $\pi(i)=i$ for a prefix and $\pi(i)=k-1-i$ for a suffix. The prefix case recovers $\mathsf{s_a}=\mathsf{s_b}$ and $\mathsf{s_a^i}=\mathsf{s_b^i}$.
 
-At a high level the check has five parts, which we explain in turn before presenting the protocol.
-
-\parhead{Filtering by length} A string shorter than $k$ can never match a length-$k$ pattern, and if left in place its anchored selectors would, once rotated, spill into the character slots of neighboring strings and corrupt the comparison. The prover therefore flags every short string up front by sending two masks: $\mathsf{m_h}$, which is $1$ on each string of length less than $k$, and $\mathsf{m_d}$, which is $1$ on every character of such a string. Running activator consistency on the masks forces them to agree---a string is flagged by $\mathsf{m_h}$ exactly when all of its characters are flagged by $\mathsf{m_d}$---and a non-negativity check certifies that the flagged strings really do have length below $k$. The masked old activators $\mathsf{a_d^{msk}}$ and $\mathsf{a_h^{msk}}$ then switch these short strings off, so that every subsequent step ranges only over strings long enough to be candidate matches.
-
-\parhead{Activator consistency} The prover claims that $\mathsf{a_h^{new}}$ and $\mathsf{a_d^{new}}$ are the activators of the filtered column. Before trusting them, the verifier checks that they are internally consistent with one another and with the lengths: a string is marked active by $\mathsf{a_h^{new}}$ exactly when its characters are marked active by $\mathsf{a_d^{new}}$, and the active-character count of each string equals its length. This prevents the prover from later exploiting a malformed pair of activators.
-
-\parhead{False positives} A string that \emph{survives} the filter must genuinely match the pattern. A string survives when it is active under both the new activator $\mathsf{a_d^{new}}$ and the masked old activator $\mathsf{a_d^{msk}}$. For each pattern position $i$, the zero-check forces the data to equal the required pattern character $\mathsf{str}[\pi(i)]$ at every surviving, anchored character slot marked by $\mathsf{s_a^i}$. Passing all $k$ checks guarantees that every surviving string matches the pattern in full, so the filter keeps no string it should have rejected.
-
-\parhead{False negatives} Conversely, a string that the prover \emph{drops} must truly fail the pattern; otherwise a legitimate match would be silently discarded. The prover first commits, for each position $i$, an equality predicate $\mathsf{p}_i$ that marks the character slots where the data matches $\mathsf{str}[\pi(i)]$ at an active, anchored position. Two checks pin $\mathsf{p}_i$ to the truth: a zero-check forces $\mathsf{p}_i$ to vanish wherever the characters disagree, and a no-zero check forces it to be nonzero wherever an active anchored slot does agree, so $\mathsf{p}_i$ marks precisely the positional matches. To test whether a string matches at \emph{every} one of the $k$ positions, these predicates---which live at $k$ different anchored offsets---are rotated back onto the common anchor by $\mathsf{p}_i' := \rho_{-\epsilon i}(\mathsf{p}_i)$, with each rotation certified by a rotation check, so that their product $\prod_i \mathsf{p}_i'$ is $1$ exactly at the anchor of a string matching the entire pattern.
-
-\parhead{Dropped strings really fail} Finally, the dropped-anchor selector $\mathsf{s_a'} := (1-\mathsf{a_d^{new}})\cdot\mathsf{a_d^{msk}}\cdot\mathsf{s_a}$ marks the anchor of every string that was active before the filter but dropped after it. A single zero-check on $(\prod_i \mathsf{p}_i',\, \mathsf{s_a'})$ forces $\prod_i\mathsf{p}_i'$ to vanish at each dropped anchor, certifying that no dropped string matched the full pattern. Together with the false-positive check, this pins the new activators to keep exactly the strings that match the filter.
 
    \begin{DefinePIOP}{Prefix/Suffix Check}{prefix-check}
     \begin{enumerate}[nosep]
+        \item (\textit{Activator Consistency}) $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:act-cons} on $(\mathsf{src}, \mathsf{a_d^{new}}, \mathsf{l}, \mathsf{a_h^{new}})$.
         \item  (\textit{Filtering by length}) $\PIOPProver$ sends $\mathsf{m_h}$ and $\mathsf{m_d}$
         \begin{enumerate}[nosep]
           \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:act-cons} on $(\mathsf{src}, \mathsf{m_d}, \mathsf{l}, \mathsf{m_h})$.
-        \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:nonneg-check} on the column $(\mathsf{m_h}, \mathsf{l}-k)$.
+        \item $\PIOPProver$ and $\PIOPVerifier$ invoke the Negative \cref{piop:sign-check} on the column $(\mathsf{m_h}, \mathsf{l}-k)$.
+        \item $\PIOPProver$ and $\PIOPVerifier$ invoke the Non-Negative \cref{piop:sign-check} on the column $(1-\mathsf{m_h}, \mathsf{l}-k)$.
                 \item $\PIOPProver$ and $\PIOPVerifier$ define the masked old activators
         \begin{align*}
           \mathsf{a_d^{msk}} := \mathsf{a_d^{old}}\cdot(1-\mathsf{m_d}), \qquad
           \mathsf{a_h^{msk}} := \mathsf{a_h^{old}}\cdot(1-\mathsf{m_h}),
         \end{align*}
         \end{enumerate}
-        \item (\textit{Activator Consistency}) $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:act-cons} on $(\mathsf{src}, \mathsf{a_d^{new}}, \mathsf{l}, \mathsf{a_h^{new}})$.
         \item (\textit{False Positive Check}) For $i=0,\ldots,k-1$, $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:zerocheck} on the column $(\mathsf{d}-\mathsf{str}[\pi(i)],\;\mathsf{s_a^i}\cdot \mathsf{a_d^{new}}\mathsf{a_d^{msk}})$.
         \item (\textit{False Negative Check}) $\PIOPProver$ and $\PIOPVerifier$ proceed as follows:
         \begin{enumerate}
