@@ -2,30 +2,46 @@
 \newif\iflncs
 \newif\ifusenix
 \newif\ifoakland
+\newif\ifsp
 
-\lncstrue
-\usenixtrue
-\fulltrue
-% \fullfalse
-
-\synctex=1
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% FORMAT SELECTION
+% Set \sptrue to typeset the paper in IEEE S&P (Oakland) 2027 format.
+% Leave \spfalse to keep the exact default format.
+\sptrue
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+\synctex=1
 
-
-\iffull
-  \documentclass[11pt,letterpaper]{article}
-  \usepackage[draft,notes=true,later=true]{styles/dtrt}
- \else
-  \iflncs
-    \documentclass[letter]{llncs}
-    \pagestyle{plain}
-  \else
-  \ifusenix
-  \documentclass[letterpaper,twocolumn,10pt]{article}
-  \usepackage{styles/usenix}
-  \fi
-  \usepackage{multicol}
-  \fi
+\ifsp
+  %% IEEE S&P 2027: IEEEtran.cls v1.8b with options "conference,compsoc", US letter.
+  \documentclass[conference,compsoc,letterpaper]{IEEEtran}
+  \fullfalse
+  \lncsfalse
+  \usenixfalse
+  \oaklandtrue
+  % dtrt supplies \parhead and loads hyperref; "notes=xxx,later=false" disables draft notes.
   \usepackage[notes=xxx,later=false]{styles/dtrt}
+\else
+  \lncstrue
+  \usenixtrue
+  \fulltrue
+  % \fullfalse
+
+  \iffull
+    \documentclass[11pt,letterpaper]{article}
+    \usepackage[draft,notes=true,later=true]{styles/dtrt}
+   \else
+    \iflncs
+      \documentclass[letter]{llncs}
+      \pagestyle{plain}
+    \else
+    \ifusenix
+    \documentclass[letterpaper,twocolumn,10pt]{article}
+    \usepackage{styles/usenix}
+    \fi
+    \usepackage{multicol}
+    \fi
+    \usepackage[notes=xxx,later=false]{styles/dtrt}
+  \fi
 \fi

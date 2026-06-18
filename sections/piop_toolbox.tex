@@ -14,7 +14,7 @@ The \emph{Bitwise AND check} takes three columns $\col_1, \col_2, \col_3$ contai
 \,\right\}.
 \end{displaymath}
 
-\begin{figure}[h]
+\ifsp\begin{figure*}[tp]\else\begin{figure}[h]\fi
 \centering
 \begin{tikzpicture}[
   cell/.style={draw, minimum width=1.4cm, minimum height=0.42cm, font=\ttfamily\small, inner sep=1pt},
@@ -40,7 +40,7 @@ The \emph{Bitwise AND check} takes three columns $\col_1, \col_2, \col_3$ contai
 \end{tikzpicture}
 \caption{The arithmetized truth-table for the bitwise AND function on n=2 bit inputs.}
 \label{fig:bitwise-and-tt}
-\end{figure}
+\ifsp\end{figure*}\else\end{figure}\fi
 
 To convince the verifier that each row of $\col_3$ is the bitwise AND of the corresponding rows of $\col_1$ and $\col_2$, the prover will convince the verifier that the concatenated rows of $\col_1, \col_2, \col_3$ can be looked up in a truth table encoding the bitwise AND function. More concretely,
 \begin{DefinePIOP}{BitwiseAND}{bitwise-and}

@@ -9,21 +9,29 @@
 % The actual paper starts here
 \begin{document}
 
-\title{\papername: Verifiable Query Engine with complete TPC-H support}
-\author{
-  Alireza Shirzad\\
-  Upenn
-  \and
-  Bharath Namboothiry\\
-  Upenn
-  \and
-  Ryan Marcus\\
-  Upenn
-  \and
-  Pratyush Mishra\\
-  Upenn
-}
-\date{\today}
+\ifsp
+  %% Double-blind submission: keep authors anonymous.
+  \title{\papername: Verifiable Query Engine with complete TPC-H support}
+  \author{%
+    \IEEEauthorblockN{Anonymous Author(s)}
+  }
+\else
+  \title{\papername: Verifiable Query Engine with complete TPC-H support}
+  \author{
+    Alireza Shirzad\\
+    Upenn
+    \and
+    Bharath Namboothiry\\
+    Upenn
+    \and
+    Ryan Marcus\\
+    Upenn
+    \and
+    Pratyush Mishra\\
+    Upenn
+  }
+  \date{\today}
+\fi
 
 
 \maketitle

@@ -1,5 +1,5 @@
 % !TEX root = ../paper.tex
-\usepackage{fullpage}
+\ifsp\else\usepackage{fullpage}\fi % fullpage alters margins; forbidden by IEEE compsoc
 \usepackage{microtype}
 \usepackage{setspace}
 \usepackage{amssymb,amsfonts,amsmath}
@@ -11,7 +11,7 @@
     \let\endproof\relax
 \fi
 \usepackage{amsthm}
-\usepackage{times}
+\ifsp\else\usepackage{times}\fi % IEEE compsoc sets its own font; do not override
 \usepackage{braket}
 \usepackage{tikz}
 \usetikzlibrary{matrix}

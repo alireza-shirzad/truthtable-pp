@@ -15,7 +15,47 @@ The \emph{NoZero Check} takes a column $\col = (\mathsf{d},\mathsf{a})$ and prov
 \,\right\}.
 \end{displaymath}
 
+A field element is nonzero exactly when it has a multiplicative inverse. The prover sends an inverse column $\mathsf{inv}$ whose value at each active index is the inverse of the data there and which is $0$ at inactive indices. If $\mathsf{inv}$ is formed this way, then $\mathsf{d}\mult\mathsf{inv} = \mathsf{a}$ holds across the whole hypercube: at an active index both sides equal $1$, and at an inactive index both sides equal $0$ (since $\mathsf{inv}$ is $0$ there). A single \cref{piop:zerocheck} on $\mathsf{d}\mult\mathsf{inv} - \mathsf{a}$ certifies this, and forces every active entry to be invertible, hence nonzero.
 \begin{DefinePIOP}{NoZero Check}{nozero-check}
+  \emph{Inputs:} $\Oracle{\MLE{\col}} = (\Oracle{\MLE{\mathsf{a}}}, \Oracle{\MLE{\mathsf{d}}})$.
+  \begin{enumerate}[nosep]
+    \item $\PIOPProver$ constructs and sends the inverse oracle $\Oracle{\MLE{\mathsf{inv}}}$, with $\mathsf{inv}[i] = \mathsf{d}[i]^{-1}$ at active indices and $\mathsf{inv}[i] = 0$ elsewhere.
+    \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:zerocheck} on the column $\mathsf{d}\mult\mathsf{inv} - \mathsf{a}$.
+  \end{enumerate}
+\end{DefinePIOP}
+
+\subsection{Booleanity Check}
+The \emph{Booleanity Check} takes a column $\col = (\mathsf{d},\mathsf{a})$ and proves that every active entry of $\col$ is $0$ or $1$. We package this as the relation
+\begin{displaymath}
+\NPRelation_{\mathsf{Bool}} = \left\{\,
+  \NPInstance = \bot,\;
+  \NPInstancey = (\Oracle{\MLE{\col}}),\;
+  \NPWitness = (\col)
+  \;\middle|\;
+    \forall i,\, \mathsf{a}[i] = 1 \implies \mathsf{d}[i]\in\{0,1\}
+\,\right\}.
+\end{displaymath}
+Since $\mathsf{d}[i]\in\{0,1\}$ exactly when $\mathsf{d}[i]\bigl(1-\mathsf{d}[i]\bigr)=0$, the check is a single \cref{piop:zerocheck} on the column $\mathsf{a}\cdot\mathsf{d}\cdot(1-\mathsf{d})$, which vanishes everywhere iff every active entry is boolean.
+\begin{DefinePIOP}{Booleanity Check}{boolean-check}
+  \emph{Inputs:} $\Oracle{\MLE{\col}} = (\Oracle{\MLE{\mathsf{a}}}, \Oracle{\MLE{\mathsf{d}}})$.
+  \begin{enumerate}[nosep]
+    \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:zerocheck} on the column $\mathsf{a}\cdot\mathsf{d}\cdot(1-\mathsf{d})$.
+  \end{enumerate}
+\end{DefinePIOP}
+
+\subsection{No-Duplicate Check}
+The \emph{No-Duplicate Check} takes a column $\col = (\mathsf{d},\mathsf{a})$ and proves that the active entries of $\col$ are pairwise distinct. We package this as the relation
+\begin{displaymath}
+\NPRelation_{\mathsf{NoDup}} = \left\{\,
+  \NPInstance = \bot,\;
+  \NPInstancey = (\Oracle{\MLE{\col}}),\;
+  \NPWitness = (\col)
+  \;\middle|\;
+    \forall i\neq j,\; \mathsf{a}[i]=\mathsf{a}[j]=1 \implies \mathsf{d}[i]\neq\mathsf{d}[j]
+\,\right\}.
+\end{displaymath}
+
+\begin{DefinePIOP}{No-Duplicate Check}{nodup-check}
     TODO
 \end{DefinePIOP}
 
@@ -32,43 +72,68 @@ The \emph{Limb Reconstruction Check} takes 1 $n$-bit column $\col$ and $k$ colum
 \end{displaymath}
 
 
+Reconstruction is a single linear identity over the hypercube: subtracting the weighted limbs from $\col$ must vanish at every row. A single \cref{piop:zerocheck} on $\col - \sum_{j=0}^{k-1} 2^{(k-1-j)n/k}\mult\col_j$ enforces exactly this, pinning down each entry of $\col$ as the concatenation of the corresponding limbs. The check certifies only the weighted-sum relationship; bounding each limb $\col_j$ to its $n/k$-bit width, when required, is done by a separate \cref{piop:range-check}.
 \begin{DefinePIOP}{Limb Reconstruction Check}{limb-check}
-    TODO
+  \emph{Inputs:} $\Oracle{\MLE{\col}}, \Oracle{\MLE{\col_0}}, \ldots, \Oracle{\MLE{\col_{k-1}}}$.
+  \begin{enumerate}[nosep]
+    \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:zerocheck} on the column $\col - \sum_{j=0}^{k-1} 2^{(k-1-j)n/k}\mult\col_j$.
+  \end{enumerate}
 \end{DefinePIOP}
 
 \subsection{Lookup Check}
-The \emph{Lookup Check} takes two columns $\col_1$ and $\col_2$ and proves that every entry of $\col_1$ can be found in $\col_2$. We package this as the relation
+The \emph{Lookup Check} takes two columns $\col_1 = (\mathsf{d}_1, \mathsf{a}_1)$ and $\col_2 = (\mathsf{d}_2, \mathsf{a}_2)$ and proves that every active value of $\col_1$ also occurs as an active value of $\col_2$, written $\col_1 \lookup \col_2$. We package this as the relation
 \begin{displaymath}
-\NPRelation_{\mathsf{Range}} = \left\{\,
-  \NPInstance = n,\;
-  \NPInstancey = (\Oracle{\MLE{\col_1}}),\;
-  \NPWitness = (\col_1)
+\NPRelation_{\mathsf{Lookup}} = \left\{\,
+  \NPInstance = \bot,\;
+  \NPInstancey = (\Oracle{\MLE{\col_1}}, \Oracle{\MLE{\col_2}}),\;
+  \NPWitness = (\col_1, \col_2)
   \;\middle|\;
-    \forall i,\, 0\leq \col[i] < 2^n
+    \forall i,\, \mathsf{a}_1[i] = 1 \implies \exists j:\, \mathsf{a}_2[j] = 1 \wedge \mathsf{d}_1[i] = \mathsf{d}_2[j]
 \,\right\}.
 \end{displaymath}
-
-
+We discharge the lookup with the LogUp technique~\cite{Habock22}: $\col_1 \lookup \col_2$ holds if and only if there is a \emph{multiplicity} column $\mathsf{m}$ over $\col_2$'s hypercube such that, with $\mu$ and $\nu$ the hypercube dimensions of $\MLE{\col_1}$ and $\MLE{\col_2}$,
+\begin{equation}
+  \label{eq:lookup-logup}
+  \sum_{x \in \BoolHCube{\mu}} \frac{\MLE{\mathsf{a}_1}(x)}{X - \MLE{\mathsf{d}_1}(x)}
+  \;=\;
+  \sum_{y \in \BoolHCube{\nu}} \frac{\MLE{\mathsf{a}_2}(y)\mult\MLE{\mathsf{m}}(y)}{X - \MLE{\mathsf{d}_2}(y)}
+\end{equation}
+as rational functions in $X$, where the activators zero out the inactive terms on each side. The prover sends $\mathsf{m}$, and the parties verify the rational identity by Schwartz--Zippel: the verifier samples a random $r \samples \F$, the prover sends the purported common value $s$ that both sides take at $X = r$, and the parties run \cref{piop:ratsumcheck} twice to confirm that each side evaluates to $s$ at $X = r$. When $\col_2$ is known to be duplicate-free, $\mathsf{m}(y)$ records the multiplicity of $\MLE{\mathsf{d}_2}(y)$ in $\col_1$, so the verifier stores $\Oracle{\MLE{\mathsf{m}}}$ as a protocol output for use by higher-level checks.
 \begin{DefinePIOP}{Lookup Check}{lookup-check}
-    TODO
+  \emph{Inputs:} $\Oracle{\MLE{\col_1}}, \Oracle{\MLE{\col_2}}$.
+  \begin{enumerate}[nosep]
+    \item $\PIOPProver$ constructs and sends the multiplicity oracle $\Oracle{\MLE{\mathsf{m}}}$, which $\PIOPVerifier$ stores as protocol output.
+    \item $\PIOPVerifier$ samples a random point $r \samples \F$ and sends it to $\PIOPProver$, who responds with the claimed common value $s$ of both sides of \cref{eq:lookup-logup} at $X = r$.
+    \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:ratsumcheck} twice to prove that both sides of \cref{eq:lookup-logup} evaluate to $s$ at $X = r$.
+  \end{enumerate}
 \end{DefinePIOP}
 
 
 \subsection{Range Check}
-The \emph{Range Check} takes a column $\col$ and proves that every entry of $\col$ is within an $n$-bit range. We package this as the relation
+The \emph{Range Check} takes a column $\col = (\mathsf{d}, \mathsf{a})$ and a width $n$, and proves that every active entry of $\col$ is a non-negative integer of bitwidth $n$, i.e.\ lies in $[0, 2^n - 1]$. We package this as the relation
 \begin{displaymath}
 \NPRelation_{\mathsf{Range}} = \left\{\,
   \NPInstance = n,\;
   \NPInstancey = (\Oracle{\MLE{\col}}),\;
   \NPWitness = (\col)
   \;\middle|\;
-    \forall i,\, 0\leq \col[i] < 2^n
+    \forall i,\, \mathsf{a}[i] = 1 \implies 0\leq \mathsf{d}[i] < 2^n
 \,\right\}.
 \end{displaymath}
-
-
+We assume $n < \log_2 |\F|$, so the range embeds unambiguously into $\F$. A direct approach proves $\col \lookup \mathsf{rng}_n := (\mathbf{1}, \idx_n)$, since the index polynomial $\idx_n$ ranges over exactly $\{0, \ldots, 2^n - 1\}$; but this lookup table has $2^n$ rows and is wasteful for large $n$. Instead we split each value into $16$-bit \emph{limbs} and range-check each limb against a small index column. Choosing $k$ and $\beta$ with $n = 16k + \beta$ and $\beta \leq 16$, the prover sends limb columns $\mathsf{d}_1, \ldots, \mathsf{d}_{k+1}$ satisfying
+\begin{displaymath}
+  \mathsf{a}(x)\mult\mathsf{d}(x) = \sum_{i=1}^{k+1} 2^{16(i-1)}\mult\mathsf{d}_i(x), \qquad x \in \BoolHCube{\mu},
+\end{displaymath}
+which a single \cref{piop:zerocheck} enforces; the activator collapses inactive rows to zero, so the identity pins the limb decomposition on active rows. A \cref{piop:lookup-check} of each limb into the appropriate small index column then forces $\mathsf{d}(x) \in [0, 2^n - 1]$ at every active $x$.
 \begin{DefinePIOP}{Range Check}{range-check}
-    TODO
+  \emph{Inputs:} $\Oracle{\MLE{\col}} = (\Oracle{\MLE{\mathsf{a}}}, \Oracle{\MLE{\mathsf{d}}})$, width $n$.
+  \begin{enumerate}[nosep]
+    \item $\PIOPProver$ and $\PIOPVerifier$ compute $\beta, k$ such that $16k + \beta = n$ and $\beta \leq 16$.
+    \item $\PIOPProver$ constructs and sends the limb oracles $\Oracle{\MLE{\mathsf{d}_1}}, \ldots, \Oracle{\MLE{\mathsf{d}_{k+1}}}$, the $16$-bit limb decomposition of $\mathsf{d}$.
+    \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:zerocheck} on the column $\mathsf{a}\mult\mathsf{d} - \sum_{i=1}^{k+1} 2^{16(i-1)}\mult\mathsf{d}_i$.
+    \item For each $i \in [k]$, $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:lookup-check} on $(\mathbf{1}, \mathsf{d}_i)$ and $\mathsf{rng}_{16} := (\mathbf{1}, \idx_{16})$, proving each limb lies in $[0, 2^{16}-1]$.
+    \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:lookup-check} on $(\mathbf{1}, \mathsf{d}_{k+1})$ and $\mathsf{rng}_\beta := (\mathbf{1}, \idx_\beta)$, proving the residual limb lies in $[0, 2^\beta-1]$.
+  \end{enumerate}
 \end{DefinePIOP}
 
 \subsection{Sign Check}
