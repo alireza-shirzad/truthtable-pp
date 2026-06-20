@@ -42,77 +42,77 @@ The check is exactly a group-by-sum: grouping the rows $(\mathsf{src}, \mathsf{a
 
 
 
-% \ifsp\begin{table*}[tp]\else\begin{table}[h!]\fi
-% \centering
-% \small
-% \begin{tabular}{p{3.8cm}p{4.5cm}p{5cm}}
-% \toprule
-% \textbf{SQL String Operator} & \textbf{Approx. Filtering Applicable?} & \textbf{Used in TPC-H?} \\
-% \midrule
-% \texttt{LIKE '\%pat\%'} (substring)
-%   & Yes --- canonical case; character/$n$-gram features are monotone
-%   & Yes: Q9, Q13 (negated), Q14, Q16 (negated) \\
-% \addlinespace
-% \texttt{LIKE 'pat\%'} (prefix)
-%   & Yes --- with anchored/positional features (or sortedness)
-%   & Yes: Q2, Q20 \\
-% \addlinespace
-% \texttt{LIKE '\%pat'} (suffix)
-%   & Yes --- with end-anchored features
-%   & No \\
-% \addlinespace
-% \texttt{LIKE 'pat'} (exact, no wildcards)
-%   & Trivially yes, but equality is usually faster directly
-%   & No (TPC-H uses \texttt{=} instead) \\
-% \addlinespace
-% \texttt{LIKE 'p\_t'} (single-char wildcard)
-%   & Partial --- anchor what you can; treat \texttt{\_} as unknown
-%   & No \\
-% \addlinespace
-% \texttt{LIKE '\%a\%b\%'} (multi-fragment)
-%   & Yes --- filter on each required fragment, AND the results
-%   & Yes: Q13 \\
-% \addlinespace
-% \texttt{NOT LIKE}
-%   & No directly --- monotonicity runs the wrong way; filter the positive form and complement
-%   & Yes: Q13, Q16 \\
-% \addlinespace
-% \texttt{=} (exact equality)
-%   & Trivially yes, but direct comparison or hashing wins
-%   & Pervasive \\
-% \addlinespace
-% \texttt{<}, \texttt{>}, \texttt{<=}, \texttt{>=} (lex.)
-%   & Partial --- works with order-preserving features; not the technique's strength
-%   & No (used on numeric/date columns only) \\
-% \addlinespace
-% \texttt{IN (lit1, lit2, ...)} (string set)
-%   & Yes --- disjunction over members; equivalent to multiple equality filters
-%   & Yes: Q19, Q22 \\
-% \addlinespace
-% \texttt{NOT IN} (string set)
-%   & No directly --- same issue as \texttt{NOT LIKE}
-%   & Yes: Q16 \\
-% \addlinespace
-% \texttt{BETWEEN} (lex.)
-%   & Partial --- same caveats as \texttt{<}/\texttt{>} on strings
-%   & No (numeric/date use in TPC-H) \\
-% \addlinespace
-% \texttt{SUBSTRING} / \texttt{SUBSTR} extract
-%   & N/A as a predicate; filter the enclosing \texttt{=} or \texttt{LIKE}
-%   & Yes: Q22 (\texttt{SUBSTRING(c\_phone FROM 1 FOR 2)}) \\
-% \addlinespace
-% \texttt{CONCAT} / \texttt{||}
-%   & N/A --- not a predicate
-%   & No (in \texttt{WHERE} clauses) \\
-% \addlinespace
-% Regex (\texttt{SIMILAR TO}, \texttt{\textasciitilde})
-%   & Partial --- works when required literal fragments can be extracted
-%   & No \\
-% \bottomrule
-% \end{tabular}
-% \caption{Applicability of approximate filtering to SQL string operators, and their occurrence in TPC-H queries.}
-% \label{tab:sql-ops-filter}
-% \ifsp\end{table*}\else\end{table}\fi
+\ifsp\begin{table*}[tp]\else\begin{table}[h!]\fi
+\centering
+\small
+\begin{tabular}{p{3.8cm}p{4.5cm}p{5cm}}
+\toprule
+\textbf{SQL String Operator} & \textbf{Approx. Filtering Applicable?} & \textbf{Used in TPC-H?} \\
+\midrule
+\texttt{LIKE '\%pat\%'} (substring)
+  & Yes --- canonical case; character/$n$-gram features are monotone
+  & Yes: Q9, Q13 (negated), Q14, Q16 (negated) \\
+\addlinespace
+\texttt{LIKE 'pat\%'} (prefix)
+  & Yes --- with anchored/positional features (or sortedness)
+  & Yes: Q2, Q20 \\
+\addlinespace
+\texttt{LIKE '\%pat'} (suffix)
+  & Yes --- with end-anchored features
+  & No \\
+\addlinespace
+\texttt{LIKE 'pat'} (exact, no wildcards)
+  & Trivially yes, but equality is usually faster directly
+  & No (TPC-H uses \texttt{=} instead) \\
+\addlinespace
+\texttt{LIKE 'p\_t'} (single-char wildcard)
+  & Partial --- anchor what you can; treat \texttt{\_} as unknown
+  & No \\
+\addlinespace
+\texttt{LIKE '\%a\%b\%'} (multi-fragment)
+  & Yes --- filter on each required fragment, AND the results
+  & Yes: Q13 \\
+\addlinespace
+\texttt{NOT LIKE}
+  & No directly --- monotonicity runs the wrong way; filter the positive form and complement
+  & Yes: Q13, Q16 \\
+\addlinespace
+\texttt{=} (exact equality)
+  & Trivially yes, but direct comparison or hashing wins
+  & Pervasive \\
+\addlinespace
+\texttt{<}, \texttt{>}, \texttt{<=}, \texttt{>=} (lex.)
+  & Partial --- works with order-preserving features; not the technique's strength
+  & No (used on numeric/date columns only) \\
+\addlinespace
+\texttt{IN (lit1, lit2, ...)} (string set)
+  & Yes --- disjunction over members; equivalent to multiple equality filters
+  & Yes: Q19, Q22 \\
+\addlinespace
+\texttt{NOT IN} (string set)
+  & No directly --- same issue as \texttt{NOT LIKE}
+  & Yes: Q16 \\
+\addlinespace
+\texttt{BETWEEN} (lex.)
+  & Partial --- same caveats as \texttt{<}/\texttt{>} on strings
+  & No (numeric/date use in TPC-H) \\
+\addlinespace
+\texttt{SUBSTRING} / \texttt{SUBSTR} extract
+  & N/A as a predicate; filter the enclosing \texttt{=} or \texttt{LIKE}
+  & Yes: Q22 (\texttt{SUBSTRING(c\_phone FROM 1 FOR 2)}) \\
+\addlinespace
+\texttt{CONCAT} / \texttt{||}
+  & N/A --- not a predicate
+  & No (in \texttt{WHERE} clauses) \\
+\addlinespace
+Regex (\texttt{SIMILAR TO}, \texttt{\textasciitilde})
+  & Partial --- works when required literal fragments can be extracted
+  & No \\
+\bottomrule
+\end{tabular}
+\caption{Applicability of approximate filtering to SQL string operators, and their occurrence in TPC-H queries.}
+\label{tab:sql-ops-filter}
+\ifsp\end{table*}\else\end{table}\fi
 
 
 \subsubsection{Length Filtering}
@@ -165,7 +165,236 @@ Booleanity forces $\mathsf{m_h}, \mathsf{m_d} \in \{0,1\}$. The two sign checks 
 \end{proof}
 
 
-    \subsubsection{Prefix and Suffix Check} A prefix/suffix check keeps the strings in a column that begin or end with a fixed pattern $\mathsf{str}$ of length $k$: a \emph{prefix} filter $\mathsf{str}\%$ keeps strings that start with $\mathsf{str}$ (as in \texttt{LIKE 'str\%'}), and a \emph{suffix} filter $\%\mathsf{str}$ keeps strings that end with it (as in \texttt{LIKE '\%str'}).
+\subsubsection{Substring Protocol}
+\label{sec:windowed-match}
+The prefix, suffix, and infix filters are three instances of one task: keep the strings that contain the length-$k$ pattern $\mathsf{str}$ at an \emph{admissible} starting position. We capture all three with a single protocol parameterized by a Boolean \emph{candidate-window mask} $\mathsf{W}$, which marks --- inside each eligible string --- the window starts that count as a match; a string \emph{matches} iff one of its candidate windows equals $\mathsf{str}$. The filters differ only in $\mathsf{W}$:
+\begin{itemize}[nosep]
+  \item \emph{Prefix} ($\mathsf{str}\%$): $\mathsf{W} = \mathsf{a_d^{old'}}\cdot\mathsf{s_b}$ --- the first character of each eligible string, one candidate per string.
+  \item \emph{Suffix} ($\%\mathsf{str}$): $\mathsf{W} = \mathsf{a_d^{old'}}\cdot\rho_{-k}(\mathsf{s_b})$ --- the start of the length-$k$ suffix window, one candidate per string.
+  \item \emph{Infix} ($\%\mathsf{str}\%$): $\mathsf{W} = \mathsf{a_d^{old'}}\cdot\bigl(1-\sum_{j=1}^{k-1}\mathsf{b}^{(j)}\bigr)$ --- every valid window start, up to $\mathsf{l}-k+1$ candidates per string.
+\end{itemize}
+In every case $\mathsf{W}\leq\mathsf{a_d^{old'}}$ and each marked position starts a window contained in its string. Under our MSM-based commitment the dedicated \cref{piop:prefix-check} is cheaper for the anchored cases --- it commits only binary selectors, whereas the protocol below commits the $k-1$ non-binary rotations of $\mathsf{d}$ --- so we keep both; the general protocol is the only option for the unanchored infix.
+
+The starting point is to compare every length-$k$ window against $\mathsf{str}$ at once. The prover first lays down the rotated character columns needed to read each window in parallel: writing $\mathsf{d}^{(0)} := \mathsf{d}$, the column $\mathsf{d}^{(\delta)}$ holds, at each position $p$, the character $\mathsf{d}[p+\delta]$, so that the tuple $(\mathsf{d}^{(0)}[p],\ldots,\mathsf{d}^{(k-1)}[p])$ spells out the length-$k$ window of $\mathsf{d}$ beginning at $p$. The verifier then collapses each window into a single field element by a random linear combination: it sends coefficients $r_0,\ldots,r_{k-1}$, and the parties form the \emph{window fingerprint} $\mathsf{wf}[p] := \sum_{\delta=0}^{k-1} r_\delta\,\mathsf{d}^{(\delta)}[p]$ together with the scalar \emph{pattern fingerprint} $\mathsf{pf} := \sum_{\delta=0}^{k-1} r_\delta\,\mathsf{str}[\delta]$. A window that equals $\mathsf{str}$ has $\mathsf{wf}[p]=\mathsf{pf}$ for every choice of coefficients, whereas a window that differs has $\mathsf{wf}[p]=\mathsf{pf}$ only with probability $(k-1)/|\F|$ over the verifier's coins. The length-$k$ comparison at every window is thereby reduced to the single field condition $\mathsf{wf}[p]=\mathsf{pf}$. Equivalently, the parties form the \emph{difference column} $\mathsf{diff} := \mathsf{wf}-\mathsf{pf}$, which vanishes exactly at the starting positions of the occurrences of $\mathsf{str}$.
+
+\parhead{Candidate windows} The mask $\mathsf{W}$ is a public function of the boundary selector $\mathsf{s_b}$, which marks each string's first character. Rotating $\mathsf{s_b}$ left by $1,\ldots,k-1$ gives $\mathsf{b}^{(j)} := \rho_{-j}(\mathsf{s_b})$, marking the $j$-th character from the end of each string --- the trailing positions whose length-$k$ windows would run off the end (or into the next string). The infix mask $\mathsf{v} := \mathsf{a_d^{old'}}\cdot(1-\sum_{j=1}^{k-1}\mathsf{b}^{(j)})$ keeps every position except those trailing $k-1$, i.e.\ the valid window starts of each eligible string; the prefix and suffix masks are the single anchored selectors $\mathsf{a_d^{old'}}\cdot\mathsf{s_b}$ and $\mathsf{a_d^{old'}}\cdot\rho_{-k}(\mathsf{s_b})$. The parties certify every rotation with \cref{piop:rotcheck}, so $\mathsf{W}$ is determined by $\mathsf{s_b}$ and the masked activator.
+
+\parhead{False negatives} A string that the filter \emph{drops} must fail at \emph{every} candidate position, where a window fails exactly when $\mathsf{diff}[p]\neq0$. This is a universal condition, so the prover sends no witness; the parties run a single \cref{piop:nozero-check} on $\mathsf{diff}$ with activator $\mathsf{W}\cdot(1-\mathsf{a_d^{new}})$, asserting $\mathsf{diff}\neq0$ at every candidate window of every dropped eligible string. The mask $\mathsf{W}$ selects the candidate windows of eligible strings (excluding the inactive and short strings and any boundary-crossing positions), and $1-\mathsf{a_d^{new}}$ restricts attention to the strings the prover did \emph{not} keep. Were a dropped eligible string a match, one of its candidate windows would make $\mathsf{diff}=0$ at a tested position and the check would reject; and because $\mathsf{diff}[p]\neq0$ implies the window differs from $\mathsf{str}$ \emph{unconditionally} (a true match always gives $\mathsf{diff}=0$, with no fingerprint-collision slack in this direction), no match can be silently discarded.
+
+\parhead{False positives} A string that the filter \emph{keeps} must match at \emph{some} candidate position. How this existential is discharged depends on how many candidates a string has.
+
+When $\mathsf{W}$ marks a \emph{single} candidate per string --- the anchored prefix and suffix filters --- ``some candidate matches'' is just ``the candidate matches'', so no witness is needed: a single \cref{piop:zerocheck} on $\mathsf{diff}$ with activator $\mathsf{W}\cdot\mathsf{a_d^{new}}$ forces the lone candidate of each kept string to equal $\mathsf{str}$.
+
+When $\mathsf{W}$ marks \emph{many} candidates --- the infix filter --- the prover exhibits a matching one by sending a Boolean \emph{witness selector} $\mathsf{w}$ that marks one matching candidate in each kept string. A \cref{piop:boolean-check} keeps $\mathsf{w}$ Boolean, and two \cref{piop:zerocheck}s confine it: $\mathsf{w}\cdot(1-\mathsf{a_d^{new}})=0$ pins each mark \emph{inside} a kept string ($\mathsf{w}\leq\mathsf{a_d^{new}}$, else a mark could hide in a non-kept string, where the occurrence check is switched off, to satisfy the count vacuously), and $\mathsf{w}\cdot(1-\mathsf{W})=0$ pins it to a genuine \emph{candidate} ($\mathsf{w}\leq\mathsf{W}$, else a boundary-crossing window could spell $\mathsf{str}$ without the kept string containing it). A \cref{piop:zerocheck} on the column with data $\mathsf{diff}$ and activator $\mathsf{w}$ then makes every mark a real occurrence. Finally a counting argument forces \emph{every} kept string to carry a mark: the prover announces the number of kept strings $n_{\mathsf{m}}$, two \cref{piop:sumcheck} invocations pin $\sum\mathsf{w}=n_{\mathsf{m}}$ and $\sum\mathsf{a_h^{new}}=n_{\mathsf{m}}$, and a \cref{piop:nodup-check} on the source indices $\mathsf{src}$ carried by the marks, with activator $\mathsf{w}$, forces those marks to lie in distinct strings; with $n_{\mathsf{m}}$ marks confined to the $n_{\mathsf{m}}$ kept strings and no two in the same string, every kept string carries exactly one occurrence of $\mathsf{str}$.
+
+\begin{DefinePIOP}{Substring Match}{windowed-match}
+  \begin{enumerate}[nosep]
+    \item (\textit{Activator validity check})
+    \begin{enumerate}[nosep]
+      \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:boolean-check} on $\mathsf{a_d^{new}}$ and on $\mathsf{a_h^{new}}$.
+      \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:act-cons} on $(\mathsf{src}, \mathsf{a_d^{new}}, \mathsf{l}, \mathsf{a_h^{new}})$, so that a string is on in $\mathsf{a_h^{new}}$ iff all of its characters are on in $\mathsf{a_d^{new}}$.
+    \end{enumerate}
+    \item (\textit{Filtering by length}) $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:len-filter} on $(\mathsf{src}, \mathsf{l}, \mathsf{a_h^{old}}, \mathsf{a_d^{old}})$ with threshold $k$, obtaining $\mathsf{a_h^{old'}}, \mathsf{a_d^{old'}}$ that switch off the inactive and shorter-than-$k$ strings.
+    \item (\textit{Containment}) $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:zerocheck} on $\mathsf{a_h^{new}}\cdot(1-\mathsf{a_h^{old'}})$, forcing $\mathsf{a_h^{new}}\leq\mathsf{a_h^{old'}}$ so that every kept string is eligible.
+    \item (\textit{Rotated character columns}) Writing $\mathsf{d}^{(0)} := \mathsf{d}$, $\PIOPProver$ sends $\mathsf{d}^{(1)},\ldots,\mathsf{d}^{(k-1)}$, each $\mathsf{d}^{(\delta)}$ a rotation of $\mathsf{d}^{(\delta-1)}$ by $-1$ (so $\mathsf{d}^{(\delta)}[p] = \mathsf{d}[p+\delta]$), and the parties invoke \cref{piop:rotcheck} on each $(\mathsf{d}^{(\delta-1)}, \mathsf{d}^{(\delta)}, -1)$.
+    \item (\textit{Window fingerprint and difference}) $\PIOPVerifier$ samples $r_0,\ldots,r_{k-1} \samples \F$. The parties form $\mathsf{wf} := \sum_{\delta=0}^{k-1} r_\delta\,\mathsf{d}^{(\delta)}$, the scalar $\mathsf{pf} := \sum_{\delta=0}^{k-1} r_\delta\,\mathsf{str}[\delta]$, and the difference column $\mathsf{diff} := \mathsf{wf}-\mathsf{pf}$, so that $\mathsf{diff}[p]=0$ exactly at the starting positions of the occurrences of $\mathsf{str}$ (up to the $(k-1)/|\F|$ fingerprint-collision error).
+    \item (\textit{Candidate-window mask}) The parties fix the candidate mask $\mathsf{W}$ for the filter, certifying each rotation of $\mathsf{s_b}$ used with \cref{piop:rotcheck}:
+    \begin{enumerate}[nosep]
+      \item \emph{prefix}: $\mathsf{W} := \mathsf{a_d^{old'}}\cdot\mathsf{s_b}$;\quad \emph{suffix}: $\mathsf{W} := \mathsf{a_d^{old'}}\cdot\rho_{-k}(\mathsf{s_b})$;
+      \item \emph{infix}: $\PIOPProver$ sends the rotated boundary columns $\mathsf{b}^{(1)},\ldots,\mathsf{b}^{(k-1)}$ ($\mathsf{b}^{(0)}:=\mathsf{s_b}$, each a rotation of the previous by $-1$), the parties \cref{piop:rotcheck} each $(\mathsf{b}^{(j-1)},\mathsf{b}^{(j)},-1)$, and set $\mathsf{W} := \mathsf{a_d^{old'}}\cdot\bigl(1-\textstyle\sum_{j=1}^{k-1}\mathsf{b}^{(j)}\bigr)$.
+    \end{enumerate}
+    \item (\textit{False negative check}) $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:nozero-check} on the column with data $\mathsf{diff}$ and activator $\mathsf{W}\cdot(1-\mathsf{a_d^{new}})$, certifying $\mathsf{diff}\neq0$ at \emph{every} candidate window of \emph{every} dropped eligible string. No witness is sent.
+    \item (\textit{False positive check})
+    \begin{enumerate}[nosep]
+      \item \emph{Anchored filters} ($\mathsf{W}$ marks one candidate per string). $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:zerocheck} on the column with data $\mathsf{diff}$ and activator $\mathsf{W}\cdot\mathsf{a_d^{new}}$, forcing the lone candidate of each kept string to equal $\mathsf{str}$.
+      \item \emph{Unanchored filter} ($\mathsf{W}$ marks many candidates per string). $\PIOPProver$ sends a witness selector $\mathsf{w}$, and the parties invoke
+      \begin{enumerate}[nosep]
+        \item \cref{piop:boolean-check} on $\mathsf{w}$;
+        \item \cref{piop:zerocheck} on $\mathsf{w}\cdot(1-\mathsf{a_d^{new}})$ and on $\mathsf{w}\cdot(1-\mathsf{W})$, forcing $\mathsf{w}\leq\mathsf{a_d^{new}}$ and $\mathsf{w}\leq\mathsf{W}$;
+        \item \cref{piop:zerocheck} on the column with data $\mathsf{diff}$ and activator $\mathsf{w}$;
+        \item \cref{piop:sumcheck} twice, for $\sum_{\vec{x}}\mathsf{w}(\vec{x})=n_{\mathsf{m}}$ and $\sum_{\vec{x}}\mathsf{a_h^{new}}(\vec{x})=n_{\mathsf{m}}$ (with $n_{\mathsf{m}}$ announced by $\PIOPProver$);
+        \item \cref{piop:nodup-check} on the column with data $\mathsf{src}$ and activator $\mathsf{w}$.
+      \end{enumerate}
+    \end{enumerate}
+  \end{enumerate}
+\end{DefinePIOP}
+
+\ifsp\begin{figure*}[t!]\else\begin{figure}[H]\fi
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[
+    cell/.style={draw, minimum size=6mm, inner sep=0pt, font=\small},
+    rowlab/.style={font=\small\itshape, anchor=east},
+    hd/.style={font=\small\bfseries}
+  ]
+
+  %==================== Panel 1: string-level columns ====================
+  \node[hd] at (0,7.6)   {$\col$};
+  \node[hd] at (2.0,7.6) {$\mathsf{h}$};
+  \node[hd] at (3.0,7.6) {$\mathsf{b}$};
+  \node[hd] at (4.0,7.6) {$\mathsf{l}$};
+  \node[hd] at (5.0,7.6) {$\mathsf{m_h}$};
+  \node[hd] at (6.3,7.6) {$\mathsf{a_h^{old}}$};
+  \node[hd] at (7.6,7.6) {$\mathsf{a_h^{old'}}$};
+  \node[hd] at (8.9,7.6) {$\mathsf{a_h^{new}}$};
+
+  % rows 0..6 are real strings (row 1 = inactive match "crust"; row 3 = the short "to");
+  % row 7 pads the column up to size 8.
+  % i / string / boundary / length / m_h / a_h_old / a_h_old' / a_h_new
+  \foreach \i/\s/\bb/\ll/\mh/\ao/\amid/\an in
+    {0/age/0/3/0/1/1/0, 1/crust/3/5/0/0/0/0, 2/abc/8/3/0/1/1/0,
+     3/to/11/2/1/1/0/0, 4/run/13/3/0/1/1/0, 5/arch/16/4/0/1/1/0,
+     6/trust/20/5/0/1/1/1, 7/{$\perp$}/25/0/0/0/0/0}{
+    \pgfmathsetmacro{\yy}{7.0 - \i*0.6}
+    \edef\pf{\ifnum\i>6 gray!12\else white\fi}
+    \edef\mhf{\ifnum\mh=1 red!40\else gray!12\fi}
+    \edef\fa{\ifnum\ao=1 green!30\else gray!12\fi}
+    \edef\fc{\ifnum\amid=1 green!30\else gray!12\fi}
+    \edef\fb{\ifnum\an=1 green!30\else gray!12\fi}
+    \node[font=\small\ttfamily, anchor=west] at (-0.4,\yy) {\s};
+    \node[cell, fill=\pf]  at (2.0,\yy) {\ifnum\i>6 0\else$h_{\i}$\fi};
+    \node[cell, fill=\pf]  at (3.0,\yy) {\bb};
+    \node[cell, fill=\pf]  at (4.0,\yy) {\ll};
+    \node[cell, fill=\mhf] at (5.0,\yy) {\mh};
+    \node[cell, fill=\fa]  at (6.3,\yy) {\ao};
+    \node[cell, fill=\fc]  at (7.6,\yy) {\amid};
+    \node[cell, fill=\fb]  at (8.9,\yy) {\an};
+  }
+
+  %==================== Panel 2: data-level columns ====================
+  % group (string) labels above the data row
+  \foreach \cx/\nm in {1/age, 5/crust, 9/abc, 11.5/to, 14/run, 17.5/arch, 22/trust}{
+    \node[font=\small\ttfamily] at (\cx*0.6, 1.35) {\nm};
+  }
+
+  % row labels
+  \node[rowlab] at (-0.5, 0.62){pos};
+  \node[rowlab] at (-0.5, 0.00){$\mathsf{d}=\mathsf{d}^{(0)}$};
+  \node[rowlab] at (-0.5,-0.62){$\mathsf{src}$};
+  \node[rowlab] at (-0.5,-1.24){$\mathsf{d}^{(1)}$};
+  \node[rowlab] at (-0.5,-1.86){$\mathsf{d}^{(2)}$};
+  \node[rowlab] at (-0.5,-2.48){$\mathsf{wf}$};
+  \node[rowlab] at (-0.5,-3.10){$\mathsf{diff}$};
+  \node[rowlab] at (-0.5,-3.72){$\mathsf{m_d}$};
+  \node[rowlab] at (-0.5,-4.34){$\mathsf{a_d^{old}}$};
+  \node[rowlab] at (-0.5,-4.96){$\mathsf{a_d^{old'}}$};
+  \node[rowlab] at (-0.5,-5.58){$\mathsf{s_b}$};
+  \node[rowlab] at (-0.5,-6.20){$\mathsf{b}^{(1)}$};
+  \node[rowlab] at (-0.5,-6.82){$\mathsf{b}^{(2)}$};
+  \node[rowlab] at (-0.5,-7.44){$\mathsf{v}$};
+  \node[rowlab] at (-0.5,-8.06){$\mathsf{a_d^{new}}$};
+  \node[rowlab] at (-0.5,-8.68){$\mathsf{w}$};
+
+  % x / char / src / d^(1)=d[p+1] / d^(2)=d[p+2] / window trigram / wf==pf? / m_d / a_d_old / a_d_old' / a_d_new
+  \foreach \x/\c/\sr/\da/\db/\wf/\mt/\md/\ao/\am/\an in {
+     0/a/0/g/e/age/0/0/1/1/0,  1/g/0/e/c/gec/0/0/1/1/0,  2/e/0/c/r/ecr/0/0/1/1/0,
+     3/c/1/r/u/cru/0/0/0/0/0,  4/r/1/u/s/rus/1/0/0/0/0,  5/u/1/s/t/ust/0/0/0/0/0,  6/s/1/t/a/sta/0/0/0/0/0,  7/t/1/a/b/tab/0/0/0/0/0,
+     8/a/2/b/c/abc/0/0/1/1/0,  9/b/2/c/t/bct/0/0/1/1/0, 10/c/2/t/o/cto/0/0/1/1/0,
+    11/t/3/o/r/tor/0/1/1/0/0, 12/o/3/r/u/oru/0/1/1/0/0,
+    13/r/4/u/n/run/0/0/1/1/0, 14/u/4/n/a/una/0/0/1/1/0, 15/n/4/a/r/nar/0/0/1/1/0,
+    16/a/5/r/c/arc/0/0/1/1/0, 17/r/5/c/h/rch/0/0/1/1/0, 18/c/5/h/t/cht/0/0/1/1/0, 19/h/5/t/r/htr/0/0/1/1/0,
+    20/t/6/r/u/tru/0/0/1/1/1, 21/r/6/u/s/rus/1/0/1/1/1, 22/u/6/s/t/ust/0/0/1/1/1, 23/s/6/t/./{st.}/0/0/1/1/1, 24/t/6/././{t..}/0/0/1/1/1}{
+    \pgfmathsetmacro{\px}{\x*0.6}
+    \edef\gc{\ifcase\sr blue!15\or purple!18\or green!22\or red!30\or
+                       orange!25\or cyan!22\or teal!28\or gray!18\fi}
+    \edef\wfc{\ifnum\mt=1 orange!35\else gray!10\fi}
+    \edef\dfc{\ifnum\mt=1 green!35\else gray!10\fi}
+    \edef\mdf{\ifnum\md=1 red!40\else gray!12\fi}
+    \edef\aof{\ifnum\ao=1 green!30\else gray!12\fi}
+    \edef\amf{\ifnum\am=1 green!30\else gray!12\fi}
+    \edef\anf{\ifnum\an=1 green!30\else gray!12\fi}
+    \node[font=\scriptsize, gray] at (\px,0.62) {\x};
+    \node[cell, fill=\gc]    at (\px, 0.00) {\texttt{\c}};
+    \node[cell, fill=\gc]    at (\px,-0.62) {\sr};
+    \node[cell, fill=white]  at (\px,-1.24) {\texttt{\da}};
+    \node[cell, fill=white]  at (\px,-1.86) {\texttt{\db}};
+    \node[cell, fill=\wfc]   at (\px,-2.48) {\scriptsize\texttt{\wf}};
+    \node[cell, fill=\dfc]   at (\px,-3.10) {\ifnum\mt=1 0\else\scriptsize$\neq 0$\fi};
+    \node[cell, fill=\mdf]   at (\px,-3.72) {\md};
+    \node[cell, fill=\aof]   at (\px,-4.34) {\ao};
+    \node[cell, fill=\amf]   at (\px,-4.96) {\am};
+    \node[cell, fill=\anf]   at (\px,-8.06) {\an};
+  }
+  % --- window-validity construction ---
+  % s_b: boundary selector (1 at first char of each string)
+  \foreach \x in {0,...,24}{\pgfmathsetmacro{\px}{\x*0.6}\node[cell, fill=gray!12] at (\px,-5.58) {0};}
+  \foreach \x in {0,3,8,11,13,16,20}{\pgfmathsetmacro{\px}{\x*0.6}\node[cell, fill=yellow!30] at (\px,-5.58) {1};}
+  % b^(1) = rho_{-1}(s_b): marks the last char of each string
+  \foreach \x in {0,...,24}{\pgfmathsetmacro{\px}{\x*0.6}\node[cell, fill=gray!12] at (\px,-6.20) {0};}
+  \foreach \x in {2,7,10,12,15,19,24}{\pgfmathsetmacro{\px}{\x*0.6}\node[cell, fill=yellow!55] at (\px,-6.20) {1};}
+  % b^(2) = rho_{-2}(s_b): marks the second-to-last char of each string
+  \foreach \x in {0,...,24}{\pgfmathsetmacro{\px}{\x*0.6}\node[cell, fill=gray!12] at (\px,-6.82) {0};}
+  \foreach \x in {1,6,9,11,14,18,23}{\pgfmathsetmacro{\px}{\x*0.6}\node[cell, fill=yellow!55] at (\px,-6.82) {1};}
+  % v: window-validity mask = a_d^old' with the last k-1 chars of each string removed
+  \foreach \x in {0,...,24}{\pgfmathsetmacro{\px}{\x*0.6}\node[cell, fill=gray!12] at (\px,-7.44) {0};}
+  \foreach \x in {0,8,13,16,17,20,21,22}{\pgfmathsetmacro{\px}{\x*0.6}\node[cell, fill=cyan!40] at (\px,-7.44) {1};}
+  % w: witness selector --- a single 1 in the kept match "trust" at p=21 (a_d^new=1, diff=0).
+  \foreach \x in {0,...,24}{
+    \pgfmathsetmacro{\px}{\x*0.6}
+    \node[cell, fill=gray!12] at (\px,-8.68) {0};
+  }
+  \node[cell, fill=green!55] at (21*0.6,-8.68) {1};
+  % padding ellipsis
+  \pgfmathsetmacro{\dx}{25.5*0.6}
+  \foreach \y in {0.00,-0.62,-1.24,-1.86,-2.48,-3.10,-3.72,-4.34,-4.96,-5.58,-6.20,-6.82,-7.44,-8.06,-8.68}{
+    \node at (\dx,\y) {$\cdots$};
+  }
+
+  % highlights: survivor "trust" solid (rus at 21..23); inactive match "crust" dashed
+  % (rus at 4..6); short string "to" dotted (length 2 < k=3, masked out).
+  \draw[red, thick]         (21*0.6-0.32,0.32) rectangle (23*0.6+0.32,-0.32);
+  \draw[red, thick, dashed] ( 4*0.6-0.32,0.32) rectangle ( 6*0.6+0.32,-0.32);
+  \draw[red, thick, dotted] (11*0.6-0.32,0.32) rectangle (12*0.6+0.32,-0.32);
+
+\end{tikzpicture}%
+}
+\caption{Infix instance for \texttt{\%rus\%} ($\mathsf{str}=\texttt{rus}$, $k=3$). The rotated
+character columns $\mathsf{d}^{(1)},\mathsf{d}^{(2)}$ bring the second and third character
+of each window into line with its start, so $\mathsf{wf}[p]$ fingerprints the length-$3$
+window beginning at position $p$ (shown as its trigram), and $\mathsf{diff}=\mathsf{wf}-\mathsf{pf}$
+vanishes exactly at the occurrences of \texttt{rus}. The two windows equal to
+\texttt{rus} are boxed: \texttt{trust} (solid) is the active match that is kept ---
+witnessed by the single mark $\mathsf{w}=1$ at $p=21$, where $\mathsf{a_d^{new}}=1$ and
+$\mathsf{diff}=0$ --- while \texttt{crust} (dashed) contains \texttt{rus} but is inactive
+($\mathsf{a_h^{old}}=0$), so it carries no witness.
+The length-$2$ string \texttt{to} (dotted) is too short for a $3$-character window and is
+removed by length filtering. The window-validity mask $\mathsf{v}=\mathsf{a_d^{old'}}(1-\mathsf{b}^{(1)}-\mathsf{b}^{(2)})$,
+built by rotating the boundary $\mathsf{s_b}$ left into $\mathsf{b}^{(1)},\mathsf{b}^{(2)}$ (which mark the last and
+second-to-last character of each string) and subtracting them from $\mathsf{a_d^{old'}}$, marks (in cyan) exactly the
+valid window starts --- the first $\mathsf{l}-k+1$ characters --- of each eligible string, so windows that run off
+the end ($p=23,24$) or cross a boundary (e.g.\ $p=6$, \texttt{sta}) are switched off.
+The false-negative check is a single no-zero check on $\mathsf{diff}$ over the valid windows of the dropped
+eligible strings (activator $\mathsf{v}\cdot(1-\mathsf{a_d^{new}})$): \texttt{age}, \texttt{abc}, \texttt{run},
+\texttt{arch} all have $\mathsf{diff}\neq0$ at every such window, so none contains \texttt{rus}.}
+\label{fig:infix-check}
+\ifsp\end{figure*}\else\end{figure}\fi
+
+\begin{proof}
+We argue completeness and soundness, assuming each invoked sub-PIOP is complete and sound for its relation. Call a string \emph{eligible} if it is active under $\mathsf{a_h^{old}}$ and has length at least $k$; by the soundness of \cref{piop:len-filter} these are exactly the strings marked by $\mathsf{a_h^{old'}}$, and we write $E := \{\,i : \mathsf{a_h^{old'}}[i]=1\,\}$. Let $\mathsf{W}$ be the candidate-window mask of the chosen filter; a string \emph{matches} if one of its candidate windows (the positions $p$ in it with $\mathsf{W}[p]=1$) equals $\mathsf{str}$. The filter must keep exactly the eligible matching strings, and we write $M := \{\,i : \mathsf{a_h^{new}}[i]=1\,\}$ for the kept set.
+
+\parhead{Completeness}
+For an honest prover the rotation checks pass, so $\mathsf{d}^{(\delta)}[p]=\mathsf{d}[p+\delta]$, $\mathsf{diff}[p]=0$ exactly at the occurrences of $\mathsf{str}$, and $\mathsf{W}$ marks the candidate windows of each eligible string. The honest new activators keep exactly the eligible matching strings, so they are boolean, consistent, and contained in $\mathsf{a_h^{old'}}$, passing the activator-validity and containment checks. Every dropped eligible string is non-matching, so all of its candidate windows have $\mathsf{diff}\neq0$ and the false-negative no-zero check passes. For an anchored filter the single candidate of each kept string equals $\mathsf{str}$, so the false-positive zerocheck passes; for the infix filter the prover marks with $\mathsf{w}$ one candidate window equal to $\mathsf{str}$ in each kept string --- boolean, satisfying $\mathsf{w}\leq\mathsf{a_d^{new}}$ and $\mathsf{w}\leq\mathsf{W}$, with $\mathsf{diff}=0$ on its support, one mark per kept string, matching the announced count $n_{\mathsf{m}}=|M|$ --- so the false-positive checks pass. Hence the honest transcript is accepted.
+
+\parhead{Soundness}
+Suppose $\PIOPVerifier$ accepts. By the soundness of \cref{piop:len-filter} (\cref{sec:length-filtering}), $E=\{\,i:\mathsf{a_h^{old'}}[i]=1\,\}$ is exactly the set of eligible strings and $\mathsf{a_d^{old'}}$ is on exactly at their characters.
+
+The rotation checks force $\mathsf{d}^{(\delta)}[p]=\mathsf{d}[p+\delta]$ for every $\delta$, so $\mathsf{wf}[p]=\sum_\delta r_\delta\,\mathsf{d}[p+\delta]$ is the fingerprint of the length-$k$ window of $\mathsf{d}$ at $p$ and $\mathsf{diff}[p]=\mathsf{wf}[p]-\mathsf{pf}$. A window equal to $\mathsf{str}$ gives $\mathsf{diff}[p]=0$ identically; a window differing from $\mathsf{str}$ gives $\mathsf{diff}[p]=0$ only when the verifier's $r_0,\ldots,r_{k-1}$ are a root of a fixed nonzero degree-$1$ polynomial, so by Schwartz--Zippel and a union bound over the $N$ positions, except with probability $N(k-1)/|\F|$,
+\[ \mathsf{diff}[p]=0 \iff \text{the length-$k$ window of $\mathsf{d}$ at $p$ equals }\mathsf{str},\qquad\text{for every }p. \]
+We condition on this event; note the direction $\mathsf{diff}[p]\neq0\Rightarrow$ window $\neq\mathsf{str}$ holds \emph{unconditionally}. The rotation checks on the boundary selectors make $\mathsf{W}$ the candidate mask of the chosen filter: within each eligible string it marks the single anchored window (prefix, suffix) or all $\mathsf{l}-k+1$ valid starts (infix), with $\mathsf{W}\leq\mathsf{a_d^{old'}}$, and in every case $\mathsf{W}[p]=1$ guarantees that the window at $p$ lies entirely within the string $\mathsf{src}[p]$.
+
+The activator-validity check makes $\mathsf{a_h^{new}},\mathsf{a_d^{new}}$ boolean and forces $\mathsf{a_d^{new}}[j]=\mathsf{a_h^{new}}[\mathsf{src}[j]]$ for every character $j$, so $\mathsf{a_d^{new}}$ is constant on each string and equals its header bit. The containment zerocheck $\mathsf{a_h^{new}}(1-\mathsf{a_h^{old'}})=0$ forces $M\subseteq E$.
+
+\emph{No false positives.} For an anchored filter, $\mathsf{W}$ marks one candidate per eligible string, and the false-positive zerocheck forces $\mathsf{diff}=0$ wherever $\mathsf{W}\cdot\mathsf{a_d^{new}}=1$, i.e.\ at the candidate of each kept string; since that window lies within its string and $\mathsf{diff}=0$ means it equals $\mathsf{str}$, every kept string matches. For the infix filter, the two confinement zerochecks give $\mathsf{w}\leq\mathsf{a_d^{new}}$ and $\mathsf{w}\leq\mathsf{W}$, and the occurrence zerocheck gives $\mathsf{diff}=0$ on the support of $\mathsf{w}$; thus every mark $p$ has $\mathsf{a_d^{new}}[p]=1$ (so $\mathsf{src}[p]\in M$), $\mathsf{W}[p]=1$ (a candidate window lying inside $\mathsf{src}[p]$), and $\mathsf{diff}[p]=0$ (that window equals $\mathsf{str}$), so $\mathsf{src}[p]$ matches. The no-duplicate check on $(\mathsf{src},\mathsf{w})$ puts the marks in distinct strings, and the two sum checks give $\sum\mathsf{w}=n_{\mathsf{m}}=\sum\mathsf{a_h^{new}}=|M|$, so the $|M|$ marks lie in distinct strings of $M$ and hit every string of $M$ exactly once. Either way, every kept string is an eligible match.
+
+\emph{No false negatives.} Let $i\in E\setminus M$ be a dropped eligible string. By consistency every character of $i$ has $\mathsf{a_d^{new}}=0$, so $\mathsf{W}\cdot(1-\mathsf{a_d^{new}})=\mathsf{W}$ on string $i$, which is $1$ at each of its candidate windows. The false-negative no-zero check therefore forces $\mathsf{diff}[p]\neq0$ there, so by the unconditional direction none of $i$'s candidate windows equals $\mathsf{str}$. Hence $i$ does not match. Contrapositively, every eligible matching string lies in $M$.
+
+Combining the two directions, $M$ is exactly the set of eligible matching strings --- the strings passing the chosen prefix, suffix, or infix filter --- except with the fingerprint-collision probability $N(k-1)/|\F|$ and the soundness errors of the invoked sub-PIOPs.
+\end{proof}
+
+
+
+
+    \subsubsection{Prefix and Suffix Check} The substring protocol of \cref{piop:windowed-match} already handles prefix and suffix as its single-candidate case, but the anchored filters admit a cheaper specialized protocol: under our MSM-based commitment it commits only binary boundary selectors, avoiding the $k-1$ non-binary rotations of $\mathsf{d}$ that the substring protocol sends. We present it here. A prefix/suffix check keeps the strings in a column that begin or end with a fixed pattern $\mathsf{str}$ of length $k$: a \emph{prefix} filter $\mathsf{str}\%$ keeps strings that start with $\mathsf{str}$ (as in \texttt{LIKE 'str\%'}), and a \emph{suffix} filter $\%\mathsf{str}$ keeps strings that end with it (as in \texttt{LIKE '\%str'}).
 
     \parhead{What the protocol proves}The verifier is given a tuple $( \mathsf{h},\mathsf{b},\mathsf{l},\mathsf{a_h^{old}}, \mathsf{d}, \mathsf{src}, \mathsf{a_d^{old}}, \mathsf{s_b})$ and new activators $\mathsf{a_h^{new}}$ and $\mathsf{a_d^{new}}$. The prover convinces the verifier that the tuple $( \mathsf{h},\mathsf{b},\mathsf{l},\mathsf{a_h^{new}}, \mathsf{d}, \mathsf{src}, \mathsf{a_d^{new}}, \mathsf{s_b})$ is the result of applying the filter to the original tuple.
 
@@ -550,206 +779,5 @@ neighbor and $\mathsf{p}$ has no collisions.
 is the active match.}
 \label{fig:suffix-check}
 \ifsp\end{figure*}\else\end{figure}\fi
-
-
-\subsubsection{Infix Check}
-\label{sec:infix-check}
-An \emph{infix} (substring) filter $\%\mathsf{str}\%$ keeps the strings of a column that contain a fixed pattern $\mathsf{str}$ of length $k$ as a contiguous substring at \emph{any} position, as in \texttt{LIKE '\%str\%'}. Unlike the prefix and suffix filters, the pattern is not anchored to either end: a string of length $l$ has $l-k+1$ candidate windows, and it matches if \emph{any} one of them equals $\mathsf{str}$.
-
-The starting point is to compare every length-$k$ window against $\mathsf{str}$ at once. The prover first lays down the rotated character columns needed to read each window in parallel: writing $\mathsf{d}^{(0)} := \mathsf{d}$, the column $\mathsf{d}^{(\delta)}$ holds, at each position $p$, the character $\mathsf{d}[p+\delta]$, so that the tuple $(\mathsf{d}^{(0)}[p],\ldots,\mathsf{d}^{(k-1)}[p])$ spells out the length-$k$ window of $\mathsf{d}$ beginning at $p$. The verifier then collapses each window into a single field element by a random linear combination: it sends coefficients $r_0,\ldots,r_{k-1}$, and the parties form the \emph{window fingerprint} $\mathsf{wf}[p] := \sum_{\delta=0}^{k-1} r_\delta\,\mathsf{d}^{(\delta)}[p]$ together with the scalar \emph{pattern fingerprint} $\mathsf{pf} := \sum_{\delta=0}^{k-1} r_\delta\,\mathsf{str}[\delta]$. A window that equals $\mathsf{str}$ has $\mathsf{wf}[p]=\mathsf{pf}$ for every choice of coefficients, whereas a window that differs has $\mathsf{wf}[p]=\mathsf{pf}$ only with probability $(k-1)/|\F|$ over the verifier's coins. The length-$k$ comparison at every window is thereby reduced to the single field condition $\mathsf{wf}[p]=\mathsf{pf}$. Equivalently, the parties form the \emph{difference column} $\mathsf{diff} := \mathsf{wf}-\mathsf{pf}$, which vanishes exactly at the starting positions of the occurrences of $\mathsf{str}$.
-
-\parhead{Window validity} Not every position starts a genuine window: the last $k-1$ characters of a string have fewer than $k$ characters left, so their windows run off the end (or into the next string). The parties single these out with the boundary selector $\mathsf{s_b}$, which marks each string's first character: rotating it left by $1,\ldots,k-1$ yields columns $\mathsf{b}^{(j)} := \rho_{-j}(\mathsf{s_b})$ marking, respectively, the last, second-to-last, \ldots, $(k-1)$-th-from-last character of every string. Subtracting these from the masked activator gives the \emph{window-validity mask} $\mathsf{v} := \mathsf{a_d^{old'}}\cdot(1 - \sum_{j=1}^{k-1}\mathsf{b}^{(j)})$, which is $1$ exactly on the valid window starts --- the first $\mathsf{l}-k+1$ characters --- of each eligible string and $0$ elsewhere.
-
-\parhead{False negatives} A string that the filter \emph{drops} must genuinely avoid the pattern: every one of its windows must fail, where a window fails exactly when $\mathsf{diff}[p]\neq0$. The prover exhibits the failure by sending a Boolean false-negative witness $\mathsf{w_n}$ that marks one valid window inside each dropped eligible string. A \cref{piop:boolean-check} keeps $\mathsf{w_n}$ Boolean, and a \cref{piop:nozero-check} on $\mathsf{diff}$ with activator $\mathsf{w_n}\cdot\mathsf{v}\cdot(1-\mathsf{a_d^{new}})\cdot\mathsf{a_d^{old}}$ certifies that every witnessed window genuinely fails ($\mathsf{diff}\neq0$). The confining factors restrict each mark to a valid window ($\mathsf{v}$, which already excludes the inactive and short strings as well as the trailing $k-1$ positions where a window would run off the end) of an active ($\mathsf{a_d^{old}}$) string the prover did \emph{not} keep ($1-\mathsf{a_d^{new}}$). Thus a mark cannot be parked on an inactive string, a degenerate boundary-crossing window, or a kept string in order to dodge the test.
-
-\parhead{False positives} Conversely, a string that the filter \emph{keeps} must genuinely contain the pattern: it must have at least one window with $\mathsf{diff}=0$. The prover exhibits such a window by sending a Boolean \emph{witness selector} $\mathsf{w}$ that marks, inside each kept string, a matching position. A \cref{piop:boolean-check} keeps $\mathsf{w}$ Boolean, and a \cref{piop:zerocheck} on the column with data $\mathsf{diff}$ and activator $\mathsf{w}\cdot\mathsf{a_d^{new}}$ asserts that every witnessed position of a kept string is a genuine occurrence of $\mathsf{str}$ ($\mathsf{diff}=0$ there); the activator $\mathsf{a_d^{new}}$ confines attention to the kept strings, so marks outside them are ignored. It remains to force \emph{every} kept string to carry such a mark, ruling out a prover that keeps a non-containing string under a vacuous $\mathsf{w}\equiv0$. This is a counting argument: the prover announces the number of kept strings $n_{\mathsf{m}}$, and two \cref{piop:sumcheck} invocations pin down $\sum\mathsf{w}=n_{\mathsf{m}}$ and $\sum\mathsf{a_h^{new}}=n_{\mathsf{m}}$, so $\mathsf{w}$ holds exactly $n_{\mathsf{m}}$ marks; a \cref{piop:nodup-check} on the source indices $\mathsf{src}$ carried by the marked positions, with activator $\mathsf{w}$, forces those marks to lie in distinct strings, so each kept string holds at most one. With $n_{\mathsf{m}}$ marks spread over the $n_{\mathsf{m}}$ kept strings, no two in the same string, every kept string carries exactly one witnessed occurrence of $\mathsf{str}$ --- so each one genuinely contains the pattern.
-
-\begin{DefinePIOP}{Infix Check}{infix-check}
-  \begin{enumerate}[nosep]
-    \item (\textit{Rotated character columns}) Writing $\mathsf{d}^{(0)} := \mathsf{d}$, $\PIOPProver$ sends the rotated character columns $\mathsf{d}^{(1)},\ldots,\mathsf{d}^{(k-1)}$, each $\mathsf{d}^{(\delta)}$ being the rotation of $\mathsf{d}^{(\delta-1)}$ by $-1$, so that $\mathsf{d}^{(\delta)}[p] = \mathsf{d}[p+\delta]$.
-    \begin{enumerate}[nosep]
-      \item For $\delta = 1,\ldots,k-1$, $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:rotcheck} on $(\mathsf{d}^{(\delta-1)}, \mathsf{d}^{(\delta)}, -1)$.
-    \end{enumerate}
-    \item (\textit{Window fingerprint}) $\PIOPVerifier$ samples $k$ random field elements $r_0,\ldots,r_{k-1} \samples \F$ and sends them to $\PIOPProver$. The parties form the window-fingerprint column $\mathsf{wf} := \sum_{\delta=0}^{k-1} r_\delta\,\mathsf{d}^{(\delta)}$ and the pattern fingerprint $\mathsf{pf} := \sum_{\delta=0}^{k-1} r_\delta\,\mathsf{str}[\delta]$, so that $\mathsf{wf}[p] = \mathsf{pf}$ exactly when the length-$k$ window of $\mathsf{d}$ at $p$ agrees with $\mathsf{str}$ on the verifier's combination.
-    \item (\textit{Difference column}) The parties form $\mathsf{diff} := \mathsf{wf} - \mathsf{pf}$, which satisfies $\mathsf{diff}[p] = 0$ exactly at the positions $p$ where the length-$k$ window of $\mathsf{d}$ equals $\mathsf{str}$ (up to the $(k-1)/|\F|$ fingerprint-collision error), i.e.\ at the starting positions of the occurrences of $\mathsf{str}$.
-    \item (\textit{Window-validity mask}) $\PIOPProver$ sends the rotated boundary columns $\mathsf{b}^{(1)},\ldots,\mathsf{b}^{(k-1)}$, where $\mathsf{b}^{(0)} := \mathsf{s_b}$ and each $\mathsf{b}^{(j)}$ is the rotation of $\mathsf{b}^{(j-1)}$ by $-1$, so that $\mathsf{b}^{(j)}$ marks the $j$-th character from the end of every string.
-    \begin{enumerate}[nosep]
-      \item For $j=1,\ldots,k-1$, $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:rotcheck} on $(\mathsf{b}^{(j-1)}, \mathsf{b}^{(j)}, -1)$.
-      \item The parties define the window-validity mask $\mathsf{v} := \mathsf{a_d^{old'}}\cdot\bigl(1 - \textstyle\sum_{j=1}^{k-1}\mathsf{b}^{(j)}\bigr)$, which is $1$ exactly on the first $\mathsf{l}-k+1$ characters of each eligible string --- its valid window starts --- and $0$ on the last $k-1$.
-    \end{enumerate}
-    \item (\textit{False negative check}) $\PIOPProver$ sends a Boolean false-negative witness $\mathsf{w_n}$ that marks, inside each \emph{dropped} eligible string, one valid window that fails to match $\mathsf{str}$.
-    \begin{enumerate}[nosep]
-      \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:boolean-check} on $\mathsf{w_n}$.
-      \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:nozero-check} on the column with data $\mathsf{diff}$ and activator $\mathsf{w_n}\cdot\mathsf{v}\cdot(1-\mathsf{a_d^{new}})\cdot\mathsf{a_d^{old}}$, certifying $\mathsf{diff}\neq0$ at every witnessed window --- so the witnessed window of each dropped string genuinely fails the pattern. The factors $\mathsf{v}\cdot(1-\mathsf{a_d^{new}})\cdot\mathsf{a_d^{old}}$ confine every mark to a valid window of an active, dropped string.
-    \end{enumerate}
-    \item (\textit{False positive check}) $\PIOPProver$ sends a witness selector $\mathsf{w}$ that marks, inside each kept string, a position where a window matches $\mathsf{str}$.
-    \begin{enumerate}[nosep]
-      \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:boolean-check} on $\mathsf{w}$.
-      \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:zerocheck} on the column with data $\mathsf{diff}$ and activator $\mathsf{w}\cdot\mathsf{a_d^{new}}$, asserting $\mathsf{diff}=0$ at every witnessed position of a kept string --- so each witness is a genuine occurrence of $\mathsf{str}$.
-      \item $\PIOPProver$ announces the number of kept strings $n_{\mathsf{m}}$, and the parties invoke \cref{piop:sumcheck} twice to check $\sum_{\vec{x}}\mathsf{w}(\vec{x}) = n_{\mathsf{m}}$ and $\sum_{\vec{x}}\mathsf{a_h^{new}}(\vec{x}) = n_{\mathsf{m}}$, forcing $\mathsf{w}$ to carry exactly as many marks as there are kept strings.
-      \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:nodup-check} on the column with data $\mathsf{src}$ and activator $\mathsf{w}$, forcing the marked positions to lie in distinct strings --- so each kept string carries at most one witness. Together with the count match, every kept string carries \emph{exactly} one witnessed occurrence of $\mathsf{str}$.
-    \end{enumerate}
-  \end{enumerate}
-\end{DefinePIOP}
-
-\ifsp\begin{figure*}[t!]\else\begin{figure}[H]\fi
-\centering
-\resizebox{\textwidth}{!}{%
-\begin{tikzpicture}[
-    cell/.style={draw, minimum size=6mm, inner sep=0pt, font=\small},
-    rowlab/.style={font=\small\itshape, anchor=east},
-    hd/.style={font=\small\bfseries}
-  ]
-
-  %==================== Panel 1: string-level columns ====================
-  \node[hd] at (0,7.6)   {$\col$};
-  \node[hd] at (2.0,7.6) {$\mathsf{h}$};
-  \node[hd] at (3.0,7.6) {$\mathsf{b}$};
-  \node[hd] at (4.0,7.6) {$\mathsf{l}$};
-  \node[hd] at (5.0,7.6) {$\mathsf{m_h}$};
-  \node[hd] at (6.3,7.6) {$\mathsf{a_h^{old}}$};
-  \node[hd] at (7.6,7.6) {$\mathsf{a_h^{old'}}$};
-  \node[hd] at (8.9,7.6) {$\mathsf{a_h^{new}}$};
-
-  % rows 0..6 are real strings (row 1 = inactive match "crust"; row 3 = the short "to");
-  % row 7 pads the column up to size 8.
-  % i / string / boundary / length / m_h / a_h_old / a_h_old' / a_h_new
-  \foreach \i/\s/\bb/\ll/\mh/\ao/\amid/\an in
-    {0/age/0/3/0/1/1/0, 1/crust/3/5/0/0/0/0, 2/abc/8/3/0/1/1/0,
-     3/to/11/2/1/1/0/0, 4/run/13/3/0/1/1/0, 5/arch/16/4/0/1/1/0,
-     6/trust/20/5/0/1/1/1, 7/{$\perp$}/25/0/0/0/0/0}{
-    \pgfmathsetmacro{\yy}{7.0 - \i*0.6}
-    \edef\pf{\ifnum\i>6 gray!12\else white\fi}
-    \edef\mhf{\ifnum\mh=1 red!40\else gray!12\fi}
-    \edef\fa{\ifnum\ao=1 green!30\else gray!12\fi}
-    \edef\fc{\ifnum\amid=1 green!30\else gray!12\fi}
-    \edef\fb{\ifnum\an=1 green!30\else gray!12\fi}
-    \node[font=\small\ttfamily, anchor=west] at (-0.4,\yy) {\s};
-    \node[cell, fill=\pf]  at (2.0,\yy) {\ifnum\i>6 0\else$h_{\i}$\fi};
-    \node[cell, fill=\pf]  at (3.0,\yy) {\bb};
-    \node[cell, fill=\pf]  at (4.0,\yy) {\ll};
-    \node[cell, fill=\mhf] at (5.0,\yy) {\mh};
-    \node[cell, fill=\fa]  at (6.3,\yy) {\ao};
-    \node[cell, fill=\fc]  at (7.6,\yy) {\amid};
-    \node[cell, fill=\fb]  at (8.9,\yy) {\an};
-  }
-
-  %==================== Panel 2: data-level columns ====================
-  % group (string) labels above the data row
-  \foreach \cx/\nm in {1/age, 5/crust, 9/abc, 11.5/to, 14/run, 17.5/arch, 22/trust}{
-    \node[font=\small\ttfamily] at (\cx*0.6, 1.35) {\nm};
-  }
-
-  % row labels
-  \node[rowlab] at (-0.5, 0.62){pos};
-  \node[rowlab] at (-0.5, 0.00){$\mathsf{d}=\mathsf{d}^{(0)}$};
-  \node[rowlab] at (-0.5,-0.62){$\mathsf{src}$};
-  \node[rowlab] at (-0.5,-1.24){$\mathsf{d}^{(1)}$};
-  \node[rowlab] at (-0.5,-1.86){$\mathsf{d}^{(2)}$};
-  \node[rowlab] at (-0.5,-2.48){$\mathsf{wf}$};
-  \node[rowlab] at (-0.5,-3.10){$\mathsf{diff}$};
-  \node[rowlab] at (-0.5,-3.72){$\mathsf{m_d}$};
-  \node[rowlab] at (-0.5,-4.34){$\mathsf{a_d^{old}}$};
-  \node[rowlab] at (-0.5,-4.96){$\mathsf{a_d^{old'}}$};
-  \node[rowlab] at (-0.5,-5.58){$\mathsf{s_b}$};
-  \node[rowlab] at (-0.5,-6.20){$\mathsf{b}^{(1)}$};
-  \node[rowlab] at (-0.5,-6.82){$\mathsf{b}^{(2)}$};
-  \node[rowlab] at (-0.5,-7.44){$\mathsf{v}$};
-  \node[rowlab] at (-0.5,-8.06){$\mathsf{a_d^{new}}$};
-  \node[rowlab] at (-0.5,-8.68){$\mathsf{w}$};
-  \node[rowlab] at (-0.5,-9.30){$\mathsf{w_n}$};
-
-  % x / char / src / d^(1)=d[p+1] / d^(2)=d[p+2] / window trigram / wf==pf? / m_d / a_d_old / a_d_old' / a_d_new
-  \foreach \x/\c/\sr/\da/\db/\wf/\mt/\md/\ao/\am/\an in {
-     0/a/0/g/e/age/0/0/1/1/0,  1/g/0/e/c/gec/0/0/1/1/0,  2/e/0/c/r/ecr/0/0/1/1/0,
-     3/c/1/r/u/cru/0/0/0/0/0,  4/r/1/u/s/rus/1/0/0/0/0,  5/u/1/s/t/ust/0/0/0/0/0,  6/s/1/t/a/sta/0/0/0/0/0,  7/t/1/a/b/tab/0/0/0/0/0,
-     8/a/2/b/c/abc/0/0/1/1/0,  9/b/2/c/t/bct/0/0/1/1/0, 10/c/2/t/o/cto/0/0/1/1/0,
-    11/t/3/o/r/tor/0/1/1/0/0, 12/o/3/r/u/oru/0/1/1/0/0,
-    13/r/4/u/n/run/0/0/1/1/0, 14/u/4/n/a/una/0/0/1/1/0, 15/n/4/a/r/nar/0/0/1/1/0,
-    16/a/5/r/c/arc/0/0/1/1/0, 17/r/5/c/h/rch/0/0/1/1/0, 18/c/5/h/t/cht/0/0/1/1/0, 19/h/5/t/r/htr/0/0/1/1/0,
-    20/t/6/r/u/tru/0/0/1/1/1, 21/r/6/u/s/rus/1/0/1/1/1, 22/u/6/s/t/ust/0/0/1/1/1, 23/s/6/t/./{st.}/0/0/1/1/1, 24/t/6/././{t..}/0/0/1/1/1}{
-    \pgfmathsetmacro{\px}{\x*0.6}
-    \edef\gc{\ifcase\sr blue!15\or purple!18\or green!22\or red!30\or
-                       orange!25\or cyan!22\or teal!28\or gray!18\fi}
-    \edef\wfc{\ifnum\mt=1 orange!35\else gray!10\fi}
-    \edef\dfc{\ifnum\mt=1 green!35\else gray!10\fi}
-    \edef\mdf{\ifnum\md=1 red!40\else gray!12\fi}
-    \edef\aof{\ifnum\ao=1 green!30\else gray!12\fi}
-    \edef\amf{\ifnum\am=1 green!30\else gray!12\fi}
-    \edef\anf{\ifnum\an=1 green!30\else gray!12\fi}
-    \node[font=\scriptsize, gray] at (\px,0.62) {\x};
-    \node[cell, fill=\gc]    at (\px, 0.00) {\texttt{\c}};
-    \node[cell, fill=\gc]    at (\px,-0.62) {\sr};
-    \node[cell, fill=white]  at (\px,-1.24) {\texttt{\da}};
-    \node[cell, fill=white]  at (\px,-1.86) {\texttt{\db}};
-    \node[cell, fill=\wfc]   at (\px,-2.48) {\scriptsize\texttt{\wf}};
-    \node[cell, fill=\dfc]   at (\px,-3.10) {\ifnum\mt=1 0\else\scriptsize$\neq 0$\fi};
-    \node[cell, fill=\mdf]   at (\px,-3.72) {\md};
-    \node[cell, fill=\aof]   at (\px,-4.34) {\ao};
-    \node[cell, fill=\amf]   at (\px,-4.96) {\am};
-    \node[cell, fill=\anf]   at (\px,-8.06) {\an};
-  }
-  % --- window-validity construction ---
-  % s_b: boundary selector (1 at first char of each string)
-  \foreach \x in {0,...,24}{\pgfmathsetmacro{\px}{\x*0.6}\node[cell, fill=gray!12] at (\px,-5.58) {0};}
-  \foreach \x in {0,3,8,11,13,16,20}{\pgfmathsetmacro{\px}{\x*0.6}\node[cell, fill=yellow!30] at (\px,-5.58) {1};}
-  % b^(1) = rho_{-1}(s_b): marks the last char of each string
-  \foreach \x in {0,...,24}{\pgfmathsetmacro{\px}{\x*0.6}\node[cell, fill=gray!12] at (\px,-6.20) {0};}
-  \foreach \x in {2,7,10,12,15,19,24}{\pgfmathsetmacro{\px}{\x*0.6}\node[cell, fill=yellow!55] at (\px,-6.20) {1};}
-  % b^(2) = rho_{-2}(s_b): marks the second-to-last char of each string
-  \foreach \x in {0,...,24}{\pgfmathsetmacro{\px}{\x*0.6}\node[cell, fill=gray!12] at (\px,-6.82) {0};}
-  \foreach \x in {1,6,9,11,14,18,23}{\pgfmathsetmacro{\px}{\x*0.6}\node[cell, fill=yellow!55] at (\px,-6.82) {1};}
-  % v: window-validity mask = a_d^old' with the last k-1 chars of each string removed
-  \foreach \x in {0,...,24}{\pgfmathsetmacro{\px}{\x*0.6}\node[cell, fill=gray!12] at (\px,-7.44) {0};}
-  \foreach \x in {0,8,13,16,17,20,21,22}{\pgfmathsetmacro{\px}{\x*0.6}\node[cell, fill=cyan!40] at (\px,-7.44) {1};}
-  % w: witness selector --- a single 1 in the kept match "trust" at p=21 (a_d^new=1, diff=0).
-  \foreach \x in {0,...,24}{
-    \pgfmathsetmacro{\px}{\x*0.6}
-    \node[cell, fill=gray!12] at (\px,-8.68) {0};
-  }
-  \node[cell, fill=green!55] at (21*0.6,-8.68) {1};
-  % w_n: false-negative witness --- one failing valid window per dropped eligible string
-  % (age at p=0, abc at p=8, run at p=13, arch at p=16); diff != 0 at each.
-  \foreach \x in {0,...,24}{
-    \pgfmathsetmacro{\px}{\x*0.6}
-    \node[cell, fill=gray!12] at (\px,-9.30) {0};
-  }
-  \foreach \x in {0,8,13,16}{\pgfmathsetmacro{\px}{\x*0.6}\node[cell, fill=orange!55] at (\px,-9.30) {1};}
-  % padding ellipsis
-  \pgfmathsetmacro{\dx}{25.5*0.6}
-  \foreach \y in {0.00,-0.62,-1.24,-1.86,-2.48,-3.10,-3.72,-4.34,-4.96,-5.58,-6.20,-6.82,-7.44,-8.06,-8.68,-9.30}{
-    \node at (\dx,\y) {$\cdots$};
-  }
-
-  % highlights: survivor "trust" solid (rus at 21..23); inactive match "crust" dashed
-  % (rus at 4..6); short string "to" dotted (length 2 < k=3, masked out).
-  \draw[red, thick]         (21*0.6-0.32,0.32) rectangle (23*0.6+0.32,-0.32);
-  \draw[red, thick, dashed] ( 4*0.6-0.32,0.32) rectangle ( 6*0.6+0.32,-0.32);
-  \draw[red, thick, dotted] (11*0.6-0.32,0.32) rectangle (12*0.6+0.32,-0.32);
-
-\end{tikzpicture}%
-}
-\caption{Infix instance for \texttt{\%rus\%} ($\mathsf{str}=\texttt{rus}$, $k=3$). The rotated
-character columns $\mathsf{d}^{(1)},\mathsf{d}^{(2)}$ bring the second and third character
-of each window into line with its start, so $\mathsf{wf}[p]$ fingerprints the length-$3$
-window beginning at position $p$ (shown as its trigram), and $\mathsf{diff}=\mathsf{wf}-\mathsf{pf}$
-vanishes exactly at the occurrences of \texttt{rus}. The two windows equal to
-\texttt{rus} are boxed: \texttt{trust} (solid) is the active match that is kept ---
-witnessed by the single mark $\mathsf{w}=1$ at $p=21$, where $\mathsf{a_d^{new}}=1$ and
-$\mathsf{diff}=0$ --- while \texttt{crust} (dashed) contains \texttt{rus} but is inactive
-($\mathsf{a_h^{old}}=0$), so it carries no witness.
-The length-$2$ string \texttt{to} (dotted) is too short for a $3$-character window and is
-removed by length filtering. The window-validity mask $\mathsf{v}=\mathsf{a_d^{old'}}(1-\mathsf{b}^{(1)}-\mathsf{b}^{(2)})$,
-built by rotating the boundary $\mathsf{s_b}$ left into $\mathsf{b}^{(1)},\mathsf{b}^{(2)}$ (which mark the last and
-second-to-last character of each string) and subtracting them from $\mathsf{a_d^{old'}}$, marks (in cyan) exactly the
-valid window starts --- the first $\mathsf{l}-k+1$ characters --- of each eligible string, so windows that run off
-the end ($p=23,24$) or cross a boundary (e.g.\ $p=6$, \texttt{sta}) are switched off.
-The false-negative witness $\mathsf{w_n}$ (orange) places one mark in each \emph{dropped} eligible string
-(\texttt{age}, \texttt{abc}, \texttt{run}, \texttt{arch}) at a valid window with $\mathsf{diff}\neq0$, certifying
-that string fails to contain \texttt{rus}.}
-\label{fig:infix-check}
-\ifsp\end{figure*}\else\end{figure}\fi
-
-
 
 
