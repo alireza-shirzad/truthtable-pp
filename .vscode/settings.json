@@ -1,0 +1,32 @@
+{
+  // The paper loads inputs by paths relative to the project root
+  // (configs/preamble.tex, styles/dtrt.sty, ...). The "-cd" flag makes latexmk
+  // change into the main file's directory before compiling, so those relative
+  // paths resolve no matter which folder VS Code was opened from.
+  "latex-workshop.latex.tools": [
+    {
+      "name": "latexmk",
+      "command": "latexmk",
+      "args": [
+        "-cd",
+        "-pdf",
+        "-synctex=1",
+        "-interaction=nonstopmode",
+        "-file-line-error",
+        "%DOC%"
+      ]
+    },
+    {
+      "name": "latexmk-clean",
+      "command": "latexmk",
+      "args": ["-cd", "-C", "%DOC%"]
+    }
+  ],
+  "latex-workshop.latex.recipes": [
+    { "name": "latexmk", "tools": ["latexmk"] }
+  ],
+  // Keep aux/pdf next to the source so SyncTeX and the viewer line up.
+  "latex-workshop.latex.outDir": "%DIR%",
+  // Let latexmk decide which aux files to remove on clean.
+  "latex-workshop.latex.clean.subfolder.enabled": false
+}

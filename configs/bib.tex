@@ -1,21 +1,5 @@
 % !TEX root = ../paper.tex
-\iffull
-\usepackage[
-  giveninits,
-  backend=biber,
-  style=alphabetic,
-  maxnames=20,
-  maxalphanames=6,
-  url=false
-]{biblatex}
-\newbibmacro{string+url}[1]{%
-  \iffieldundef{url}{#1}{\href{\thefield{url}}{#1}}}
-\DeclareFieldFormat{title}{\usebibmacro{string+url}{\mkbibemph{#1}}}
-\DeclareFieldFormat[article]{title}{\usebibmacro{string+url}{\mkbibquote{#1}}}
-\DeclareFieldFormat[inproceedings]{title}{\usebibmacro{string+url}{\mkbibquote{#1}}}
-\DeclareFieldFormat[misc]{title}{\usebibmacro{string+url}{\mkbibquote{#1\isdot}}}
-
-\else
+\ifsp
 \usepackage[
   style=alphabetic,
   giveninits,
@@ -57,6 +41,21 @@
   }%
 }
 
+\else
+\usepackage[
+  giveninits,
+  backend=biber,
+  style=alphabetic,
+  maxnames=20,
+  maxalphanames=6,
+  url=false
+]{biblatex}
+\newbibmacro{string+url}[1]{%
+  \iffieldundef{url}{#1}{\href{\thefield{url}}{#1}}}
+\DeclareFieldFormat{title}{\usebibmacro{string+url}{\mkbibemph{#1}}}
+\DeclareFieldFormat[article]{title}{\usebibmacro{string+url}{\mkbibquote{#1}}}
+\DeclareFieldFormat[inproceedings]{title}{\usebibmacro{string+url}{\mkbibquote{#1}}}
+\DeclareFieldFormat[misc]{title}{\usebibmacro{string+url}{\mkbibquote{#1\isdot}}}
 
 \fi
 

@@ -1,5 +1,8 @@
 % !TEX root = ../paper.tex
-\iffull
+\ifsp
+  \setcounter{tocdepth}{2}
+  \setcounter{page}{1}
+\else
   \thispagestyle{empty}
   \clearpage
   \setcounter{tocdepth}{2}
@@ -7,8 +10,5 @@
     {\small \tableofcontents}
   \end{spacing}
   \clearpage
-  \setcounter{page}{1}
-\else
-  \setcounter{tocdepth}{2}
   \setcounter{page}{1}
 \fi

@@ -1,5 +1,6 @@
 % !TEX root = paper.tex
 \section{PIOP Toolbox}
+\label{sec:logical-toolbox}
 \papername{} builds on a small toolbox of low-level PIOPs and relations. Most of these are standard or lightly adapted from prior work, so we defer their relations and constructions to \cref{sec:deferred-piops} and recall them inline as needed. Here we present only the Bitwise AND check, which illustrates the truth-table lookup technique that underlies several of our string protocols.
 
 \subsection{Bitwise AND}
@@ -14,7 +15,43 @@ The \emph{Bitwise AND check} takes three columns $\col_1, \col_2, \col_3$ contai
 \,\right\}.
 \end{displaymath}
 
-\ifsp\begin{figure*}[tp]\else\begin{figure}[h]\fi
+\ifsp
+%% Single-column (IEEE) variant: columns laid out horizontally as rows.
+\begin{figure}[tp]
+\centering
+\resizebox{\columnwidth}{!}{%
+\begin{tikzpicture}[
+  cell/.style={draw, align=center, minimum width=0.75cm, minimum height=0.85cm, font=\ttfamily\small, inner sep=1pt},
+  plab/.style={anchor=west, font=\small},
+  op/.style={font=\bfseries}
+]
+\def\cellW{0.75}
+% --- column 1 ---
+\node[plab] at (-0.375, 0) {$\idx'_2(X_0,X_1,X_2,X_3) = 2X_0 + X_1$};
+\foreach \val/\bin [count=\i from 0] in
+  {0/00,0/00,0/00,0/00,1/01,1/01,1/01,1/01,2/10,2/10,2/10,2/10,3/11,3/11,3/11,3/11}
+  {\node[cell] at (\cellW*\i, -0.9) {\val\\{\scriptsize(\bin)}};}
+% --- AND ---
+\node[op] at (\cellW*7.5, -1.8) {AND};
+% --- column 2 ---
+\node[plab] at (-0.375, -2.7) {$\idx''_2(X_0,X_1,X_2,X_3) = 2X_2 + X_3$};
+\foreach \val/\bin [count=\i from 0] in
+  {0/00,1/01,2/10,3/11,0/00,1/01,2/10,3/11,0/00,1/01,2/10,3/11,0/00,1/01,2/10,3/11}
+  {\node[cell] at (\cellW*\i, -3.6) {\val\\{\scriptsize(\bin)}};}
+% --- = ---
+\node[op] at (\cellW*7.5, -4.5) {$=$};
+% --- column 3 ---
+\node[plab] at (-0.375, -5.4) {$\MLE{\mathsf{and}}(X_0,X_1,X_2,X_3) = 2X_0X_2 + X_1X_3$};
+\foreach \val/\bin [count=\i from 0] in
+  {0/00,0/00,0/00,0/00,0/00,1/01,0/00,1/01,0/00,0/00,2/10,2/10,0/00,1/01,2/10,3/11}
+  {\node[cell] at (\cellW*\i, -6.3) {\val\\{\scriptsize(\bin)}};}
+\end{tikzpicture}%
+}
+\caption{The arithmetized truth-table for the bitwise AND function on $n=2$ bit inputs, with the three columns laid out as rows.}
+\label{fig:bitwise-and-tt}
+\end{figure}
+\else
+\begin{figure}[h]
 \centering
 \begin{tikzpicture}[
   cell/.style={draw, minimum width=1.4cm, minimum height=0.42cm, font=\ttfamily\small, inner sep=1pt},
@@ -40,7 +77,8 @@ The \emph{Bitwise AND check} takes three columns $\col_1, \col_2, \col_3$ contai
 \end{tikzpicture}
 \caption{The arithmetized truth-table for the bitwise AND function on n=2 bit inputs.}
 \label{fig:bitwise-and-tt}
-\ifsp\end{figure*}\else\end{figure}\fi
+\end{figure}
+\fi
 
 To convince the verifier that each row of $\col_3$ is the bitwise AND of the corresponding rows of $\col_1$ and $\col_2$, the prover will convince the verifier that the concatenated rows of $\col_1, \col_2, \col_3$ can be looked up in a truth table encoding the bitwise AND function. More concretely,
 \begin{DefinePIOP}{BitwiseAND}{bitwise-and}
