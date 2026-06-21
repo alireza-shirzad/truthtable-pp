@@ -1,5 +1,7 @@
 % !TEX root = paper.tex
+\doclearpage
 \section{Arithmetization}
+\label{sec:arithmetization}
 Let $\col$ be a string column in the database. We encode $\col$ in as a tuple of $8$ columns, $( \mathsf{h},\mathsf{b},\mathsf{l},\mathsf{a_{hb}}, \mathsf{d}, \mathsf{src}, \mathsf{a_d}, \mathsf{s_b})$, with the following semantics:
 \begin{itemize}[nosep]
     \item Hash column $\mathsf{h}$ is of the same length as $\col$ containing the hash of each string in $\col$.

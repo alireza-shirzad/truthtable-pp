@@ -9,7 +9,9 @@
 \end{tabular}
 }
 \newcommand{\doclearpage}{%
-  \ifsp\else\clearpage\fi
+\iflncs
+\clearpage
+\fi
 }
 \newcommand{\DoQuote}[1]{``#1''}
 \newcommand{\defemph}[1]{\textbf{\emph{#1}}}

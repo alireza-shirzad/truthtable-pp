@@ -1,193 +1,17 @@
-\section{PIOPs for Strings}
+\doclearpage
+\section{PIOPs for Wild-Card Pattern Matching}
 
-
-\subsubsection{Activator Consistency Check}
-\label{sec:act-consistency}
-The \emph{Activator Consistency Check} takes the source column $\mathsf{src}$, the data activator $\mathsf{a_d}$, the length column $\mathsf{l}$, and the string activator $\mathsf{a_h}$, and proves that $\mathsf{a_d}$ and $\mathsf{a_h}$ are consistent: for every string, the number of its active characters equals its length when the string is active, and is $0$ otherwise. Equivalently, for every string index $i$,
-\begin{displaymath}
-  \mathsf{a_h}[i]\cdot\mathsf{l}[i] \;=\; \sum_{j:\,\mathsf{src}[j]=i} \mathsf{a_d}[j].
-\end{displaymath}
-We package this as the relation
-\ifsp
-\begin{equation*}
-\NPRelation_{\mathsf{ActCons}} = \left\{
-\begin{aligned}
-  & \NPInstance = \bot,\; \\
-  & \NPInstancey = (\Oracle{\MLE{\mathsf{src}}}, \Oracle{\MLE{\mathsf{a_d}}}, \Oracle{\MLE{\mathsf{l}}}, \Oracle{\MLE{\mathsf{a_h}}}),\; \\
-  & \NPWitness = (\mathsf{src}, \mathsf{a_d}, \mathsf{l}, \mathsf{a_h}) \\
-  & \;\big|\;\; \forall i,\; \mathsf{a_h}[i]\cdot\mathsf{l}[i] = \!\!\!\sum_{j:\,\mathsf{src}[j]=i}\!\!\! \mathsf{a_d}[j]
-\end{aligned}
-\right\}.
-\end{equation*}
-\else
-\begin{align*}
-\NPRelation_{\mathsf{ActCons}} = \left\{\,
-  \NPInstance = \bot,\;
-  \NPInstancey = (\Oracle{\MLE{\mathsf{src}}}, \Oracle{\MLE{\mathsf{a_d}}}, \Oracle{\MLE{\mathsf{l}}}, \Oracle{\MLE{\mathsf{a_h}}}),\;
-  \NPWitness = (\mathsf{src}, \mathsf{a_d}, \mathsf{l}, \mathsf{a_h})
-  \;\middle|\;
-  \forall i,\; \mathsf{a_h}[i]\cdot\mathsf{l}[i] = \!\!\!\sum_{j:\,\mathsf{src}[j]=i}\!\!\! \mathsf{a_d}[j]
-\,\right\}.
-\end{align*}
-\fi
-The check is exactly a group-by-sum: grouping the rows $(\mathsf{src}, \mathsf{a_d})$ by $\mathsf{src}$ and summing $\mathsf{a_d}$ within each group must reproduce $\mathsf{l}$ on the active strings (those marked by $\mathsf{a_h}$). Treating $(\mathsf{src}, \mathsf{a_d})$ as an input table grouped by its key and $(\mathsf{ind}, \mathsf{l})$ with activator $\mathsf{a_h}$ as the grouped output, this is discharged by a single \cref{piop:keyedsumcheck}.
-\begin{DefinePIOP}{Activator Consistency Check}{act-cons}
-  \emph{Inputs:} $\Oracle{\MLE{\mathsf{src}}}, \Oracle{\MLE{\mathsf{a_d}}}, \Oracle{\MLE{\mathsf{l}}}, \Oracle{\MLE{\mathsf{a_h}}}$.
-  \begin{enumerate}[nosep]
-    \item $\PIOPProver$ and $\PIOPVerifier$ locally form the input table $\Left$ with key column $\Left.\key = \mathsf{src}$, value column $\Left.\val = \mathbf{1}$, and activator $\Left.\act = \mathsf{a_d}$ (so the keyed sum counts the active characters of each string).
-    \item $\PIOPProver$ and $\PIOPVerifier$ locally form the output table $\Right$ with key column $\Right.\key = \mathsf{ind}$ (the index column, $\mathsf{ind}[i] = i$), value column $\Right.\val = \mathsf{l}$, and activator $\Right.\act = \mathsf{a_h}$.
-    \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:keyedsumcheck} on $\Left$ and $\Right$, which forces $\sum_{j:\,\mathsf{src}[j]=i}\mathsf{a_d}[j] = \mathsf{a_h}[i]\cdot\mathsf{l}[i]$ for every key $i$.
-  \end{enumerate}
-\end{DefinePIOP}
+In this section we develop PIOPs for SQL \emph{wild-card} pattern matching --- the predicates written with the \texttt{LIKE} operator. A \texttt{LIKE} pattern may use two kinds of wild-card: the multi-character \texttt{\%}, which matches any (possibly empty) run of characters, and the single-character \texttt{\_}, which matches exactly one character.
 
 
 
-\ifsp\begin{table*}[tp]\else\begin{table}[h!]\fi
-\centering
-\small
-\begin{tabular}{p{3.8cm}p{4.5cm}p{5cm}}
-\toprule
-\textbf{SQL String Operator} & \textbf{Approx. Filtering Applicable?} & \textbf{Used in TPC-H?} \\
-\midrule
-\texttt{LIKE '\%pat\%'} (substring)
-  & Yes --- canonical case; character/$n$-gram features are monotone
-  & Yes: Q9, Q13 (negated), Q14, Q16 (negated) \\
-\addlinespace
-\texttt{LIKE 'pat\%'} (prefix)
-  & Yes --- with anchored/positional features (or sortedness)
-  & Yes: Q2, Q20 \\
-\addlinespace
-\texttt{LIKE '\%pat'} (suffix)
-  & Yes --- with end-anchored features
-  & No \\
-\addlinespace
-\texttt{LIKE 'pat'} (exact, no wildcards)
-  & Trivially yes, but equality is usually faster directly
-  & No (TPC-H uses \texttt{=} instead) \\
-\addlinespace
-\texttt{LIKE 'p\_t'} (single-char wildcard)
-  & Partial --- anchor what you can; treat \texttt{\_} as unknown
-  & No \\
-\addlinespace
-\texttt{LIKE '\%a\%b\%'} (multi-fragment)
-  & Yes --- filter on each required fragment, AND the results
-  & Yes: Q13 \\
-\addlinespace
-\texttt{NOT LIKE}
-  & No directly --- monotonicity runs the wrong way; filter the positive form and complement
-  & Yes: Q13, Q16 \\
-\addlinespace
-\texttt{=} (exact equality)
-  & Trivially yes, but direct comparison or hashing wins
-  & Pervasive \\
-\addlinespace
-\texttt{<}, \texttt{>}, \texttt{<=}, \texttt{>=} (lex.)
-  & Partial --- works with order-preserving features; not the technique's strength
-  & No (used on numeric/date columns only) \\
-\addlinespace
-\texttt{IN (lit1, lit2, ...)} (string set)
-  & Yes --- disjunction over members; equivalent to multiple equality filters
-  & Yes: Q19, Q22 \\
-\addlinespace
-\texttt{NOT IN} (string set)
-  & No directly --- same issue as \texttt{NOT LIKE}
-  & Yes: Q16 \\
-\addlinespace
-\texttt{BETWEEN} (lex.)
-  & Partial --- same caveats as \texttt{<}/\texttt{>} on strings
-  & No (numeric/date use in TPC-H) \\
-\addlinespace
-\texttt{SUBSTRING} / \texttt{SUBSTR} extract
-  & N/A as a predicate; filter the enclosing \texttt{=} or \texttt{LIKE}
-  & Yes: Q22 (\texttt{SUBSTRING(c\_phone FROM 1 FOR 2)}) \\
-\addlinespace
-\texttt{CONCAT} / \texttt{||}
-  & N/A --- not a predicate
-  & No (in \texttt{WHERE} clauses) \\
-\addlinespace
-Regex (\texttt{SIMILAR TO}, \texttt{\textasciitilde})
-  & Partial --- works when required literal fragments can be extracted
-  & No \\
-\bottomrule
-\end{tabular}
-\caption{Applicability of approximate filtering to SQL string operators, and their occurrence in TPC-H queries.}
-\label{tab:sql-ops-filter}
-\ifsp\end{table*}\else\end{table}\fi
+\subsection{Multi-Character Pattern Matching Protocol}
+\label{sec:multi-char-pattern-matching}
+
+The most common white-box expression that peeks into the strings is the pattern matching  expression denoted by \texttt{like} keyword in SQL which filters the strings based on matching a pattern or not.
 
 
-\subsubsection{Length Filtering}
-\label{sec:length-filtering}
-The \emph{Length Filtering Check} takes the source column $\mathsf{src}$, the length column $\mathsf{l}$, the string activator $\mathsf{a_h^{old}}$, and the data activator $\mathsf{a_d^{old}}$ of a string column, together with a threshold $k$, and produces masked activators $\mathsf{a_h^{old'}}$ and $\mathsf{a_d^{old'}}$ that retain exactly the \emph{active} strings of length at least $k$ (and their characters), switching off every string shorter than $k$. We package this as the relation
-\ifsp
-\begin{equation*}
-\NPRelation_{\mathsf{LenFilter}} = \left\{
-\begin{aligned}
-  & \NPInstance = k,\; \\
-  & \NPInstancey = (\Oracle{\MLE{\mathsf{src}}}, \Oracle{\MLE{\mathsf{l}}}, \Oracle{\MLE{\mathsf{a_h^{old}}}}, \\
-  & \qquad\qquad \Oracle{\MLE{\mathsf{a_d^{old}}}}, \Oracle{\MLE{\mathsf{a_h^{old'}}}}, \Oracle{\MLE{\mathsf{a_d^{old'}}}}),\; \\
-  & \NPWitness = (\mathsf{src}, \mathsf{l}, \mathsf{a_h^{old}}, \mathsf{a_d^{old}}, \mathsf{a_h^{old'}}, \mathsf{a_d^{old'}}) \\
-  & \;\big|\;\; \forall i:\, \mathsf{a_h^{old'}}[i] = \mathsf{a_h^{old}}[i]\cdot\mathbbm{1}[\mathsf{l}[i]\geq k], \\
-  & \phantom{\;\big|\;\;} \forall j:\, \mathsf{a_d^{old'}}[j] = \mathsf{a_d^{old}}[j]\cdot\mathbbm{1}[\mathsf{l}[\mathsf{src}[j]]\geq k]
-\end{aligned}
-\right\}.
-\end{equation*}
-\else
-\begin{equation*}
-\NPRelation_{\mathsf{LenFilter}} = \left\{
-\begin{aligned}
-  & \NPInstance = k,\;
-    \NPInstancey = (\Oracle{\MLE{\mathsf{src}}}, \Oracle{\MLE{\mathsf{l}}}, \Oracle{\MLE{\mathsf{a_h^{old}}}}, \Oracle{\MLE{\mathsf{a_d^{old}}}}, \Oracle{\MLE{\mathsf{a_h^{old'}}}}, \Oracle{\MLE{\mathsf{a_d^{old'}}}}),\; \\
-  & \NPWitness = (\mathsf{src}, \mathsf{l}, \mathsf{a_h^{old}}, \mathsf{a_d^{old}}, \mathsf{a_h^{old'}}, \mathsf{a_d^{old'}}) \\
-  & \;\big|\;\; \forall i:\, \mathsf{a_h^{old'}}[i] = \mathsf{a_h^{old}}[i]\cdot\mathbbm{1}[\mathsf{l}[i]\geq k]
-    \;\text{ and }\; \forall j:\, \mathsf{a_d^{old'}}[j] = \mathsf{a_d^{old}}[j]\cdot\mathbbm{1}[\mathsf{l}[\mathsf{src}[j]]\geq k]
-\end{aligned}
-\right\}.
-\end{equation*}
-\fi
-Removing short strings is essential to the prefix/suffix protocol: a string shorter than $k$ can never match a length-$k$ pattern, and once the anchored selectors are rotated inward, its selectors would run past its own end and spill into the character slots of its neighbors. The prover flags the short strings with two masks: $\mathsf{m_h}$, set to $1$ on each string of length less than $k$, and $\mathsf{m_d}$, set to $1$ on every character of such a string. A \cref{piop:boolean-check} keeps both masks $\{0,1\}$-valued, and an \cref{piop:act-cons} on $(\mathsf{src}, \mathsf{m_d}, \mathsf{l}, \mathsf{m_h})$ ties them together, forcing a string to be flagged by $\mathsf{m_h}$ exactly when all of its characters are flagged by $\mathsf{m_d}$. Two sign checks then certify that $\mathsf{m_h}$ flags \emph{exactly} the short strings: a \emph{Negative} \cref{piop:sign-check} over the flagged rows forces every flagged string to satisfy $\mathsf{l}-k<0$, while a \emph{Non-Negative} \cref{piop:sign-check} over the unflagged rows forces every unflagged string to satisfy $\mathsf{l}-k\geq0$. The masked activators are then the originals with the flagged strings switched off.
-\begin{DefinePIOP}{Length Filtering Check}{len-filter}
-  \emph{Inputs:} $\Oracle{\MLE{\mathsf{src}}}, \Oracle{\MLE{\mathsf{l}}}, \Oracle{\MLE{\mathsf{a_h^{old}}}}, \Oracle{\MLE{\mathsf{a_d^{old}}}}$, threshold $k$.
-  \begin{enumerate}[nosep]
-    \item $\PIOPProver$ sends the masks $\mathsf{m_h}$ and $\mathsf{m_d}$.
-    \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:boolean-check} on $\mathsf{m_h}$ and on $\mathsf{m_d}$.
-    \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:act-cons} on $(\mathsf{src}, \mathsf{m_d}, \mathsf{l}, \mathsf{m_h})$.
-    \item $\PIOPProver$ and $\PIOPVerifier$ invoke the Negative \cref{piop:sign-check} on the column $(\mathsf{m_h}, \mathsf{l}-k)$.
-    \item $\PIOPProver$ and $\PIOPVerifier$ invoke the Non-Negative \cref{piop:sign-check} on the column $(1-\mathsf{m_h}, \mathsf{l}-k)$.
-    \item $\PIOPProver$ and $\PIOPVerifier$ define the masked activators as the derived oracles
-    \begin{align*}
-      \mathsf{a_d^{old'}} := \mathsf{a_d^{old}}\cdot(1-\mathsf{m_d}), \qquad
-      \mathsf{a_h^{old'}} := \mathsf{a_h^{old}}\cdot(1-\mathsf{m_h}).
-    \end{align*}
-  \end{enumerate}
-\end{DefinePIOP}
-\begin{proof}
-Booleanity forces $\mathsf{m_h}, \mathsf{m_d} \in \{0,1\}$. The two sign checks force $\mathsf{m_h}[i]=1 \iff \mathsf{l}[i]<k$: the Negative check rules out $\mathsf{l}[i]\geq k$ wherever $\mathsf{m_h}[i]=1$, and the Non-Negative check rules out $\mathsf{l}[i]<k$ wherever $\mathsf{m_h}[i]=0$. The activator-consistency check forces $\sum_{j:\,\mathsf{src}[j]=i}\mathsf{m_d}[j] = \mathsf{m_h}[i]\cdot\mathsf{l}[i]$ for every string $i$; as string $i$ has exactly $\mathsf{l}[i]$ characters and $\mathsf{m_d}$ is boolean, this forces $\mathsf{m_d}[j]=\mathsf{m_h}[\mathsf{src}[j]]$ for every character $j$, i.e.\ a character is flagged exactly when its string is. Hence $\mathsf{m_h}[i]=\mathbbm{1}[\mathsf{l}[i]<k]$ and $\mathsf{m_d}[j]=\mathbbm{1}[\mathsf{l}[\mathsf{src}[j]]<k]$, so the derived activators satisfy $\mathsf{a_h^{old'}}[i]=\mathsf{a_h^{old}}[i]\cdot\mathbbm{1}[\mathsf{l}[i]\geq k]$ and $\mathsf{a_d^{old'}}[j]=\mathsf{a_d^{old}}[j]\cdot\mathbbm{1}[\mathsf{l}[\mathsf{src}[j]]\geq k]$, exactly $\NPRelation_{\mathsf{LenFilter}}$. Completeness is immediate: the honest masks $\mathsf{m_h}=\mathbbm{1}[\mathsf{l}<k]$ and its per-character expansion $\mathsf{m_d}$ pass booleanity, activator-consistency, and both sign checks.
-\end{proof}
-
-
-\subsubsection{Substring Protocol}
-\label{sec:windowed-match}
-The prefix, suffix, and infix filters are three instances of one task: keep the strings that contain the length-$k$ pattern $\mathsf{str}$ at an \emph{admissible} starting position. We capture all three with a single protocol parameterized by a Boolean \emph{candidate-window mask} $\mathsf{W}$, which marks --- inside each eligible string --- the window starts that count as a match; a string \emph{matches} iff one of its candidate windows equals $\mathsf{str}$. The filters differ only in $\mathsf{W}$:
-\begin{itemize}[nosep]
-  \item \emph{Prefix} ($\mathsf{str}\%$): $\mathsf{W} = \mathsf{a_d^{old'}}\cdot\mathsf{s_b}$ --- the first character of each eligible string, one candidate per string.
-  \item \emph{Suffix} ($\%\mathsf{str}$): $\mathsf{W} = \mathsf{a_d^{old'}}\cdot\rho_{-k}(\mathsf{s_b})$ --- the start of the length-$k$ suffix window, one candidate per string.
-  \item \emph{Infix} ($\%\mathsf{str}\%$): $\mathsf{W} = \mathsf{a_d^{old'}}\cdot\bigl(1-\sum_{j=1}^{k-1}\mathsf{b}^{(j)}\bigr)$ --- every valid window start, up to $\mathsf{l}-k+1$ candidates per string.
-\end{itemize}
-In every case $\mathsf{W}\leq\mathsf{a_d^{old'}}$ and each marked position starts a window contained in its string. Under our MSM-based commitment the dedicated \cref{piop:prefix-check} is cheaper for the anchored cases --- it commits only binary selectors, whereas the protocol below commits the $k-1$ non-binary rotations of $\mathsf{d}$ --- so we keep both; the general protocol is the only option for the unanchored infix.
-
-The starting point is to compare every length-$k$ window against $\mathsf{str}$ at once. The prover first lays down the rotated character columns needed to read each window in parallel: writing $\mathsf{d}^{(0)} := \mathsf{d}$, the column $\mathsf{d}^{(\delta)}$ holds, at each position $p$, the character $\mathsf{d}[p+\delta]$, so that the tuple $(\mathsf{d}^{(0)}[p],\ldots,\mathsf{d}^{(k-1)}[p])$ spells out the length-$k$ window of $\mathsf{d}$ beginning at $p$. The verifier then collapses each window into a single field element by a random linear combination: it sends coefficients $r_0,\ldots,r_{k-1}$, and the parties form the \emph{window fingerprint} $\mathsf{wf}[p] := \sum_{\delta=0}^{k-1} r_\delta\,\mathsf{d}^{(\delta)}[p]$ together with the scalar \emph{pattern fingerprint} $\mathsf{pf} := \sum_{\delta=0}^{k-1} r_\delta\,\mathsf{str}[\delta]$. A window that equals $\mathsf{str}$ has $\mathsf{wf}[p]=\mathsf{pf}$ for every choice of coefficients, whereas a window that differs has $\mathsf{wf}[p]=\mathsf{pf}$ only with probability $(k-1)/|\F|$ over the verifier's coins. The length-$k$ comparison at every window is thereby reduced to the single field condition $\mathsf{wf}[p]=\mathsf{pf}$. Equivalently, the parties form the \emph{difference column} $\mathsf{diff} := \mathsf{wf}-\mathsf{pf}$, which vanishes exactly at the starting positions of the occurrences of $\mathsf{str}$.
-
-\parhead{Candidate windows} The mask $\mathsf{W}$ is a public function of the boundary selector $\mathsf{s_b}$, which marks each string's first character. Rotating $\mathsf{s_b}$ left by $1,\ldots,k-1$ gives $\mathsf{b}^{(j)} := \rho_{-j}(\mathsf{s_b})$, marking the $j$-th character from the end of each string --- the trailing positions whose length-$k$ windows would run off the end (or into the next string). The infix mask $\mathsf{v} := \mathsf{a_d^{old'}}\cdot(1-\sum_{j=1}^{k-1}\mathsf{b}^{(j)})$ keeps every position except those trailing $k-1$, i.e.\ the valid window starts of each eligible string; the prefix and suffix masks are the single anchored selectors $\mathsf{a_d^{old'}}\cdot\mathsf{s_b}$ and $\mathsf{a_d^{old'}}\cdot\rho_{-k}(\mathsf{s_b})$. The parties certify every rotation with \cref{piop:rotcheck}, so $\mathsf{W}$ is determined by $\mathsf{s_b}$ and the masked activator.
-
-\parhead{False negatives} A string that the filter \emph{drops} must fail at \emph{every} candidate position, where a window fails exactly when $\mathsf{diff}[p]\neq0$. This is a universal condition, so the prover sends no witness; the parties run a single \cref{piop:nozero-check} on $\mathsf{diff}$ with activator $\mathsf{W}\cdot(1-\mathsf{a_d^{new}})$, asserting $\mathsf{diff}\neq0$ at every candidate window of every dropped eligible string. The mask $\mathsf{W}$ selects the candidate windows of eligible strings (excluding the inactive and short strings and any boundary-crossing positions), and $1-\mathsf{a_d^{new}}$ restricts attention to the strings the prover did \emph{not} keep. Were a dropped eligible string a match, one of its candidate windows would make $\mathsf{diff}=0$ at a tested position and the check would reject; and because $\mathsf{diff}[p]\neq0$ implies the window differs from $\mathsf{str}$ \emph{unconditionally} (a true match always gives $\mathsf{diff}=0$, with no fingerprint-collision slack in this direction), no match can be silently discarded.
-
-\parhead{False positives} A string that the filter \emph{keeps} must match at \emph{some} candidate position. How this existential is discharged depends on how many candidates a string has.
-
-When $\mathsf{W}$ marks a \emph{single} candidate per string --- the anchored prefix and suffix filters --- ``some candidate matches'' is just ``the candidate matches'', so no witness is needed: a single \cref{piop:zerocheck} on $\mathsf{diff}$ with activator $\mathsf{W}\cdot\mathsf{a_d^{new}}$ forces the lone candidate of each kept string to equal $\mathsf{str}$.
-
-When $\mathsf{W}$ marks \emph{many} candidates --- the infix filter --- the prover exhibits a matching one by sending a Boolean \emph{witness selector} $\mathsf{w}$ that marks one matching candidate in each kept string. A \cref{piop:boolean-check} keeps $\mathsf{w}$ Boolean, and two \cref{piop:zerocheck}s confine it: $\mathsf{w}\cdot(1-\mathsf{a_d^{new}})=0$ pins each mark \emph{inside} a kept string ($\mathsf{w}\leq\mathsf{a_d^{new}}$, else a mark could hide in a non-kept string, where the occurrence check is switched off, to satisfy the count vacuously), and $\mathsf{w}\cdot(1-\mathsf{W})=0$ pins it to a genuine \emph{candidate} ($\mathsf{w}\leq\mathsf{W}$, else a boundary-crossing window could spell $\mathsf{str}$ without the kept string containing it). A \cref{piop:zerocheck} on the column with data $\mathsf{diff}$ and activator $\mathsf{w}$ then makes every mark a real occurrence. Finally a counting argument forces \emph{every} kept string to carry a mark: the prover announces the number of kept strings $n_{\mathsf{m}}$, two \cref{piop:sumcheck} invocations pin $\sum\mathsf{w}=n_{\mathsf{m}}$ and $\sum\mathsf{a_h^{new}}=n_{\mathsf{m}}$, and a \cref{piop:nodup-check} on the source indices $\mathsf{src}$ carried by the marks, with activator $\mathsf{w}$, forces those marks to lie in distinct strings; with $n_{\mathsf{m}}$ marks confined to the $n_{\mathsf{m}}$ kept strings and no two in the same string, every kept string carries exactly one occurrence of $\mathsf{str}$.
-
-\begin{DefinePIOP}{Substring Match}{windowed-match}
+\begin{DefinePIOP}{Single-Factor Multi-Character Pattern Matching}{single-factor-multi-char-pattern-matching}
   \begin{enumerate}[nosep]
     \item (\textit{Activator validity check})
     \begin{enumerate}[nosep]
@@ -394,7 +218,9 @@ Combining the two directions, $M$ is exactly the set of eligible matching string
 
 
 
-    \subsubsection{Prefix and Suffix Check} The substring protocol of \cref{piop:windowed-match} already handles prefix and suffix as its single-candidate case, but the anchored filters admit a cheaper specialized protocol: under our MSM-based commitment it commits only binary boundary selectors, avoiding the $k-1$ non-binary rotations of $\mathsf{d}$ that the substring protocol sends. We present it here. A prefix/suffix check keeps the strings in a column that begin or end with a fixed pattern $\mathsf{str}$ of length $k$: a \emph{prefix} filter $\mathsf{str}\%$ keeps strings that start with $\mathsf{str}$ (as in \texttt{LIKE 'str\%'}), and a \emph{suffix} filter $\%\mathsf{str}$ keeps strings that end with it (as in \texttt{LIKE '\%str'}).
+    \subsection{Prefix and Suffix Check} 
+    \label{sec:prefix-suffix} 
+    The substring protocol of \cref{piop:pattern-matching} already handles prefix and suffix as its single-candidate case, but the anchored filters admit a cheaper specialized protocol: under our MSM-based commitment it commits only binary boundary selectors, avoiding the $k-1$ non-binary rotations of $\mathsf{d}$ that the substring protocol sends. We present it here. A prefix/suffix check keeps the strings in a column that begin or end with a fixed pattern $\mathsf{str}$ of length $k$: a \emph{prefix} filter $\mathsf{str}\%$ keeps strings that start with $\mathsf{str}$ (as in \texttt{LIKE 'str\%'}), and a \emph{suffix} filter $\%\mathsf{str}$ keeps strings that end with it (as in \texttt{LIKE '\%str'}).
 
     \parhead{What the protocol proves}The verifier is given a tuple $( \mathsf{h},\mathsf{b},\mathsf{l},\mathsf{a_h^{old}}, \mathsf{d}, \mathsf{src}, \mathsf{a_d^{old}}, \mathsf{s_b})$ and new activators $\mathsf{a_h^{new}}$ and $\mathsf{a_d^{new}}$. The prover convinces the verifier that the tuple $( \mathsf{h},\mathsf{b},\mathsf{l},\mathsf{a_h^{new}}, \mathsf{d}, \mathsf{src}, \mathsf{a_d^{new}}, \mathsf{s_b})$ is the result of applying the filter to the original tuple.
 

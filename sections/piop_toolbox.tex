@@ -1,4 +1,5 @@
 % !TEX root = paper.tex
+\doclearpage
 \section{PIOP Toolbox}
 \label{sec:logical-toolbox}
 \papername{} builds on a small toolbox of low-level PIOPs and relations. Most of these are standard or lightly adapted from prior work, so we defer their relations and constructions to \cref{sec:deferred-piops} and recall them inline as needed. Here we present only the Bitwise AND check, which illustrates the truth-table lookup technique that underlies several of our string protocols.
@@ -93,3 +94,90 @@ To convince the verifier that each row of $\col_3$ is the bitwise AND of the cor
         \end{align*}
     \end{enumerate}
 \end{DefinePIOP}
+
+
+
+\subsection{Activator Consistency Check}
+\label{sec:act-consistency}
+As described in \cref{sec:arithmetization}, a string column carries two activators: $\mathsf{a_h}$, marking the active strings on the hash polynomial, and $\mathsf{a_d}$, marking the active characters on the data polynomial. The protocols that follow repeatedly have the prover send a fresh pair of such activators, so the verifier's first task is to confirm that the pair is mutually consistent: every character of an active string must be active, and every character of an inactive string inactive. We package this as the relation 
+\ifsp
+\begin{equation*}
+\NPRelation_{\mathsf{ActCons}} = \left\{
+\begin{aligned}
+  & \NPInstance = \bot,\;\;
+    \NPInstancey = (\Oracle{\MLE{\mathsf{a_d}}}, \Oracle{\MLE{\mathsf{a_h}}}),\; \\
+  & \NPWitness = (\mathsf{a_d}, \mathsf{a_h}) \\
+  & \;\big|\;\; \mathsf{a_d}[j] = \mathsf{a_h}[i]\ \text{for every character } j \text{ of string } i
+\end{aligned}
+\right\}.
+\end{equation*}
+\else
+\begin{align*}
+\NPRelation_{\mathsf{ActCons}} = \left\{\,
+  \NPInstance = \bot,\;
+  \NPInstancey = (\Oracle{\MLE{\mathsf{a_d}}}, \Oracle{\MLE{\mathsf{a_h}}}),\;
+  \NPWitness = (\mathsf{a_d}, \mathsf{a_h})
+  \;\middle|\;
+  \mathsf{a_d}[j] = \mathsf{a_h}[i]\ \text{for every character } j \text{ of string } i
+\,\right\}.
+\end{align*}
+\fi
+
+
+ We design a PIOP for this relation that relies on the following observations: grouping the rows $(\mathsf{src}, \mathsf{a_d})$ by $\mathsf{src}$ and summing $\mathsf{a_d}$ within each group must reproduce $\mathsf{l}$ on the active strings (those marked by $\mathsf{a_h}$). Hence, treating $(\mathsf{src}, \mathsf{a_d})$ as an input table grouped by its key and $(\mathsf{ind}, \mathsf{l})$ with activator $\mathsf{a_h}$ as the grouped output, We can invoke the \texttt{Group By Sum} protocol from \cite{cryptoeprint:2026/1260} which is a single \cref{piop:keyedsumcheck} invocation.
+\begin{DefinePIOP}{Activator Consistency Check}{act-cons}
+  \emph{Inputs:} $\Oracle{\MLE{\mathsf{src}}}, \Oracle{\MLE{\mathsf{a_d}}}, \Oracle{\MLE{\mathsf{l}}}, \Oracle{\MLE{\mathsf{a_h}}}$.
+  \begin{enumerate}[nosep]
+    \item $\PIOPProver$ and $\PIOPVerifier$ define the table $\Left$ with key column $\Left.\key = \mathsf{src}$, value column $\Left.\val = \mathbf{1}$, and activator $\Left.\act = \mathsf{a_d}$.
+    \item $\PIOPProver$ and $\PIOPVerifier$ define the table $\Right$ with key column $\Right.\key = \mathsf{ind}$, value column $\Right.\val = \mathsf{l}$, and activator $\Right.\act = \mathsf{a_h}$.
+    \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:keyedsumcheck} on $\Left$ and $\Right$, which forces $\sum_{j:\,\mathsf{src}[j]=i}\mathsf{a_d}[j] = \mathsf{a_h}[i]\cdot\mathsf{l}[i]$ for every key $i$.
+  \end{enumerate}
+\end{DefinePIOP}
+
+
+
+\subsection{Length Filtering}
+\label{sec:length-filtering}
+
+In every pattern-matching filter --- prefix, suffix, and substring --- a string can match only if it is at least as long as the pattern. Any shorter string is therefore a guaranteed non-match and can be discarded before the filter runs. As we will see in \cref{sec:single-factor-multi-char-pattern-matching,sec:prefix-suffix}, this is not merely an optimization: length filtering is necessary for the pattern-matching protocols to remain complete and sound. We define the length filtering relation as follows
+\ifsp
+\begin{equation*}
+\NPRelation_{\mathsf{LenFilter}} = \left\{
+\begin{aligned}
+  & \NPInstance = k,\; \\
+  & \NPInstancey = (\Oracle{\MLE{\mathsf{l}}}, \Oracle{\MLE{\mathsf{a_h}}}, \Oracle{\MLE{\mathsf{a_d}}}, \\
+  & \qquad\qquad \Oracle{\MLE{\mathsf{a_h'}}}, \Oracle{\MLE{\mathsf{a_d'}}}),\; \\
+  & \NPWitness = (\mathsf{l}, \mathsf{a_h}, \mathsf{a_d}, \mathsf{a_h'}, \mathsf{a_d'}) \\
+  & \;\big|\;\; \mathsf{a_h'}[i] = 1 \iff \bigl(\mathsf{a_h}[i] = 1 \ \text{and}\ \mathsf{l}[i]\geq k\bigr), \\
+  & \phantom{\;\big|\;\;} \mathsf{a_d'}[j] = \mathsf{a_h'}[i]\ \text{for every character } j \text{ of string } i
+\end{aligned}
+\right\}.
+\end{equation*}
+\else
+\begin{align*}
+\NPRelation_{\mathsf{LenFilter}} = \Big\{\,
+  & \NPInstance = k,\;
+  \NPInstancey = (\Oracle{\MLE{\mathsf{l}}}, \Oracle{\MLE{\mathsf{a_h}}}, \Oracle{\MLE{\mathsf{a_d}}}, \Oracle{\MLE{\mathsf{a_h'}}}, \Oracle{\MLE{\mathsf{a_d'}}}),\;
+  \NPWitness = (\mathsf{l}, \mathsf{a_h}, \mathsf{a_d}, \mathsf{a_h'}, \mathsf{a_d'}) \Big|\;\; \mathsf{a_h'}[i] = 1 \\&\iff \bigl(\mathsf{a_h}[i] = 1 \ \text{and}\ \mathsf{l}[i]\geq k\bigr) \text{ and }\;
+  \mathsf{a_d'}[j] = \mathsf{a_h'}[i]\ \text{for every character } j \text{ of string } i
+\,\Big\}.
+\end{align*}
+\fi
+
+
+\begin{DefinePIOP}{Length Filtering Check}{len-filter}
+  \emph{Inputs:} $\Oracle{\MLE{\mathsf{src}}}, \Oracle{\MLE{\mathsf{l}}}, \Oracle{\MLE{\mathsf{a_h}}}, \Oracle{\MLE{\mathsf{a_d}}}$, threshold $k$.
+  \begin{enumerate}[nosep]
+    \item (\textit{Activator validity check})
+    \begin{enumerate}[nosep]
+    \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:boolean-check} on $\mathsf{a_h'}$ and on $\mathsf{a_d'}$.
+    \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:act-cons} on $(\mathsf{a_d'}, \mathsf{a_h'})$.
+    \end{enumerate}
+    \item (\textit{Containment}) $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:zerocheck} on the column $\mathsf{a_h'}\cdot(1-\mathsf{a_h})$.
+    \item(\textit{False negative check}) $\PIOPProver$ and $\PIOPVerifier$ invoke the Negative \cref{piop:sign-check} on the column $(\mathsf{a_h}\cdot(1-\mathsf{a_h'}), \mathsf{l}-k)$.
+    \item (\textit{False Positive check}) $\PIOPProver$ and $\PIOPVerifier$ invoke the Non-Negative \cref{piop:sign-check} on the column $(\mathsf{a_h'}, \mathsf{l}-k)$.
+  \end{enumerate}
+\end{DefinePIOP}
+\begin{proof}
+Every kept string is active (containment) and at least $k$ long (no false positives), and every active string of length at least $k$ is kept (no false negatives), so the kept strings are exactly the active strings of length $\geq k$; by validity, $\mathsf{a_d'}$ is the matching character activator. This is precisely $\NPRelation_{\mathsf{LenFilter}}$. Completeness is immediate: the honest output --- the input activators with the short strings switched off --- is boolean, consistent, contained in $\mathsf{a_h}$, and passes both length checks.
+\end{proof}
