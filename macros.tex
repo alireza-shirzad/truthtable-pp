@@ -27,21 +27,26 @@
 \Crefformat{PIOP}{#2#1#3}
 
 \makeatletter
-\NewDocumentEnvironment{DefinePIOP}{mm}{%
-  % nobreak=false lets a long box split across columns (two-column S&P) and
-  % across pages; short boxes still stay whole since a break only happens when
-  % the box does not fit. splittopskip keeps spacing tidy at a continuation.
-  \begin{mdframed}[nobreak=false, splittopskip=\topskip, splitbottomskip=0.4em]
+% Args: * (optional star) forces the box to stay on one page/column;
+%       #2 full title (shown in the box), #3 label key (piop:#3),
+%       #4 optional short name used as the \cref link text (defaults to the title).
+\NewDocumentEnvironment{DefinePIOP}{s m m O{#2}}{%
+  % Default nobreak=false lets a long box split across columns (two-column S&P)
+  % and across pages; short boxes still stay whole since a break only happens
+  % when the box does not fit. The star sets nobreak=true to keep the box
+  % together (it will overflow the page bottom if taller than the text height).
+  \IfBooleanTF{#1}{\def\dpiop@nobreak{true}}{\def\dpiop@nobreak{false}}%
+  \begin{mdframed}[nobreak=\dpiop@nobreak, splittopskip=\topskip, splitbottomskip=0.4em]
     \small
     \begin{center}
       \refstepcounter{piopnum}%
-      \textbf{PIOP \thepiopnum: #1}%
-      \protected@edef\@currentlabelname{#1}%
-      \def\@currentlabel{#1}%
+      \textbf{PIOP \thepiopnum: #2}%
+      \protected@edef\@currentlabelname{#4}%
+      \def\@currentlabel{#4}%
       \protected@edef\cref@currentlabel{%
-        [piopnum][\arabic{piopnum}][]\unexpanded{#1}}%
+        [piopnum][\arabic{piopnum}][]\unexpanded{#4}}%
       \let\@currentcounter\@empty
-      \label[PIOP]{piop:#2}%
+      \label[PIOP]{piop:#3}%
     \end{center}
     \vspace{0.5em}
     \noindent
