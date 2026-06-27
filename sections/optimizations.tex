@@ -1,0 +1,391 @@
+
+
+    \section{Optimizations} 
+    \subsection{Prefix and Suffix Check} 
+    \label{sec:prefix-suffix} 
+    The substring protocol of \cref{piop:single-factor-multi-char-pattern-matching} already handles prefix and suffix as its single-candidate case, but the anchored filters admit a cheaper specialized protocol: under our MSM-based commitment it commits only binary boundary selectors, avoiding the $k-1$ non-binary rotations of $\mathsf{c}$ that the substring protocol sends. We present it here. A prefix/suffix check keeps the strings in a column that begin or end with a fixed pattern $\mathsf{str}$ of length $k$: a \emph{prefix} filter $\mathsf{str}\%$ keeps strings that start with $\mathsf{str}$ (as in \texttt{LIKE 'str\%'}), and a \emph{suffix} filter $\%\mathsf{str}$ keeps strings that end with it (as in \texttt{LIKE '\%str'}).
+
+    \parhead{What the protocol proves}The verifier is given a tuple $( \mathsf{h},\mathsf{l},\mathsf{a_h^{old}}, \mathsf{c}, \mathsf{src}, \mathsf{a_c^{old}}, \mathsf{s_b})$ and new activators $\mathsf{a_h^{new}}$ and $\mathsf{a_c^{new}}$. The prover convinces the verifier that the tuple $( \mathsf{h},\mathsf{l},\mathsf{a_h^{new}}, \mathsf{c}, \mathsf{src}, \mathsf{a_c^{new}}, \mathsf{s_b})$ is the result of applying the filter to the original tuple.
+
+
+At a high level the check has several parts, which we explain in turn before presenting the protocol. For concreteness we describe the prefix scenario throughout; afterwards we show how the prefix and suffix protocols can be unified into a single check.
+
+
+\parhead{Activator consistency} The prover claims that $\mathsf{a_h^{new}}$ and $\mathsf{a_c^{new}}$ are the activators of the filtered column. The verifier checks that they are internally consistent with one another and with the lengths: a string is marked active by $\mathsf{a_h^{new}}$ exactly when its characters are marked active by $\mathsf{a_c^{new}}$, and the active-character count of each string equals its length.
+
+\parhead{Filtering by length} A string shorter than $k$ can never match a length-$k$ pattern, and leaving it in place is actively harmful: once the anchored selectors are rotated inward, a short string's selectors run past its own end and spill into the character slots of its neighbors, corrupting the comparison. The first step therefore removes every string of length less than $k$ by invoking the \cref{piop:len-filter} (\cref{sec:length-filtering}), which returns masked activators $\mathsf{a_h^{old'}}$ and $\mathsf{a_c^{old'}}$ equal to $\mathsf{a_h^{old}}, \mathsf{a_c^{old}}$ with every short string (and all of its characters) switched off. All later steps use these in place of the originals, so that they range only over strings long enough to be candidate matches.
+
+
+
+\parhead{Containment} A string can only survive the filter if it was eligible to begin with. A \cref{piop:zerocheck} on $\mathsf{a_h^{new}}\cdot(1-\mathsf{a_h^{old'}})$ forces $\mathsf{a_h^{new}}\leq\mathsf{a_h^{old'}}$, so the prover cannot retain a short or inactive string --- one whose anchored slots, and hence the pattern comparison below, are switched off. Every kept string is therefore eligible, with all $k$ of its anchored slots live.
+
+\parhead{False positives Check} A string that \emph{survives} the filter must genuinely match the pattern. The pattern column $\mathsf{p}$ already holds the required character at every anchored slot, so this reduces to a single check that the data agrees with $\mathsf{p}$ there. The parties run a \cref{piop:zerocheck} on $\mathsf{c}-\mathsf{p}$ with activator $\mathsf{a_c^{new}}\cdot\sum_{i=0}^{k-1}\mathsf{s'_b}^{(i)}$, which is on exactly at the anchored slots of the kept strings; the check therefore forces $\mathsf{c}=\mathsf{p}$ at every one of them, so no kept string disagrees with the pattern at any position.
+
+\parhead{False negatives Check} Conversely, a string that the prover \emph{drops} must genuinely fail the pattern; otherwise a real match would be silently discarded. A single mismatched position is enough to rule a string out, so rather than re-prove the whole comparison, the prover exhibits one witness per dropped string. It sends a boolean \emph{mismatch selector} $\mathsf{s_n}$ that places a single $1$ inside each \emph{dropped candidate} --- a string that was eligible ($\mathsf{a_c^{old'}}=1$: active and at least $k$ long) but not kept ($\mathsf{a_c^{new}}=0$) --- at an anchored slot where its character violates the pattern, and is $0$ everywhere else. For this to rule out false negatives, $\mathsf{s_n}$ must be \emph{well-formed}: it must place exactly one mark in each non-matching eligible string, and that mark must sit at a genuine mismatch. We establish this with a counting argument. A \cref{piop:boolean-check} forces $\mathsf{s_n}$ to be $\{0,1\}$-valued, a \cref{piop:nodup-check} on the source indices carried by the marked slots forces those slots to lie in distinct strings, so each string holds at most one mark, and a \cref{piop:zerocheck} on $\mathsf{s_n}\cdot(1-\sum_{i=0}^{k-1}\mathsf{s'_b}^{(i)})$ confines every mark to an anchored slot of an eligible string (so a mark cannot be parked on an inactive slot where $\mathsf{p}=0$ would make the mismatch test pass vacuously). The prover then announces the number of matches $n_{\mathsf{m}}$ and non-matches $n_{\mathsf{nm}}$, and three sumchecks pin these down: $\sum\mathsf{a_h^{new}} = n_{\mathsf{m}}$ counts the kept strings, $\sum\mathsf{s_n} = n_{\mathsf{nm}}$ counts the marks, and $\sum\mathsf{a_h^{old'}} = n_{\mathsf{m}}+n_{\mathsf{nm}}$ counts the eligible strings. Since every eligible string is either kept or marked but not both (a marked slot has $\mathsf{c}\neq\mathsf{p}$, which a kept string never has), the identity $n_{\mathsf{m}}+n_{\mathsf{nm}}=\sum\mathsf{a_h^{old'}}$ forces the marks to cover \emph{every} non-matching eligible string. Finally, a \cref{piop:nozero-check} on $\mathsf{c}-\mathsf{p}$ with activator $\mathsf{s_n}$ confirms every marked slot is a genuine mismatch ($\mathsf{c}\neq\mathsf{p}$ there), so each dropped string really fails the pattern.
+
+\parhead{Anchored selectors and the pattern column} Let $\rho_t(\cdot)$ denote rotation of a column by $t$ positions (a $1$ at index $p$ moves to index $p+t$). The boundary selector $\mathsf{s_b}$ from the tuple marks each string's first character. Once the masked activator $\mathsf{a_c^{old'}}$ is in hand (it switches off short and inactive strings; see below), the parties form the \emph{masked boundary selector}
+\begin{displaymath}
+  \mathsf{s'_b}^{(0)} := \mathsf{a_c^{old'}}\cdot\mathsf{s_b},
+\end{displaymath}
+which keeps a boundary mark only on the strings that survive into the comparison. The prover then sends the further \emph{anchored selectors} $\mathsf{s'_b}^{(1)},\ldots,\mathsf{s'_b}^{(k-1)}$, defined by
+\begin{displaymath}
+  \mathsf{s'_b}^{(i)} := \rho_{i}\bigl(\mathsf{s'_b}^{(0)}\bigr), \qquad i = 0,\ldots,k-1,
+\end{displaymath}
+so that $\mathsf{s'_b}^{(i)}$ marks the $(i{+}1)$-th character of every surviving string. Each $\mathsf{s'_b}^{(i)}$ is tied to $\mathsf{s'_b}^{(0)}$ by a \cref{piop:rotcheck}. Because the short strings were removed \emph{before} rotating, no selector runs off the end of a string into a neighbor, so the marks never collide. The parties then define the \emph{pattern column}
+\begin{displaymath}
+  \mathsf{p} := \sum_{i=0}^{k-1} \mathsf{s'_b}^{(i)}\cdot\mathsf{str}[i],
+\end{displaymath}
+which carries the required pattern character $\mathsf{str}[i]$ at the $(i{+}1)$-th slot of every surviving string and is $0$ elsewhere --- exactly the pattern the prefix filter expects laid over the anchored slots.
+
+\emph{Unifying prefix and suffix.} The two cases differ only in which end the comparison is anchored to. A suffix filter anchors at each string's \emph{last} character, so the masked anchor is $\mathsf{s'_a}^{(0)} := \mathsf{a_c^{old'}}\cdot\rho_{-1}(\mathsf{s_b})$ and the prover sends the backward rotations $\mathsf{s'_a}^{(i)} := \rho_{-i}\bigl(\mathsf{s'_a}^{(0)}\bigr)$, forming the pattern column $\mathsf{p} := \sum_{i=0}^{k-1}\mathsf{s'_a}^{(i)}\cdot\mathsf{str}[k-1-i]$, which places $\mathsf{str}[k-1]$ on the last character, $\mathsf{str}[k-2]$ on the second-to-last, and so on. Writing $\epsilon := +1$ for a prefix and $\epsilon := -1$ for a suffix, both cases use masked anchored selectors $\rho_{\epsilon i}(\text{anchor})$ and pattern characters $\mathsf{str}[\pi(i)]$ with $\pi(i) := \tfrac{(k-1)(1-\epsilon)}{2} + \epsilon\, i$, so $\pi(i)=i$ for a prefix and $k-1-i$ for a suffix.
+
+
+   \begin{DefinePIOP}{Prefix/Suffix Check}{prefix-check}
+    \begin{enumerate}[nosep]
+        \item (\textit{Activator validity check})
+        \begin{enumerate}[nosep]
+          \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:boolean-check} on $\mathsf{a_c^{new}}$ and on $\mathsf{a_h^{new}}$.
+          \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:act-cons} on $(\mathsf{src}, \mathsf{a_c^{new}}, \mathsf{l}, \mathsf{a_h^{new}})$.
+        \end{enumerate}
+        \item (\textit{Filtering by length}) $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:len-filter} on $(\mathsf{src}, \mathsf{l}, \mathsf{a_h^{old}}, \mathsf{a_c^{old}})$ with threshold $k$, obtaining the masked activators $\mathsf{a_h^{old'}}$ and $\mathsf{a_c^{old'}}$.
+        \item (\textit{Containment}) $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:zerocheck} on the column $\mathsf{a_h^{new}}\cdot(1-\mathsf{a_h^{old'}})$, forcing every kept string to be eligible.
+        \item (\textit{Pattern selectors}) $\PIOPProver$ and $\PIOPVerifier$ define $\mathsf{s'_b}^{(0)} := \mathsf{a_c^{old'}}\cdot\mathsf{s_b}$ as the first pattern selector, then
+       \begin{enumerate}[nosep]
+        \item $\PIOPProver$ sends $\mathsf{s'_b}^{(1)},\ldots,\mathsf{s'_b}^{(k-1)}$, each $\mathsf{s'_b}^{(i)}$ being the rotation of $\mathsf{s'_b}^{(i-1)}$ by $\epsilon$.
+        \item For $i=1,\ldots,k-1$ the parties invoke \cref{piop:rotcheck} on $(\mathsf{s'_b}^{(i-1)}, \mathsf{s'_b}^{(i)}, \epsilon)$. 
+        \item $\PIOPProver$ and $\PIOPVerifier$ then define the pattern column $\mathsf{p} := \sum_{i=0}^{k-1}\mathsf{s'_b}^{(i)}\cdot\mathsf{str}[\pi(i)]$.
+       \end{enumerate} 
+        \item (\textit{False Positive Check}) $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:zerocheck} on the column $\bigl(\mathsf{c}-\mathsf{p},\;\;\mathsf{a_c^{new}}\cdot\textstyle\sum_{i=0}^{k-1}\mathsf{s'_b}^{(i)}\bigr)$.
+        \item (\textit{False Negative Check}) $\PIOPProver$ sends the boolean mismatch selector $\mathsf{s_n}$.
+        \begin{enumerate}[nosep]
+          \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:nozero-check} on the column $(\mathsf{c}-\mathsf{p},\;\mathsf{s_n})$, confirming each marked slot is a genuine mismatch.
+          \item (\textit{$\mathsf{s_n}$ well-formedness})
+          \begin{enumerate}[nosep]
+            \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:boolean-check} on $\mathsf{s_n}$.
+            \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:nodup-check} on the column with data $\mathsf{src}$ and activator $\mathsf{s_n}$, so no two marks fall in the same string.
+            \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:zerocheck} on the column $\mathsf{s_n}\cdot\bigl(1-\sum_{i=0}^{k-1}\mathsf{s'_b}^{(i)}\bigr)$, confining each mark to an anchored slot of an eligible string.
+            \item $\PIOPProver$ sends the match count $n_{\mathsf{m}}$ and the non-match count $n_{\mathsf{nm}}$.
+            \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:sumcheck} on $\mathsf{a_h^{new}}$ with claimed sum $n_{\mathsf{m}}$ (the number of matches).
+            \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:sumcheck} on $\mathsf{s_n}$ with claimed sum $n_{\mathsf{nm}}$ (the number of non-matches).
+            \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:sumcheck} on $\mathsf{a_h^{old'}}$ with claimed sum $n_{\mathsf{m}}+n_{\mathsf{nm}}$ (the number of eligible strings).
+          \end{enumerate}
+        \end{enumerate}
+    \end{enumerate}
+\end{DefinePIOP}
+
+\begin{proof}
+We argue completeness and soundness, assuming each invoked sub-PIOP is complete and sound for its relation. Call a string \emph{eligible} if it is active under $\mathsf{a_h^{old}}$ and has length at least $k$; by construction these are exactly the strings marked by $\mathsf{a_h^{old'}}$, and we write $E := \{\,i : \mathsf{a_h^{old'}}[i]=1\,\}$ for this set. The filter must keep exactly the eligible strings that match $\mathsf{str}$.
+
+\parhead{Completeness}
+By the completeness of \cref{piop:len-filter}, an honest prover's masked activators $\mathsf{a_h^{old'}},\mathsf{a_c^{old'}}$ switch off precisely the short and inactive strings. The masked boundary selector and its rotations are genuine rotations, so the rotation checks pass and $\mathsf{p}$ carries $\mathsf{str}[\pi(i)]$ on the $(i{+}1)$-th anchored slot of every eligible string. The honest new activators keep exactly the eligible matching strings, so they are boolean, consistent, contained in $\mathsf{a_h^{old'}}$, and agree with $\mathsf{p}$ on every anchored slot of a kept string, passing the activator-validity and false-positive checks. For each eligible non-matching string the prover marks one anchored slot where $\mathsf{c}\neq\mathsf{p}$; this $\mathsf{s_n}$ is boolean, places no two marks in one string, lies on anchored slots, and the announced counts satisfy the three sum checks, so every false-negative check passes. Hence the honest transcript is accepted.
+
+\parhead{Soundness}
+Suppose $\PIOPVerifier$ accepts. We show that the kept set $M := \{\,i : \mathsf{a_h^{new}}[i]=1\,\}$ is exactly the set of eligible matching strings; since a match requires length at least $k$ and original activity, this is precisely the set of strings passing the filter.
+
+By the soundness of \cref{piop:len-filter} (\cref{sec:length-filtering}), the masked activators $\mathsf{a_h^{old'}}, \mathsf{a_c^{old'}}$ are on exactly for the active strings of length at least $k$ and their characters; hence $E = \{\,i : \mathsf{a_h^{old'}}[i]=1\,\}$ is precisely the set of eligible strings, as claimed.
+
+The activator-validity check makes $\mathsf{a_h^{new}},\mathsf{a_c^{new}}$ boolean and mutually consistent: a string is on in $\mathsf{a_h^{new}}$ iff all of its characters are on in $\mathsf{a_c^{new}}$, and its active-character count equals its length. The containment zerocheck $\mathsf{a_h^{new}}(1-\mathsf{a_h^{old'}})=0$ forces $M\subseteq E$, so every kept string is eligible and, by consistency, all of its characters carry $\mathsf{a_c^{new}}=1$.
+
+\emph{No false positives.} For $i\in M$ the anchored slots of string $i$ have $\mathsf{a_c^{new}}=1$ and $\sum_t \mathsf{s'_b}^{(t)}=1$, so the false-positive zerocheck forces $\mathsf{c}=\mathsf{p}$ there. As $\mathsf{p}$ carries $\mathsf{str}[\pi(t)]$ at the $(t{+}1)$-th anchored slot, string $i$ matches $\mathsf{str}$. Thus every kept string is an eligible match.
+
+\emph{No false negatives.} Let $N := \{\,i : \sum_{\mathsf{src}[j]=i}\mathsf{s_n}[j]=1\,\}$ be the marked strings. Booleanity of $\mathsf{s_n}$ and the no-duplicate check on $(\mathsf{src},\mathsf{s_n})$ give at most one mark per string, so $\sum\mathsf{s_n}=|N|$, while the confinement zerocheck $\mathsf{s_n}(1-\sum_t\mathsf{s'_b}^{(t)})=0$ places every mark on an anchored slot of an eligible string, so $N\subseteq E$. The nonzero check on $(\mathsf{c}-\mathsf{p},\mathsf{s_n})$ makes $\mathsf{c}\neq\mathsf{p}$ at each marked slot; since that slot is anchored, $\mathsf{p}=\mathsf{str}[\pi(t)]$, so the marked string mismatches $\mathsf{str}$ and is non-matching. In particular $N\cap M=\emptyset$, since a kept eligible string agrees with $\mathsf{p}$ on all of its anchored slots.
+
+The three sum checks give $|M|=\sum\mathsf{a_h^{new}}=n_{\mathsf{m}}$, $|N|=\sum\mathsf{s_n}=n_{\mathsf{nm}}$, and $|E|=\sum\mathsf{a_h^{old'}}=n_{\mathsf{m}}+n_{\mathsf{nm}}=|M|+|N|$. As $M,N\subseteq E$ are disjoint with sizes summing to $|E|$, they partition $E=M\sqcup N$. Every eligible string is therefore either kept or marked, and the marked ones are non-matching, so no eligible matching string is dropped. Combined with the no-false-positive direction, $M$ is exactly the set of eligible matching strings, i.e.\ the strings passing the prefix filter. The suffix case is identical, with $\epsilon=-1$ and $\pi(i)=k-1-i$.
+\end{proof}
+
+\ifsp\begin{figure*}[tp]\else\begin{figure}[h!]\fi
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[
+    cell/.style={draw, minimum size=6mm, inner sep=0pt, font=\small},
+    rowlab/.style={font=\small\itshape, anchor=east},
+    hd/.style={font=\small\bfseries}
+  ]
+
+  %==================== Panel 1: string-level columns ====================
+  \node[hd] at (0,7.6)   {$\col$};
+  \node[hd] at (2.0,7.6) {$\mathsf{h}$};
+  \node[hd] at (3.0,7.6) {$\mathsf{l}$};
+  \node[hd] at (4.0,7.6) {$\mathsf{m_h}$};
+  \node[hd] at (5.3,7.6) {$\mathsf{a_h^{old}}$};
+  \node[hd] at (6.6,7.6) {$\mathsf{a_h^{old'}}$};
+  \node[hd] at (7.9,7.6) {$\mathsf{a_h^{new}}$};
+
+  % rows 0..6 are real strings (row 3 = the length-2 string "to" that gets masked);
+  % row 7 pads the column up to size 8.
+  % i / string / boundary / length / m_h / a_h_old / a_h_msk / a_h_new
+  \foreach \i/\s/\bb/\ll/\mh/\ao/\amid/\an in
+    {0/age/0/3/0/1/1/0, 1/truth/3/5/0/0/0/0, 2/trip/8/4/0/1/1/0,
+     3/to/12/2/1/1/0/0, 4/run/14/3/0/1/1/0, 5/arch/17/4/0/1/1/0,
+     6/trust/21/5/0/1/1/1, 7/{$\perp$}/26/0/0/0/0/0}{
+    \pgfmathsetmacro{\yy}{7.0 - \i*0.6}
+    \edef\pf{\ifnum\i>6 gray!12\else white\fi}
+    \edef\mhf{\ifnum\mh=1 red!40\else gray!12\fi}
+    \edef\fa{\ifnum\ao=1 green!30\else gray!12\fi}
+    \edef\fc{\ifnum\amid=1 green!30\else gray!12\fi}
+    \edef\fb{\ifnum\an=1 green!30\else gray!12\fi}
+    \node[font=\small\ttfamily, anchor=west] at (-0.4,\yy) {\s};
+    \node[cell, fill=\pf]  at (2.0,\yy) {\ifnum\i>6 0\else$h_{\i}$\fi};
+    \node[cell, fill=\pf]  at (3.0,\yy) {\ll};
+    \node[cell, fill=\mhf] at (4.0,\yy) {\mh};
+    \node[cell, fill=\fa]  at (5.3,\yy) {\ao};
+    \node[cell, fill=\fc]  at (6.6,\yy) {\amid};
+    \node[cell, fill=\fb]  at (7.9,\yy) {\an};
+  }
+
+  %==================== Panel 2: data-level columns ====================
+  % group (string) labels above the data row
+  \foreach \cx/\nm in {1/age, 5/truth, 9.5/trip, 12.5/to, 15/run, 18.5/arch, 23/trust}{
+    \node[font=\small\ttfamily] at (\cx*0.6, 1.35) {\nm};
+  }
+
+  % row labels
+  \node[rowlab] at (-0.5, 0.62){pos};
+  \node[rowlab] at (-0.5, 0.00){$\mathsf{c}$};
+  \node[rowlab] at (-0.5,-0.62){$\mathsf{src}$};
+  \node[rowlab] at (-0.5,-1.24){$\mathsf{s_b}$};
+  \node[rowlab] at (-0.5,-1.86){$\mathsf{s'^{(0)}_b}$};
+  \node[rowlab] at (-0.5,-2.48){$\mathsf{s'^{(1)}_b}$};
+  \node[rowlab] at (-0.5,-3.10){$\mathsf{s'^{(2)}_b}$};
+  \node[rowlab] at (-0.5,-3.72){$\mathsf{p}$};
+  \node[rowlab] at (-0.5,-4.34){$\mathsf{m_c}$};
+  \node[rowlab] at (-0.5,-4.96){$\mathsf{a_c^{old}}$};
+  \node[rowlab] at (-0.5,-5.58){$\mathsf{a_c^{old'}}$};
+  \node[rowlab] at (-0.5,-6.20){$\mathsf{a_c^{new}}$};
+  \node[rowlab] at (-0.5,-6.82){$\mathsf{s_n}$};
+
+  % pos / char / src / s_b / s'b0 / s'b1 / s'b2 / p / p-nonzero / m_c / a_c_old / a_c_msk / a_c_new
+  % s'b0 = a_c_msk * s_b drops the inactive "truth" (pos 3) and the short "to" (pos 12)
+  % BEFORE rotating, so s'b1, s'b2 never spill into a neighbor: p has no collisions.
+  % str = tru: s'b0 lays t, s'b1 lays r, s'b2 lays u onto p, only on surviving strings.
+  \foreach \x/\c/\sr/\sb/\spa/\spb/\spc/\pp/\pn/\md/\ao/\am/\an in {
+     0/a/0/1/1/0/0/t/1/0/1/1/0,  1/g/0/0/0/1/0/r/1/0/1/1/0,  2/e/0/0/0/0/1/u/1/0/1/1/0,
+     3/t/1/1/0/0/0/0/0/0/0/0/0,  4/r/1/0/0/0/0/0/0/0/0/0/0,  5/u/1/0/0/0/0/0/0/0/0/0/0,  6/t/1/0/0/0/0/0/0/0/0/0/0,  7/h/1/0/0/0/0/0/0/0/0/0/0,
+     8/t/2/1/1/0/0/t/1/0/1/1/0,  9/r/2/0/0/1/0/r/1/0/1/1/0, 10/i/2/0/0/0/1/u/1/0/1/1/0, 11/p/2/0/0/0/0/0/0/0/1/1/0,
+    12/t/3/1/0/0/0/0/0/1/1/0/0, 13/o/3/0/0/0/0/0/0/1/1/0/0,
+    14/r/4/1/1/0/0/t/1/0/1/1/0, 15/u/4/0/0/1/0/r/1/0/1/1/0, 16/n/4/0/0/0/1/u/1/0/1/1/0,
+    17/a/5/1/1/0/0/t/1/0/1/1/0, 18/r/5/0/0/1/0/r/1/0/1/1/0, 19/c/5/0/0/0/1/u/1/0/1/1/0, 20/h/5/0/0/0/0/0/0/0/1/1/0,
+    21/t/6/1/1/0/0/t/1/0/1/1/1, 22/r/6/0/0/1/0/r/1/0/1/1/1, 23/u/6/0/0/0/1/u/1/0/1/1/1, 24/s/6/0/0/0/0/0/0/0/1/1/1, 25/t/6/0/0/0/0/0/0/0/1/1/1}{
+    \pgfmathsetmacro{\px}{\x*0.6}
+    \edef\gc{\ifcase\sr blue!15\or purple!18\or green!22\or red!30\or
+                       orange!25\or cyan!22\or teal!28\or gray!18\fi}
+    \edef\sbf{\ifnum\sb=1 yellow!30\else white\fi}
+    \edef\spaf{\ifnum\spa=1 yellow!55\else white\fi}
+    \edef\spbf{\ifnum\spb=1 yellow!55\else white\fi}
+    \edef\spcf{\ifnum\spc=1 yellow!55\else white\fi}
+    \edef\ppf{\ifnum\pn=1 orange!30\else gray!12\fi}
+    \edef\mdf{\ifnum\md=1 red!40\else gray!12\fi}
+    \edef\aof{\ifnum\ao=1 green!30\else gray!12\fi}
+    \edef\amf{\ifnum\am=1 green!30\else gray!12\fi}
+    \edef\anf{\ifnum\an=1 green!30\else gray!12\fi}
+    \node[font=\scriptsize, gray] at (\px,0.62) {\x};
+    \node[cell, fill=\gc]   at (\px, 0.00) {\texttt{\c}};
+    \node[cell, fill=\gc]   at (\px,-0.62) {\sr};
+    \node[cell, fill=\sbf]  at (\px,-1.24) {\sb};
+    \node[cell, fill=\spaf] at (\px,-1.86) {\spa};
+    \node[cell, fill=\spbf] at (\px,-2.48) {\spb};
+    \node[cell, fill=\spcf] at (\px,-3.10) {\spc};
+    \node[cell, fill=\ppf]  at (\px,-3.72) {\texttt{\pp}};
+    \node[cell, fill=\mdf]  at (\px,-4.34) {\md};
+    \node[cell, fill=\aof]  at (\px,-4.96) {\ao};
+    \node[cell, fill=\amf]  at (\px,-5.58) {\am};
+    \node[cell, fill=\anf]  at (\px,-6.20) {\an};
+  }
+
+  % s_n: mismatch witness --- a single 1 inside each dropped candidate (age, trip, run,
+  % arch) at an anchored slot where d != p; one violation per string suffices.
+  \foreach \x in {0,...,25}{
+    \pgfmathsetmacro{\px}{\x*0.6}
+    \node[cell, fill=gray!12] at (\px,-6.82) {0};
+  }
+  \foreach \x in {0,10,14,17}{
+    \pgfmathsetmacro{\px}{\x*0.6}
+    \node[cell, fill=red!50] at (\px,-6.82) {1};
+  }
+
+  % padding tail: render pos 26 and a far pos 35, with an ellipsis between.
+  \foreach \x/\slot in {26/0, 35/2}{
+    \pgfmathsetmacro{\px}{(26 + \slot)*0.6}
+    \node[font=\scriptsize, gray] at (\px,0.62) {\x};
+    \node[cell, fill=gray!18]  at (\px, 0.00) {0};
+    \node[cell, fill=gray!18]  at (\px,-0.62) {7};
+    \foreach \yy in {-1.24,-1.86,-2.48,-3.10,-3.72,-4.34,-4.96,-5.58,-6.20,-6.82}{
+      \node[cell, fill=gray!12] at (\px,\yy) {0};
+    }
+  }
+  \pgfmathsetmacro{\dx}{27*0.6}
+  \foreach \y in {0.00,-0.62,-1.24,-1.86,-2.48,-3.10,-3.72,-4.34,-4.96,-5.58,-6.20,-6.82}{
+    \node at (\dx,\y) {$\cdots$};
+  }
+
+  % highlights: survivor "trust" solid (t,r,u); "truth" dashed (matched but inactive);
+  % short string "to" dotted (length 2 < k=3, masked out).
+  \draw[red, thick]         (21*0.6-0.32,0.32) rectangle (23*0.6+0.32,-0.32);
+  \draw[red, thick, dashed] ( 3*0.6-0.32,0.32) rectangle ( 5*0.6+0.32,-0.32);
+  \draw[red, thick, dotted] (12*0.6-0.32,0.32) rectangle (13*0.6+0.32,-0.32);
+
+\end{tikzpicture}%
+}
+\caption{Prefix instance ($\epsilon=+1$) of the
+check for \texttt{tru\%} ($\mathsf{str}=\texttt{tru}$, $k=3$).
+The length-$2$ string \texttt{to} (dotted) is too short for a $3$-character prefix:
+the masks $\mathsf{m_h},\mathsf{m_c}$ flag it, and the masked activators
+$\mathsf{a_h^{old'}}=\mathsf{a_h^{old}}(1-\mathsf{m_h})$,
+$\mathsf{a_c^{old'}}=\mathsf{a_c^{old}}(1-\mathsf{m_c})$ deactivate it.
+\texttt{truth} matches the prefix but is inactive (dashed); \texttt{trust} (solid)
+is the active match.}
+\label{fig:prefix-check}
+\ifsp\end{figure*}\else\end{figure}\fi
+
+\ifsp\begin{figure*}[tp]\else\begin{figure}[h!]\fi
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[
+    cell/.style={draw, minimum size=6mm, inner sep=0pt, font=\small},
+    rowlab/.style={font=\small\itshape, anchor=east},
+    hd/.style={font=\small\bfseries}
+  ]
+
+  %==================== Panel 1: string-level columns ====================
+  \node[hd] at (0,7.6)   {$\col$};
+  \node[hd] at (2.0,7.6) {$\mathsf{h}$};
+  \node[hd] at (3.0,7.6) {$\mathsf{l}$};
+  \node[hd] at (4.0,7.6) {$\mathsf{m_h}$};
+  \node[hd] at (5.3,7.6) {$\mathsf{a_h^{old}}$};
+  \node[hd] at (6.6,7.6) {$\mathsf{a_h^{old'}}$};
+  \node[hd] at (7.9,7.6) {$\mathsf{a_h^{new}}$};
+
+  % row 1 = dust (matched but inactive); row 3 = the length-2 string "to" (masked);
+  % row 7 pads the column up to size 8.
+  % i / string / boundary / length / m_h / a_h_old / a_h_msk / a_h_new
+  \foreach \i/\s/\bb/\ll/\mh/\ao/\amid/\an in
+    {0/age/0/3/0/1/1/0, 1/dust/3/4/0/0/0/0, 2/trip/7/4/0/1/1/0,
+     3/to/11/2/1/1/0/0, 4/run/13/3/0/1/1/0, 5/arch/16/4/0/1/1/0,
+     6/trust/20/5/0/1/1/1, 7/{$\perp$}/25/0/0/0/0/0}{
+    \pgfmathsetmacro{\yy}{7.0 - \i*0.6}
+    \edef\pf{\ifnum\i>6 gray!12\else white\fi}
+    \edef\mhf{\ifnum\mh=1 red!40\else gray!12\fi}
+    \edef\fa{\ifnum\ao=1 green!30\else gray!12\fi}
+    \edef\fc{\ifnum\amid=1 green!30\else gray!12\fi}
+    \edef\fb{\ifnum\an=1 green!30\else gray!12\fi}
+    \node[font=\small\ttfamily, anchor=west] at (-0.4,\yy) {\s};
+    \node[cell, fill=\pf]  at (2.0,\yy) {\ifnum\i>6 0\else$h_{\i}$\fi};
+    \node[cell, fill=\pf]  at (3.0,\yy) {\ll};
+    \node[cell, fill=\mhf] at (4.0,\yy) {\mh};
+    \node[cell, fill=\fa]  at (5.3,\yy) {\ao};
+    \node[cell, fill=\fc]  at (6.6,\yy) {\amid};
+    \node[cell, fill=\fb]  at (7.9,\yy) {\an};
+  }
+
+  %==================== Panel 2: data-level columns ====================
+  % group (string) labels above the data row
+  \foreach \cx/\nm in {1/age, 4.5/dust, 8.5/trip, 11.5/to, 14/run, 17.5/arch, 22/trust}{
+    \node[font=\small\ttfamily] at (\cx*0.6, 1.35) {\nm};
+  }
+
+  % row labels
+  \node[rowlab] at (-0.5, 0.62){pos};
+  \node[rowlab] at (-0.5, 0.00){$\mathsf{c}$};
+  \node[rowlab] at (-0.5,-0.62){$\mathsf{src}$};
+  \node[rowlab] at (-0.5,-1.24){$\mathsf{s_b}$};
+  \node[rowlab] at (-0.5,-1.86){$\mathsf{s'^{(0)}_a}$};
+  \node[rowlab] at (-0.5,-2.48){$\mathsf{s'^{(1)}_a}$};
+  \node[rowlab] at (-0.5,-3.10){$\mathsf{s'^{(2)}_a}$};
+  \node[rowlab] at (-0.5,-3.72){$\mathsf{p}$};
+  \node[rowlab] at (-0.5,-4.34){$\mathsf{m_c}$};
+  \node[rowlab] at (-0.5,-4.96){$\mathsf{a_c^{old}}$};
+  \node[rowlab] at (-0.5,-5.58){$\mathsf{a_c^{old'}}$};
+  \node[rowlab] at (-0.5,-6.20){$\mathsf{a_c^{new}}$};
+  \node[rowlab] at (-0.5,-6.82){$\mathsf{s_n}$};
+
+  % suffix filter %ust, str = ust, k=3, epsilon = -1.
+  % masked anchor s'a0 = a_c_msk * rho_{-1}(s_b) marks the LAST char of each surviving
+  % string {2,10,15,19,24} (inactive "dust" and short "to" already dropped); s'a1, s'a2
+  % rotate one/two steps backward. p = sum s'a^i str[k-1-i]: s'a0 lays t, s'a1 lays s,
+  % s'a2 lays u. Masking before rotation removes the collision (p is clean everywhere).
+  % pos / char / src / s_b / s'a0 / s'a1 / s'a2 / p / p-nonzero / m_c / a_c_old / a_c_msk / a_c_new
+  \foreach \x/\c/\sr/\sb/\saa/\sab/\sac/\pp/\pn/\md/\ao/\am/\an in {
+     0/a/0/1/0/0/1/u/1/0/1/1/0,  1/g/0/0/0/1/0/s/1/0/1/1/0,  2/e/0/0/1/0/0/t/1/0/1/1/0,
+     3/d/1/1/0/0/0/0/0/0/0/0/0,  4/u/1/0/0/0/0/0/0/0/0/0/0,  5/s/1/0/0/0/0/0/0/0/0/0/0,  6/t/1/0/0/0/0/0/0/0/0/0/0,
+     7/t/2/1/0/0/0/0/0/0/1/1/0,  8/r/2/0/0/0/1/u/1/0/1/1/0,  9/i/2/0/0/1/0/s/1/0/1/1/0, 10/p/2/0/1/0/0/t/1/0/1/1/0,
+    11/t/3/1/0/0/0/0/0/1/1/0/0, 12/o/3/0/0/0/0/0/0/1/1/0/0,
+    13/r/4/1/0/0/1/u/1/0/1/1/0, 14/u/4/0/0/1/0/s/1/0/1/1/0, 15/n/4/0/1/0/0/t/1/0/1/1/0,
+    16/a/5/1/0/0/0/0/0/0/1/1/0, 17/r/5/0/0/0/1/u/1/0/1/1/0, 18/c/5/0/0/1/0/s/1/0/1/1/0, 19/h/5/0/1/0/0/t/1/0/1/1/0,
+    20/t/6/1/0/0/0/0/0/0/1/1/0, 21/r/6/0/0/0/0/0/0/0/1/1/0, 22/u/6/0/0/0/1/u/1/0/1/1/1, 23/s/6/0/0/1/0/s/1/0/1/1/1, 24/t/6/0/1/0/0/t/1/0/1/1/1}{
+    \pgfmathsetmacro{\px}{\x*0.6}
+    \edef\gc{\ifcase\sr blue!15\or purple!18\or green!22\or red!30\or
+                       orange!25\or cyan!22\or teal!28\or gray!18\fi}
+    \edef\sbf{\ifnum\sb=1 yellow!55\else white\fi}
+    \edef\saaf{\ifnum\saa=1 cyan!35\else white\fi}
+    \edef\sabf{\ifnum\sab=1 cyan!35\else white\fi}
+    \edef\sacf{\ifnum\sac=1 cyan!35\else white\fi}
+    \edef\ppf{\ifnum\pn=1 orange!30\else gray!12\fi}
+    \edef\mdf{\ifnum\md=1 red!40\else gray!12\fi}
+    \edef\aof{\ifnum\ao=1 green!30\else gray!12\fi}
+    \edef\amf{\ifnum\am=1 green!30\else gray!12\fi}
+    \edef\anf{\ifnum\an=1 green!30\else gray!12\fi}
+    \node[font=\scriptsize, gray] at (\px,0.62) {\x};
+    \node[cell, fill=\gc]   at (\px, 0.00) {\texttt{\c}};
+    \node[cell, fill=\gc]   at (\px,-0.62) {\sr};
+    \node[cell, fill=\sbf]  at (\px,-1.24) {\sb};
+    \node[cell, fill=\saaf] at (\px,-1.86) {\saa};
+    \node[cell, fill=\sabf] at (\px,-2.48) {\sab};
+    \node[cell, fill=\sacf] at (\px,-3.10) {\sac};
+    \node[cell, fill=\ppf]  at (\px,-3.72) {\texttt{\pp}};
+    \node[cell, fill=\mdf]  at (\px,-4.34) {\md};
+    \node[cell, fill=\aof]  at (\px,-4.96) {\ao};
+    \node[cell, fill=\amf]  at (\px,-5.58) {\am};
+    \node[cell, fill=\anf]  at (\px,-6.20) {\an};
+  }
+
+  % s_n: mismatch witness --- a single 1 inside each dropped candidate (age, trip, run,
+  % arch) at an anchored slot where d != p; one violation per string suffices.
+  \foreach \x in {0,...,24}{
+    \pgfmathsetmacro{\px}{\x*0.6}
+    \node[cell, fill=gray!12] at (\px,-6.82) {0};
+  }
+  \foreach \x in {2,10,15,19}{
+    \pgfmathsetmacro{\px}{\x*0.6}
+    \node[cell, fill=red!50] at (\px,-6.82) {1};
+  }
+
+  % padding tail: render pos 25 and a far pos 35, with an ellipsis between.
+  \foreach \x/\slot in {25/0, 35/2}{
+    \pgfmathsetmacro{\px}{(25 + \slot)*0.6}
+    \node[font=\scriptsize, gray] at (\px,0.62) {\x};
+    \node[cell, fill=gray!18]  at (\px, 0.00) {0};
+    \node[cell, fill=gray!18]  at (\px,-0.62) {7};
+    \foreach \yy in {-1.24,-1.86,-2.48,-3.10,-3.72,-4.34,-4.96,-5.58,-6.20,-6.82}{
+      \node[cell, fill=gray!12] at (\px,\yy) {0};
+    }
+  }
+  \pgfmathsetmacro{\dx}{26*0.6}
+  \foreach \y in {0.00,-0.62,-1.24,-1.86,-2.48,-3.10,-3.72,-4.34,-4.96,-5.58,-6.20,-6.82}{
+    \node at (\dx,\y) {$\cdots$};
+  }
+
+  % highlights: survivor "trust" solid (u,s,t); "dust" dashed (matched but inactive);
+  % short string "to" dotted (length 2 < k=3, masked out).
+  \draw[red, thick]         (22*0.6-0.32,0.32) rectangle (24*0.6+0.32,-0.32);
+  \draw[red, thick, dashed] ( 4*0.6-0.32,0.32) rectangle ( 6*0.6+0.32,-0.32);
+  \draw[red, thick, dotted] (11*0.6-0.32,0.32) rectangle (12*0.6+0.32,-0.32);
+
+\end{tikzpicture}%
+}
+\caption{Suffix instance ($\epsilon=-1$) of the check for \texttt{\%ust}
+($\mathsf{str}=\texttt{ust}$, $k=3$). The masked anchor
+$\mathsf{s'^{(0)}_a}=\mathsf{a_c^{old'}}\cdot\rho_{-1}(\mathsf{s_b})$ marks the \emph{last}
+character of each surviving string, and $\mathsf{s'^{(1)}_a},\mathsf{s'^{(2)}_a}$ step
+backward from it; the pattern column $\mathsf{p}=\sum_i\mathsf{s'^{(i)}_a}\,\mathsf{str}[k{-}1{-}i]$
+lays \texttt{t},\texttt{s},\texttt{u} from the end. Because inactive \texttt{dust} and the
+short \texttt{to} are dropped \emph{before} rotating, the selectors never spill into a
+neighbor and $\mathsf{p}$ has no collisions.
+\texttt{dust} ends in \texttt{ust} but is inactive (dashed); \texttt{trust} (solid)
+is the active match.}
+\label{fig:suffix-check}
+\ifsp\end{figure*}\else\end{figure}\fi
+
+
+
+\subsubsection{Multi-Factor}
+\label{sec:multi-factor-multi-char-pattern-matching}
