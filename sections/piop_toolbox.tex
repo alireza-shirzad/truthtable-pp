@@ -136,6 +136,29 @@ As described in \cref{sec:arithmetization}, a string column carries two activato
 
 
 
+\subsection{Broadcast Check}
+\label{sec:broadcast}
+The \emph{Broadcast Check} takes a string-level column $\mathsf{x}$ (one entry per string, over the hash hypercube) and a character-level column $\mathsf{x}'$, and proves that $\mathsf{x}'$ copies each string's value to all of its characters, i.e.\ every character carries the value of its own string. We package this as the relation
+\begin{displaymath}
+\NPRelation_{\mathsf{Bcast}} = \left\{\,
+  \NPInstance = \bot,\;
+  \NPInstancey = (\Oracle{\MLE{\mathsf{src}}}, \Oracle{\MLE{\mathsf{x}}}, \Oracle{\MLE{\mathsf{x}'}}),\;
+  \NPWitness = (\mathsf{src}, \mathsf{x}, \mathsf{x}')
+  \;\middle|\;
+    \mathsf{x}'[c] = \mathsf{x}[\mathsf{src}[c]]\ \text{for every character } c
+\,\right\}.
+\end{displaymath}
+Since the string indices $\mathsf{ind}$ are distinct, the pair $(\mathsf{src}[c], \mathsf{x}'[c])$ equals the string row $(\mathsf{ind}[i], \mathsf{x}[i])$ exactly for $i = \mathsf{src}[c]$. Encoding each pair as a single field element $\key + r\mult\val$ with a random challenge $r$ collapses the check to one lookup of the character pairs into the string pairs: by Schwartz--Zippel, $\mathsf{src}[c] + r\,\mathsf{x}'[c] \in \{\mathsf{ind}[i] + r\,\mathsf{x}[i]\}_i$ at a random $r$ forces $(\mathsf{src}[c], \mathsf{x}'[c]) = (\mathsf{src}[c], \mathsf{x}[\mathsf{src}[c]])$, hence $\mathsf{x}'[c] = \mathsf{x}[\mathsf{src}[c]]$.
+\begin{DefinePIOP}{Broadcast Check}{broadcast}
+  \emph{Inputs:} $\Oracle{\MLE{\mathsf{src}}}, \Oracle{\MLE{\mathsf{ind}}}, \Oracle{\MLE{\mathsf{x}}}, \Oracle{\MLE{\mathsf{x}'}}$.
+  \begin{enumerate}[nosep]
+    \item $\PIOPVerifier$ samples a random $r \samples \F$ and sends it to $\PIOPProver$.
+    \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:lookup-check} on $(\mathbf{1},\, \mathsf{src} + r\,\mathsf{x}')$ and $(\mathbf{1},\, \mathsf{ind} + r\,\mathsf{x})$, proving $(\mathbf{1},\, \mathsf{src} + r\,\mathsf{x}') \lookup (\mathbf{1},\, \mathsf{ind} + r\,\mathsf{x})$.
+  \end{enumerate}
+\end{DefinePIOP}
+
+
+
 \subsection{Length Filtering}
 \label{sec:length-filtering}
 
