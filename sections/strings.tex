@@ -62,11 +62,7 @@ We present a single general protocol (\cref{piop:single-factor-multi-char-patter
 \label{sec:single-factor-multi-char-pattern-matching}
 \begin{DefinePIOP}{Single-Factor Multi-Character (SFMC) Pattern Matching}{single-factor-multi-char-pattern-matching}[SFMC Pattern Matching]
   \begin{enumerate}[nosep]
-    \item (\textit{Activator validity check})
-    \begin{enumerate}[nosep]
-      \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:boolean-check} on $\mathsf{a_c^{new}}$ and on $\mathsf{a_h^{new}}$.
-      \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:act-cons} on $(\mathsf{a_c^{new}}, \mathsf{a_h^{new}})$.
-    \end{enumerate}
+    \item (\textit{Activator validity check}) $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:act-len-consistency} on $(\mathsf{a_c^{new}}, \mathsf{a_h^{new}}, \mathsf{orig}, \mathsf{ind}, \mathsf{l})$.
     \item (\textit{Filtering by length}) $\PIOPProver$ computes $\mathsf{a_h^{old'}}$ and $\mathsf{a_c^{old'}}$ which is the result of filtering the strings with length less than $k$, then $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:len-filter} $(\mathsf{a_h^{old}}, \mathsf{a_c^{old}}, \mathsf{a_h^{old'}}, \mathsf{a_c^{old'}})$ with threshold $k$.
     \item (\textit{Containment}) $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:zerocheck} on $\mathsf{a_h^{new}}\cdot(1-\mathsf{a_h^{old'}})$.
     \item (\textit{Rotated character columns}) $\PIOPProver$ sends $\mathsf{c}^{(1)},\ldots,\mathsf{c}^{(k-1)}$, each $\mathsf{c}^{(\delta)}$ a rotation of $\mathsf{c}^{(\delta-1)}$ by $-1$ (so $\mathsf{c}^{(\delta)}[p] = \mathsf{c}[p+\delta]$) and $\mathsf{c}^{(0)} := \mathsf{c}$. Then the parties invoke \cref{piop:rotcheck} on each $(\mathsf{c}^{(\delta-1)}, \mathsf{c}^{(\delta)}, -1)$.
@@ -92,7 +88,7 @@ We present a single general protocol (\cref{piop:single-factor-multi-char-patter
         \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:zerocheck} on $\mathsf{m_{fp}}\cdot(1-\mathsf{a_c^{new}})$ and on $\mathsf{m_{fp}}\cdot(1-\mathsf{att\_mask})$.
         \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:zerocheck} on the column with data $\mathsf{diff}$ and activator $\mathsf{m_{fp}}$;
         \item $\PIOPProver$ sends $n_{\mathsf{m}}$ to $\PIOPVerifier$, then $\PIOPProver$ and $\PIOPVerifier$ invoke invoke \cref{piop:sumcheck} twice, for $\sum_{\vec{x}}\mathsf{m_{fp}}(\vec{x})=n_{\mathsf{m}}$ and $\sum_{\vec{x}}\mathsf{a_h^{new}}(\vec{x})=n_{\mathsf{m}}$.
-        \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:nodup-check} on the column with data $\mathsf{src}$ and activator $\mathsf{m_{fp}}$.
+        \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:nodup-check} on the column with data $\mathsf{orig}$ and activator $\mathsf{m_{fp}}$.
       \end{enumerate}
     \end{enumerate}
   \end{enumerate}
@@ -204,7 +200,7 @@ We present a single general protocol (\cref{piop:single-factor-multi-char-patter
   % row labels
   \node[rowlab] at (-0.4,0.62){pos};
   \node[rowlab] at (-0.4,0){$\mathsf{c}$};
-  \node[rowlab] at (-0.4,\ysrc){$\mathsf{src}$};
+  \node[rowlab] at (-0.4,\ysrc){$\mathsf{orig}$};
   \node[rowlab] at (-0.4,\ysb){$\mathsf{s_b}$};
   \node[rowlab] at (-0.4,\yaold){$\mathsf{a_c^{old}}$};
   \node[rowlab] at (-0.4,\yaoldm){$\mathsf{a_c^{old'}}$};
@@ -234,11 +230,11 @@ Suppose $\PIOPVerifier$ accepts. By the soundness of \cref{piop:len-filter} (\cr
 
 The rotation checks force $\mathsf{c}^{(\delta)}[p]=\mathsf{c}[p+\delta]$ for every $\delta$, so $\mathsf{wf}[p]=\sum_\delta r_\delta\,\mathsf{c}[p+\delta]$ is the fingerprint of the length-$k$ window of $\mathsf{c}$ at $p$ and $\mathsf{diff}[p]=\mathsf{wf}[p]-\mathsf{pf}$. A window equal to $\mathsf{str}$ gives $\mathsf{diff}[p]=0$ identically; a window differing from $\mathsf{str}$ gives $\mathsf{diff}[p]=0$ only when the verifier's $r_0,\ldots,r_{k-1}$ are a root of a fixed nonzero degree-$1$ polynomial, so by Schwartz--Zippel and a union bound over the $N$ positions, except with probability $N(k-1)/|\F|$,
 \[ \mathsf{diff}[p]=0 \iff \text{the length-$k$ window of $\mathsf{c}$ at $p$ equals }\mathsf{str},\qquad\text{for every }p. \]
-We condition on this event; note the direction $\mathsf{diff}[p]\neq0\Rightarrow$ window $\neq\mathsf{str}$ holds \emph{unconditionally}. The rotation checks on the boundary selectors make $\mathsf{att\_mask}$ the attention mask of the chosen filter: within each eligible string it marks the single anchored window (prefix, suffix) or all $\mathsf{l}-k+1$ valid starts (infix), with $\mathsf{att\_mask}\leq\mathsf{a_c^{old'}}$, and in every case $\mathsf{att\_mask}[p]=1$ guarantees that the window at $p$ lies entirely within the string $\mathsf{src}[p]$.
+We condition on this event; note the direction $\mathsf{diff}[p]\neq0\Rightarrow$ window $\neq\mathsf{str}$ holds \emph{unconditionally}. The rotation checks on the boundary selectors make $\mathsf{att\_mask}$ the attention mask of the chosen filter: within each eligible string it marks the single anchored window (prefix, suffix) or all $\mathsf{l}-k+1$ valid starts (infix), with $\mathsf{att\_mask}\leq\mathsf{a_c^{old'}}$, and in every case $\mathsf{att\_mask}[p]=1$ guarantees that the window at $p$ lies entirely within the string $\mathsf{orig}[p]$.
 
-The activator-validity check makes $\mathsf{a_h^{new}},\mathsf{a_c^{new}}$ boolean and forces $\mathsf{a_c^{new}}[j]=\mathsf{a_h^{new}}[\mathsf{src}[j]]$ for every character $j$, so $\mathsf{a_c^{new}}$ is constant on each string and equals its header bit. The containment zerocheck $\mathsf{a_h^{new}}(1-\mathsf{a_h^{old'}})=0$ forces $M\subseteq E$.
+The activator-validity check makes $\mathsf{a_h^{new}},\mathsf{a_c^{new}}$ boolean and forces $\mathsf{a_c^{new}}[j]=\mathsf{a_h^{new}}[\mathsf{orig}[j]]$ for every character $j$, so $\mathsf{a_c^{new}}$ is constant on each string and equals its header bit. The containment zerocheck $\mathsf{a_h^{new}}(1-\mathsf{a_h^{old'}})=0$ forces $M\subseteq E$.
 
-\emph{No false positives.} For an anchored filter, $\mathsf{att\_mask}$ marks one candidate per eligible string, and the false-positive zerocheck forces $\mathsf{diff}=0$ wherever $\mathsf{att\_mask}\cdot\mathsf{a_c^{new}}=1$, i.e.\ at the candidate of each kept string; since that window lies within its string and $\mathsf{diff}=0$ means it equals $\mathsf{str}$, every kept string matches. For the infix filter, the two confinement zerochecks give $\mathsf{m_{fp}}\leq\mathsf{a_c^{new}}$ and $\mathsf{m_{fp}}\leq\mathsf{att\_mask}$, and the occurrence zerocheck gives $\mathsf{diff}=0$ on the support of $\mathsf{m_{fp}}$; thus every mark $p$ has $\mathsf{a_c^{new}}[p]=1$ (so $\mathsf{src}[p]\in M$), $\mathsf{att\_mask}[p]=1$ (a candidate window lying inside $\mathsf{src}[p]$), and $\mathsf{diff}[p]=0$ (that window equals $\mathsf{str}$), so $\mathsf{src}[p]$ matches. The no-duplicate check on $(\mathsf{src},\mathsf{m_{fp}})$ puts the marks in distinct strings, and the two sum checks give $\sum\mathsf{m_{fp}}=n_{\mathsf{m}}=\sum\mathsf{a_h^{new}}=|M|$, so the $|M|$ marks lie in distinct strings of $M$ and hit every string of $M$ exactly once. Either way, every kept string is an eligible match.
+\emph{No false positives.} For an anchored filter, $\mathsf{att\_mask}$ marks one candidate per eligible string, and the false-positive zerocheck forces $\mathsf{diff}=0$ wherever $\mathsf{att\_mask}\cdot\mathsf{a_c^{new}}=1$, i.e.\ at the candidate of each kept string; since that window lies within its string and $\mathsf{diff}=0$ means it equals $\mathsf{str}$, every kept string matches. For the infix filter, the two confinement zerochecks give $\mathsf{m_{fp}}\leq\mathsf{a_c^{new}}$ and $\mathsf{m_{fp}}\leq\mathsf{att\_mask}$, and the occurrence zerocheck gives $\mathsf{diff}=0$ on the support of $\mathsf{m_{fp}}$; thus every mark $p$ has $\mathsf{a_c^{new}}[p]=1$ (so $\mathsf{orig}[p]\in M$), $\mathsf{att\_mask}[p]=1$ (a candidate window lying inside $\mathsf{orig}[p]$), and $\mathsf{diff}[p]=0$ (that window equals $\mathsf{str}$), so $\mathsf{orig}[p]$ matches. The no-duplicate check on $(\mathsf{orig},\mathsf{m_{fp}})$ puts the marks in distinct strings, and the two sum checks give $\sum\mathsf{m_{fp}}=n_{\mathsf{m}}=\sum\mathsf{a_h^{new}}=|M|$, so the $|M|$ marks lie in distinct strings of $M$ and hit every string of $M$ exactly once. Either way, every kept string is an eligible match.
 
 \emph{No false negatives.} Let $i\in E\setminus M$ be a dropped eligible string. By consistency every character of $i$ has $\mathsf{a_c^{new}}=0$, so $\mathsf{att\_mask}\cdot(1-\mathsf{a_c^{new}})=\mathsf{att\_mask}$ on string $i$, which is $1$ at each of its candidate windows. The false-negative no-zero check therefore forces $\mathsf{diff}[p]\neq0$ there, so by the unconditional direction none of $i$'s candidate windows equals $\mathsf{str}$. Hence $i$ does not match. Contrapositively, every eligible matching string lies in $M$.
 
@@ -253,35 +249,15 @@ A multi-factor multi-character pattern matches several literal factors against e
 
 The objective of the protocol is to establish that the updated activators $\mathsf{a_h^{new}}$ and $\mathsf{a_c^{new}}$ correctly capture the result of the pattern matching. As in \cref{piop:single-factor-multi-char-pattern-matching}, the first steps check the validity of the provided activators (\cref{mfmc:validity}), filter by length (\cref{mfmc:filter}), and enforce containment (\cref{mfmc:containment}).
 
-The prover and the verifier then run \cref{piop:single-factor-multi-char-pattern-matching} for each factor $p\in\mathcal{P}$, obtaining a separate activator $\mathsf{a^{new}_{h,p}}$ per factor. It is important to note that a string satisfying every factor predicate \emph{separately} need not satisfy the full pattern $\mathcal{P}$: in general $\mathsf{a^{new}_{h}}\neq\mathsf{a^{\cap}_h}$, where $\mathsf{a^{\cap}_h}:=\prod_{p\in \mathcal{P}}\mathsf{a^{new}_{h,p}}$. The reason is that the order of the factors matters. For the pattern \texttt{\%ab\%cd\%}, for instance, the value \texttt{xabycdz} satisfies the predicate while \texttt{xcdyabz} does not---even though both contain \texttt{ab} and \texttt{cd}---because there \texttt{cd} precedes \texttt{ab}. Hence the finally-active words form a subset of those active in every factor, which is enforced in \cref{mfmc:cap-containment}. The rest of the protocol establishes that the words deactivated between $\mathsf{a^{\cap}_h}$ and $\mathsf{a^{new}_{h}}$ fail to admit the correct ordering (there are no false negatives), while the words that survive into $\mathsf{a^{new}_{h}}$ do satisfy the ordering constraints (there are no false positives).
-
-\parhead{Ordering False-Positive Check} The easier direction is to verify that the words surviving into the final activator---those active in both $\mathsf{a_h^\cap}$ and $\mathsf{a_h^{new}}$---do respect the required ordering. For this the verifier needs a handle on where each factor sits inside its word: at \cref{mfmc:false-pos-word-level-occ-ind} the prover sends, for every factor $p_i\in\mathcal{P}$, the word-level offset column $\mathsf{offset}_{p_i}$ recording the position at which $p_i$ is placed. Then, at \cref{mfmc:false-pos-verdict}, for each consecutive pair $(p_{i},p_{i+1})$ the verifier checks that $\mathsf{offset}_{p_{i+1}}$ exceeds $\mathsf{offset}_{p_{i}}$ by at least $|p_i|$, so the factors appear in order and without overlap. The remaining checks ensure that each $\mathsf{offset}_{p_i}$ is itself well-formed---that it genuinely marks an occurrence of $p$ inside the word.
-
-\parhead{Ordering False-Negative Check} The trickier direction is to establish that every discarded string---one that contains all the factors (active in $\mathsf{a_h^\cap}$) but is switched off in the output (inactive in $\mathsf{a_h^{new}}$)---genuinely fails to admit the factors in the required order. The difficulty is that a cheating prover has many ways to discard a perfectly valid ordering simply by reporting the factor placements incorrectly. Consider the pattern \texttt{\%ab\%bd\%bd\%} ($\mathcal{P}=\{p_1,p_2,p_3\}=\{\texttt{ab},\texttt{bd},\texttt{bd}\}$), in which the factor \texttt{bd} repeats, together with the string \texttt{xabybdzbd}: it matches the pattern (\texttt{ab} at $1$, \texttt{bd} at $4$, \texttt{bd} at $7$) and should be active in the output. A cheating prover, however, could report the placements of $p_2$ and $p_3$ as $7$ and $4$---swapping the two \texttt{bd} occurrences---so that the offsets appear out of order and the string is wrongly discarded.
-
-To rule out this attack, the verifier forces $\mathsf{offset}_{p_i}$ to be formed greedily: each factor is placed at the earliest match at or past the end of the previous factor, never skipping a valid occurrence. This greedy placement is optimal---if any in-order embedding exists, the greedy one does too---so once the verifier is convinced that even the greedy offsets cannot place all factors in order, no placement can, and the string is rightly discarded.
-
-
-To enforce greedy offsetting, the core idea is to keep track of three things: \begin{enumerate*}[label=(\roman*)]
-  \item \emph{all} occurrences of the factors, which is denoted by $\mathsf{occurs_p}$ masking polynomial.
-  \item The set of allowed offsets that a factor can get, which starts when the previous factor is completely finished, i.e. $\mathsf{offset}{p_{j-1}}+|p_{j-1}|$, which is denoted by $\mathsf{allowed\_offset}$ masking polynomial.
-  \item The set of offsets that could have been used for the factor $p_j$ but was not used, which is denoted by $\mathsf{unused\_offset}$ masking polynomial.
-\end{enumerate*}
-Now, the greediness of the offsets can be established by a zerocheck on the multiplication on these three polynomials which means: It's impossible for a factor $p_j$ to occur in an allowed offset which is smaller than the recorded offset. This is checked in \cref{mfmc:greedy-verdict}.
-
-
+A natural approach to checking a multi-factor pattern is to verify each factor individually: $\PIOPProver$ and $\PIOPVerifier$ run \cref{piop:single-factor-multi-char-pattern-matching} for every factor $p\in\mathcal{P}$, obtaining a separate activator $\mathsf{a^{new}_{h,p}}$, and test whether $\mathsf{a^{new}_{h}}$ equals their product $\mathsf{a^{\cap}_h}:=\prod_{p\in \mathcal{P}}\mathsf{a^{new}_{h,p}}$. This alone is insufficient, however, because the order of the factors matters: a string may contain every factor yet still fail the pattern, so in general $\mathsf{a^{new}_{h}}\neq\mathsf{a^{\cap}_h}$. For the pattern \texttt{\%ab\%cd\%}, for instance, the string \texttt{xabycdz} satisfies the predicate while \texttt{xcdyabz} does not---even though both contain \texttt{ab} and \texttt{cd}---because in the latter \texttt{cd} precedes \texttt{ab}. The matching words therefore form a subset of those active in every factor, a containment enforced in \cref{mfmc:cap-containment}. It remains to show that this subset is exactly right: the words deactivated between $\mathsf{a^{\cap}_h}$ and $\mathsf{a^{new}_{h}}$ admit no valid ordering (no false negatives), while the words surviving into $\mathsf{a^{new}_{h}}$ do (no false positives). This is the task of \cref{mfmc:ordering}, which invokes \cref{piop:factor-ordering}.
 
 
 
 \begin{DefinePIOP}{Multi-Factor Multi-Character (MFMC) Pattern Matching}{multi-factor-multi-char-pattern-matching}[MFMC Pattern Matching]
   \emergencystretch=3em\relax
   \begin{enumerate}[nosep]
-        \item (\emph{Activator validity check})\label[step]{mfmc:validity}
-    \begin{enumerate}[nosep]
-      \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:boolean-check} on $\mathsf{a_c^{new}}$ and on $\mathsf{a_h^{new}}$.
-      \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:act-cons} on $(\mathsf{a_c^{new}}, \mathsf{a_h^{new}})$.
-    \end{enumerate}
-    \item (\emph{Filtering by length})\label[step]{mfmc:filter} $\PIOPProver$ computes $\mathsf{a_h^{old'}}$ and $\mathsf{a_c^{old'}}$, the result of filtering out strings shorter than $k:=\sum_{p\in\mathcal{P}}|p|$ (the least length a string can have while containing all factors without overlap), then $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:len-filter} $(\mathsf{a_h^{old}}, \mathsf{a_c^{old}}, \mathsf{a_h^{old'}}, \mathsf{a_c^{old'}})$ with threshold $k$.
+        \item (\emph{Activator validity})\label[step]{mfmc:validity} $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:act-len-consistency} on $(\mathsf{a_c^{new}}, \mathsf{a_h^{new}}, \mathsf{orig}, \mathsf{ind}, \mathsf{l})$.
+    \item (\emph{Length Filtering})\label[step]{mfmc:filter} $\PIOPProver$ computes $\mathsf{a_h^{old'}}$ and $\mathsf{a_c^{old'}}$, the result of filtering out strings shorter than $k:=\sum_{p\in\mathcal{P}}|p|$ (the least length a string can have while containing all factors without overlap), then $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:len-filter} $(\mathsf{a_h^{old}}, \mathsf{a_c^{old}}, \mathsf{a_h^{old'}}, \mathsf{a_c^{old'}})$ with threshold $k$.
     \item (\emph{Containment in the input})\label[step]{mfmc:containment} $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:zerocheck} on $\mathsf{a_h^{new}}\cdot(1-\mathsf{a_h^{old'}})$.
     \item (\emph{Checking patterns separately})\label[step]{mfmc:separate} For each \emph{distinct} $p\in\mathcal{P}$:
     \begin{enumerate}[nosep]
@@ -295,6 +271,27 @@ Now, the greediness of the offsets can be established by a zerocheck on the mult
      \end{enumerate}
     \end{enumerate}
     \item (\emph{Containment in the per-factor match intersection})\label[step]{mfmc:cap-containment} $\PIOPProver$ and $\PIOPVerifier$ define the per-factor match intersection $\mathsf{a^{\cap}_h}:=\prod_{p\in\mathcal{P}}\mathsf{a^{new}_{h,p}}$ and invoke a \cref{piop:zerocheck} on $\mathsf{a^{new}_{h}}\cdot\bigl(1-\mathsf{a^{\cap}_h}\bigr)$.
+    \item (\emph{Factor ordering check})\label[step]{mfmc:ordering} Finally, $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:factor-ordering} on the ordered factors $(p_1,\dots,p_t)$, the activators $\mathsf{a^{new}_h}$, $\mathsf{a^{\cap}_h}$, and $\mathsf{a^{\cap}_c}$, and the per-factor occurrence columns $\{\mathsf{occurs}_{p_j}\}_{j=1}^{t}$.
+  \end{enumerate}
+\end{DefinePIOP}
+
+\parhead{Checking the factor ordering} It remains to certify the ordering among the candidate strings---those matching every factor. We must establish that a candidate survives only if its factors occur in the correct order (no false positives), and is dropped otherwise (no false negatives).
+
+
+\begin{itemize}[nosep]
+  \item \textbf{False Positive Check:} The easier direction is to verify that the words surviving into the final activator---those active in both $\mathsf{a_h^\cap}$ and $\mathsf{a_h^{new}}$---do respect the required ordering. For this the verifier needs a handle on where each factor sits inside its word: at \cref{mfmc:false-pos-word-level-occ-ind} the prover sends, for every factor $p_i\in\mathcal{P}$, the word-level offset column $\mathsf{offset}_{p_i}$ recording the position at which $p_i$ is placed. Then, at \cref{mfmc:false-pos-verdict}, for each consecutive pair $(p_{i},p_{i+1})$ the verifier checks that $\mathsf{offset}_{p_{i+1}}$ exceeds $\mathsf{offset}_{p_{i}}$ by at least $|p_i|$, so the factors appear in order and without overlap. The remaining checks ensure that each $\mathsf{offset}_{p_i}$ is itself well-formed---that it genuinely marks an occurrence of $p$ inside the word.
+  \item \textbf{False Negative Check:} The trickier direction is to establish that every discarded string---one that contains all the factors (active in $\mathsf{a_h^\cap}$) but is switched off in the output (inactive in $\mathsf{a_h^{new}}$)---genuinely fails to admit the factors in the required order. The difficulty is that a cheating prover has many ways to discard a perfectly valid ordering simply by reporting the factor placements incorrectly. Consider the pattern \texttt{\%ab\%bd\%bd\%} ($\mathcal{P}=\{p_1,p_2,p_3\}=\{\texttt{ab},\texttt{bd},\texttt{bd}\}$), in which the factor \texttt{bd} repeats, together with the string \texttt{xabybdzbd}: it matches the pattern (\texttt{ab} at $1$, \texttt{bd} at $4$, \texttt{bd} at $7$) and should be active in the output. A cheating prover, however, could report the placements of $p_2$ and $p_3$ as $7$ and $4$---swapping the two \texttt{bd} occurrences---so that the offsets appear out of order and the string is wrongly discarded.
+To rule out this attack, the prover convinces the verifier that it matched all the factors in a greedy manner, i.e each factor is placed at the earliest match at or past the end of the previous factor, never skipping a valid occurrence. This greedy placement is optimal---if any in-order embedding exists, the greedy one does too---so once the verifier is convinced that even the greedy offsets cannot place all factors in order, no placement can, and the string is rightly discarded. This is done in \cref{mfmc:greedy} via the \cref{piop:greedy-check}.
+\end{itemize}
+
+
+
+
+
+\begin{DefinePIOP}{Factor Ordering Check}{factor-ordering}[FactorOrdering]
+  \emergencystretch=3em\relax
+  \emph{Inputs:} the ordered factors $(p_1,\dots,p_t)$ with lengths $|p_j|$; the activators $\Oracle{\MLE{\mathsf{a^{new}_h}}}, \Oracle{\MLE{\mathsf{a^{\cap}_h}}}, \Oracle{\MLE{\mathsf{a^{\cap}_c}}}$; the per-factor occurrence columns $\Oracle{\MLE{\mathsf{occurs}_{p_j}}}$ for $j=1,\dots,t$; and the shared columns $\Oracle{\MLE{\mathsf{o}}}, \Oracle{\MLE{\mathsf{orig}}}, \Oracle{\MLE{\mathsf{ind}}}$.
+  \begin{enumerate}[nosep]
     \item \label[step]{mfmc:false-pos} (\emph{False-positive check for factor ordering}) $\PIOPProver$ and $\PIOPVerifier$ proceed as follows:
     \begin{enumerate}[nosep]
       \item \label[step]{mfmc:false-pos-word-level-occ-ind} \emph{(word-level offset)} For each $j=1,\dots,t$, $\PIOPProver$ computes a word-level column $\mathsf{offset}_{p_j}$ of size $N$ giving the start at which $p_j$ is greedily placed in each word. With frontier $f:=\mathsf{offset}_{p_{j-1}}[i]+|p_{j-1}|$ left by the previous factor ($f:=0$ when $j=1$),
@@ -308,7 +305,7 @@ Now, the greediness of the offsets can be established by a zerocheck on the mult
         \]
         $\PIOPProver$ sends $\mathsf{offset}_{p_j}$ to $\PIOPVerifier$.
 
-   \item \emph{(character-level offset marker)} For each $j=1,\dots,t$, $\PIOPProver$ sends a character-level boolean column $\mathsf{offset\_marker}_{p_j}$ (of size $M$) marking, in each matched word where $p_j$ is placed in order, the character at the placed start: for a character $c$ in word $i:=\mathsf{src}[c]$,
+   \item \emph{(character-level offset marker)} For each $j=1,\dots,t$, $\PIOPProver$ sends a character-level boolean column $\mathsf{offset\_marker}_{p_j}$ (of size $M$) marking, in each matched word where $p_j$ is placed in order, the character at the placed start: for a character $c$ in word $i:=\mathsf{orig}[c]$,
         \[
           \mathsf{offset\_marker}_{p_j}[c]:=
           \begin{cases}
@@ -321,7 +318,7 @@ Now, the greediness of the offsets can be established by a zerocheck on the mult
         \item a \cref{piop:boolean-check} on $\mathsf{offset\_marker}_{p_j}$;
         \item a \cref{piop:zerocheck} on $\mathsf{offset\_marker}_{p_j}(1-\mathsf{occurs}_{p_j})$;
         \item a \cref{piop:zerocheck} on $\mathsf{offset\_marker}_{p_j}(1-\mathsf{a^{\cap}_c})$;
-        \item a \cref{piop:nodup-check} on $\mathsf{src}$ with activator $\mathsf{offset\_marker}_{p_j}$;
+        \item a \cref{piop:nodup-check} on $\mathsf{orig}$ with activator $\mathsf{offset\_marker}_{p_j}$;
         \item two \cref{piop:sumcheck}s for $\sum_{c}\mathsf{offset\_marker}_{p_j}[c]=n$ and $\sum_{i}\mathsf{a^{\cap}_h}[i]\,\mathsf{is\_ordered}_{p_j}[i]=n$, where $n$ is a count sent by $\PIOPProver$.
       \end{enumerate}
 
@@ -338,22 +335,14 @@ Now, the greediness of the offsets can be established by a zerocheck on the mult
         \item a \cref{piop:boolean-check} on $\mathsf{is\_ordered}_{p_j}$;
         \item a $\mathsf{NonNeg}$ \cref{piop:sign-check} on $\mathsf{offset}_{p_j}-\mathsf{offset}_{p_{j-1}}-|p_{j-1}|$ with activator $\mathsf{a^{\cap}_h}\,\mathsf{is\_ordered}_{p_j}$;
       \end{itemize}
-   
-      \item \emph{(consistency between the offset and offset marker)} $\PIOPVerifier$ then samples $\{r_j\}_{j=1}^{t}\samples\F$ and sends them to $\PIOPProver$, then they both run \cref{piop:mset} on $\bigcup_{j=1}^{t}\{\,\mathsf{ind}[i]+r_j\,\mathsf{offset}_{p_j}[i]\ :\ \mathsf{a^{\cap}_h}[i]=1\ \text{and}\ \mathsf{is\_ordered}_{p_j}[i]=1\,\}$ and $\bigcup_{j=1}^{t}\{\,\mathsf{src}[c]+r_j\,\mathsf{o}[c]\ :\ \mathsf{offset\_marker}_{p_j}[c]=1\,\}$.
+
+      \item \emph{(consistency between the offset and offset marker)} $\PIOPVerifier$ then samples $\{r_j\}_{j=1}^{t}\samples\F$ and sends them to $\PIOPProver$, then they both run \cref{piop:mset} on $\bigcup_{j=1}^{t}\{\,\mathsf{ind}[i]+r_j\,\mathsf{offset}_{p_j}[i]\ :\ \mathsf{a^{\cap}_h}[i]=1\ \text{and}\ \mathsf{is\_ordered}_{p_j}[i]=1\,\}$ and $\bigcup_{j=1}^{t}\{\,\mathsf{orig}[c]+r_j\,\mathsf{o}[c]\ :\ \mathsf{offset\_marker}_{p_j}[c]=1\,\}$.
         \item \emph{(verdict)} For each $j=2,\dots,t$, the parties invoke a \cref{piop:zerocheck} on $\mathsf{a^{new}_h}\,(1-\mathsf{is\_ordered}_{p_j})$.
     \end{enumerate}
-    \item \label[step]{mfmc:false-neg}(\emph{False-negative check for factor ordering}) $\PIOPProver$ and $\PIOPVerifier$ denote by $\mathsf{d_h}:=\mathsf{a^{\cap}_h}-\mathsf{a^{new}_h}$ the \emph{discarded candidates}. 
+    \item \label[step]{mfmc:false-neg}(\emph{False-negative check for factor ordering}) $\PIOPProver$ and $\PIOPVerifier$ denote by $\mathsf{d_h}:=\mathsf{a^{\cap}_h}-\mathsf{a^{new}_h}$ the \emph{discarded candidates}.
     \begin{enumerate}[nosep]
-      \item (\emph{broadcasting}) $\PIOPProver$ sends the columns $\mathsf{d_h}'$, $\mathsf{offset}'_{p_j}$ for $j=1,\dots,t$ (with $\mathsf{offset}'_{p_0}:=0$), and $\mathsf{is\_ordered}'_{p_j}$ for $j=2,\dots,t$ (with $\mathsf{is\_ordered}'_{p_1}:=\mathbf{1}$), where $x'$ denotes the broadcasted version of $x$. Then $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:broadcast} on all of the broadcasted polynomials.
-      \item \label[step]{mfmc:op-well}(\emph{the offset is greedy}) For each $j=1,\dots,t$ the parties invoke:
-      \begin{itemize}[nosep]
-        \item a $\mathsf{NonNeg}$ \cref{piop:sign-check} on $\mathsf{o}-\bigl(\mathsf{offset}'_{p_{j-1}}+|p_{j-1}|\bigr)$, giving a boolean column $\mathsf{allowed\_offset}_{p_j}$ marking $\mathsf{o}\ge\mathsf{offset}'_{p_{j-1}}+|p_{j-1}|$, with activator $\mathsf{d_h}'$ (so $\mathsf{allowed\_offset}_{p_j}$ flags the offsets from which $p_j$ may still start---those at or past the end of the previously placed factor);
-        \item a $\mathsf{Neg}$ \cref{piop:sign-check} on $\mathsf{o}-\mathsf{offset}'_{p_j}$, giving a boolean column $\mathsf{unused\_offset}_{p_j}$ marking $\mathsf{o}<\mathsf{offset}'_{p_j}$, with activator $\mathsf{d_h}'$ (so $\mathsf{unused\_offset}_{p_j}$ flags the offsets strictly before the placement claimed for $p_j$; together, $\mathsf{allowed\_offset}_{p_j}\cdot\mathsf{unused\_offset}_{p_j}$ picks out exactly the window $\mathsf{offset}'_{p_{j-1}}+|p_{j-1}|\le\mathsf{o}<\mathsf{offset}'_{p_j}$);
-
-        \item \cref{piop:zerocheck} on $\mathsf{occurs}_{p_j}\cdot\mathsf{allowed\_offset}_{p_j}$, with activator $\mathsf{d_h}'(1-\mathsf{is\_ordered}'_{p_j})$ (it is impossible for $p_j$ to occur at any offset $\mathsf{o}$ with $\mathsf{o}\ge\mathsf{offset}'_{p_{j-1}}+|p_{j-1}|$, so the scan genuinely has \emph{no} occurrence past the previous factor and is stuck).
-        \item \label[step]{mfmc:greedy-verdict} \emph{(verdict)} \cref{piop:zerocheck} on $\mathsf{occurs}_{p_j}\cdot\mathsf{allowed\_offset}_{p_j}\cdot\mathsf{unused\_offset}_{p_j}$, with activator $\mathsf{d_h}'\,\mathsf{is\_ordered}'_{p_j}$ (it is impossible for $p_j$ to occur at an offset $\mathsf{o}$ with $\mathsf{offset}'_{p_{j-1}}+|p_{j-1}|\le\mathsf{o}<\mathsf{offset}'_{p_j}$, so $\mathsf{offset}'_{p_j}$ is the \emph{earliest} occurrence past the previous factor);
-      \end{itemize}
-      \item (\emph{verdict}) The parties invoke \cref{piop:zerocheck} on $\mathsf{d_h}\cdot\prod_{j=1}^{t}\mathsf{is\_ordered}_{p_j}$.
+      \item \label[step]{mfmc:greedy}(\emph{the offsets are greedy}) For each $j=1,\dots,t$, $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:greedy-check} on factor $p_j$.
+      \item (\emph{False Negative Verdict}) The parties invoke \cref{piop:zerocheck} on $\mathsf{d_h}\cdot\prod_{j=1}^{t}\mathsf{is\_ordered}_{p_j}$.
     \end{enumerate}
   \end{enumerate}
 \end{DefinePIOP}
@@ -428,11 +417,6 @@ Now, the greediness of the offsets can be established by a zerocheck on the mult
   \def\ydab{-7.14}\def\ydbd{-7.76}%   diff (ab, bd)
   \def\yzab{-8.54}\def\yzbd{-9.16}%   occurs (ab, bd)
   \def\yselab{-9.94}\def\yselb{-10.56}\def\yselc{-11.18}% offset_marker (ab, bd2, bd3)
-  \def\yobab{-11.96}\def\yobb{-12.58}\def\yobc{-13.20}% offset' (ab, bd2, bd3)
-  \def\yalab{-13.98}\def\yalb{-14.60}\def\yalc{-15.22}% allowed_offset (ab, bd2, bd3)
-  \def\ybpab{-16.00}\def\ybpb{-16.62}\def\ybpc{-17.24}% before_placement (ab, bd2, bd3)
-  \def\yordb{-18.02}\def\yordc{-18.64}% is_ordered' (2, 3)
-  \def\ydc{-19.42}% d_h'
   % word-name headers
   \foreach \cx/\nm in {2.375/abbdbd, 8.075/abdbdx, 13.775/xxbdbd, 17.575/ab, 22.325/abubdtbd}{
     \node[font=\footnotesize\ttfamily] at (\cx,1.32){\nm};}
@@ -525,49 +509,6 @@ Now, the greediness of the offsets can be established by a zerocheck on the mult
   % greedy walk: ab@offset0 (pos6), bd@offset3 (pos9; skips the pre-frontier bd at offset1/pos7), then 3rd bd stuck (no mark)
   \node[c2,fill=red!45] at ({6*0.95},\yselab){1};   % offset_marker_ab : ab placed at pos 6
   \node[c2,fill=red!45] at ({9*0.95},\yselb){1};    % offset_marker^(2)_bd : bd placed at offset3 (pos9)
-  % ---- character-level broadcasts (constant within each word = its word-level value) ----
-  % o-hat_ab : o_ab=0 for every word
-  \foreach \p in {0,...,27}{\pgfmathsetmacro{\px}{\p*0.95}\node[c2,fill=gray!8] at (\px,\yobab){0};}
-  % o-hat^(2)_bd : abbdbd=2, abdbdx=3, xxbdbd=0, ab=0, abubdtbd=3
-  \foreach \p in {0,...,5}{\pgfmathsetmacro{\px}{\p*0.95}\node[c2,fill=gray!8] at (\px,\yobb){2};}
-  \foreach \p in {6,...,11}{\pgfmathsetmacro{\px}{\p*0.95}\node[c2,fill=gray!8] at (\px,\yobb){3};}
-  \foreach \p in {12,...,19}{\pgfmathsetmacro{\px}{\p*0.95}\node[c2,fill=gray!8] at (\px,\yobb){0};}
-  \foreach \p in {20,...,27}{\pgfmathsetmacro{\px}{\p*0.95}\node[c2,fill=gray!8] at (\px,\yobb){3};}
-  % o-hat^(3)_bd : abbdbd=4, abdbdx=3, xxbdbd=0, ab=0, abubdtbd=6
-  \foreach \p in {0,...,5}{\pgfmathsetmacro{\px}{\p*0.95}\node[c2,fill=gray!8] at (\px,\yobc){4};}
-  \foreach \p in {6,...,11}{\pgfmathsetmacro{\px}{\p*0.95}\node[c2,fill=gray!8] at (\px,\yobc){3};}
-  \foreach \p in {12,...,19}{\pgfmathsetmacro{\px}{\p*0.95}\node[c2,fill=gray!8] at (\px,\yobc){0};}
-  \foreach \p in {20,...,27}{\pgfmathsetmacro{\px}{\p*0.95}\node[c2,fill=gray!8] at (\px,\yobc){6};}
-  % allowed_offset (o >= frontier of previous factor); active only on the dropped candidate abdbdx (pos 6--11, offsets 0--5)
-  % allowed_offset_ab: frontier 0  -> allowed at every offset (pos 6--11)
-  \foreach \p in {0,...,27}{\pgfmathsetmacro{\px}{\p*0.95}\node[c2,fill=gray!12] at (\px,\yalab){0};}
-  \foreach \p in {6,...,11}{\pgfmathsetmacro{\px}{\p*0.95}\node[c2,fill=orange!25] at (\px,\yalab){1};}
-  % allowed_offset^(2)_bd: frontier 2 -> allowed at offsets >=2 (pos 8--11)
-  \foreach \p in {0,...,27}{\pgfmathsetmacro{\px}{\p*0.95}\node[c2,fill=gray!12] at (\px,\yalb){0};}
-  \foreach \p in {8,...,11}{\pgfmathsetmacro{\px}{\p*0.95}\node[c2,fill=orange!25] at (\px,\yalb){1};}
-  % allowed_offset^(3)_bd: frontier 5 -> allowed only at offset 5 (pos 11); no bd occurs there, so the scan is stuck
-  \foreach \p in {0,...,27}{\pgfmathsetmacro{\px}{\p*0.95}\node[c2,fill=gray!12] at (\px,\yalc){0};}
-  \node[c2,fill=orange!25] at ({11*0.95},\yalc){1};
-  % before_placement (o < offset'_{p_j}); active only on the dropped candidate abdbdx (pos 6--11). allowed_offset * before_placement = the window
-  % before_placement_ab: offset'_ab=0, so o<0 never -> all zero
-  \foreach \p in {0,...,27}{\pgfmathsetmacro{\px}{\p*0.95}\node[c2,fill=gray!12] at (\px,\ybpab){0};}
-  % before_placement^(2)_bd: offset'^(2)_bd=3 -> o<3 (pos 6,7,8)
-  \foreach \p in {0,...,27}{\pgfmathsetmacro{\px}{\p*0.95}\node[c2,fill=gray!12] at (\px,\ybpb){0};}
-  \foreach \p in {6,7,8}{\pgfmathsetmacro{\px}{\p*0.95}\node[c2,fill=purple!20] at (\px,\ybpb){1};}
-  % before_placement^(3)_bd: offset'^(3)_bd=3 -> o<3 (pos 6,7,8)
-  \foreach \p in {0,...,27}{\pgfmathsetmacro{\px}{\p*0.95}\node[c2,fill=gray!12] at (\px,\ybpc){0};}
-  \foreach \p in {6,7,8}{\pgfmathsetmacro{\px}{\p*0.95}\node[c2,fill=purple!20] at (\px,\ybpc){1};}
-  % is_ordered_2 (broadcast) : abbdbd=1, abdbdx=1, xxbdbd=0, ab=0, abubdtbd=1
-  \foreach \p in {0,...,11}{\pgfmathsetmacro{\px}{\p*0.95}\node[c2,fill=green!30] at (\px,\yordb){1};}
-  \foreach \p in {12,...,19}{\pgfmathsetmacro{\px}{\p*0.95}\node[c2,fill=gray!12] at (\px,\yordb){0};}
-  \foreach \p in {20,...,27}{\pgfmathsetmacro{\px}{\p*0.95}\node[c2,fill=green!30] at (\px,\yordb){1};}
-  % is_ordered_3 (broadcast) : abbdbd=1, abdbdx=0, xxbdbd=0, ab=0, abubdtbd=1
-  \foreach \p in {0,...,5}{\pgfmathsetmacro{\px}{\p*0.95}\node[c2,fill=green!30] at (\px,\yordc){1};}
-  \foreach \p in {6,...,19}{\pgfmathsetmacro{\px}{\p*0.95}\node[c2,fill=gray!12] at (\px,\yordc){0};}
-  \foreach \p in {20,...,27}{\pgfmathsetmacro{\px}{\p*0.95}\node[c2,fill=green!30] at (\px,\yordc){1};}
-  % d_c : abdbdx=1 (the only dropped candidate), all others 0
-  \foreach \p in {0,...,27}{\pgfmathsetmacro{\px}{\p*0.95}\node[c2,fill=gray!12] at (\px,\ydc){0};}
-  \foreach \p in {6,...,11}{\pgfmathsetmacro{\px}{\p*0.95}\node[c2,fill=red!30] at (\px,\ydc){1};}
   % arrangement boxes on the char row of the kept word abbdbd: ab | bd | bd
   \draw[black,thick] (-0.475,0.32) rectangle (1.425,-0.32);
   \draw[red,thick]   (1.425,0.32) rectangle (3.325,-0.32);
@@ -579,7 +520,7 @@ Now, the greediness of the offsets can be established by a zerocheck on the mult
   % row labels
   \node[rowlab] at (-0.6,0.62){pos};
   \node[rowlab] at (-0.6,\yc){$\mathsf{c}$};
-  \node[rowlab] at (-0.6,\ysrc){$\mathsf{src}$};
+  \node[rowlab] at (-0.6,\ysrc){$\mathsf{orig}$};
   \node[rowlab] at (-0.6,\yo){$\mathsf{o}$};
   \node[rowlab] at (-0.6,\yaco){$\mathsf{a_c^{old}}$};
   \node[rowlab] at (-0.6,\yacf){$\mathsf{a_c^{old'}}$};
@@ -596,6 +537,98 @@ Now, the greediness of the offsets can be established by a zerocheck on the mult
   \node[rowlab] at (-0.6,\yzbd){$\mathsf{occurs_{bd}}$};
   \node[rowlab] at (-0.6,\yselb){$\mathsf{offset\_marker}^{(2)}_{bd}$};
   \node[rowlab] at (-0.6,\yselc){$\mathsf{offset\_marker}^{(3)}_{bd}$};
+\end{tikzpicture}}
+\caption{Worked example of the Multi-Factor Multi-Character Pattern Matching \textsc{PIOP} (\cref{piop:multi-factor-multi-char-pattern-matching}) on \texttt{LIKE 'ab\%bd\%bd\%'} (factors $\mathcal{P}=\{\mathtt{ab},\mathtt{bd},\mathtt{bd}\}$). The top panel lists the word-level columns and the bottom panel the character-level columns. The activator shrinks from $\mathsf{a_h^{new}}$ (each factor matches separately) to the per-factor intersection $\mathsf{a^{\cap}_h}$, and the discarded candidates $\mathsf{d_h}=\mathsf{a^{\cap}_h}-\mathsf{a^{new}_h}$ (here only \texttt{abdbdx}) are the words that match every factor but admit no valid \emph{ordering}; their greedy placement is audited in \cref{fig:greedy-check}.}
+\label{fig:two-infix}
+\ifsp\end{figure*}\else\end{figure}\fi
+
+\ifsp\begin{figure*}[p]\else\begin{figure}[p]\fi
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[
+    c2/.style={draw, minimum width=9.5mm, minimum height=6mm, inner sep=0pt, font=\small},
+    rowlab/.style={font=\small\itshape, anchor=east}]
+  % Greedy Check (PIOP 7) on the worked example LIKE 'ab%bd%bd%'.
+  % The check runs per factor on the broadcasted (character-level) columns; it is only
+  % active where d_h'=1, i.e. on the dropped candidate abdbdx (pos 6--11).
+  \def\yc{0}\def\yo{-0.78}%
+  \def\yzab{-1.56}\def\yzbd{-2.18}%        occurs (ab, bd)
+  \def\yobab{-2.96}\def\yobb{-3.58}\def\yobc{-4.20}% offset' (ab, bd2, bd3)
+  \def\yalab{-4.98}\def\yalb{-5.60}\def\yalc{-6.22}% allowed_offset (ab, bd2, bd3)
+  \def\ybpab{-7.00}\def\ybpb{-7.62}\def\ybpc{-8.24}% unused_offset (ab, bd2, bd3)
+  \def\yordb{-9.02}\def\yordc{-9.64}%      is_ordered' (2, 3)
+  \def\ydc{-10.42}%                        d_h'
+  % word-name headers
+  \foreach \cx/\nm in {2.375/abbdbd, 8.075/abdbdx, 13.775/xxbdbd, 17.575/ab, 22.325/abubdtbd}{
+    \node[font=\footnotesize\ttfamily] at (\cx,1.0){\nm};}
+  % char (colored by word) + local offset o
+  \foreach \p/\ch/\s/\oo in {%
+      0/a/0/0,1/b/0/1,2/b/0/2,3/d/0/3,4/b/0/4,5/d/0/5,
+      6/a/1/0,7/b/1/1,8/d/1/2,9/b/1/3,10/d/1/4,11/x/1/5,
+      12/x/2/0,13/x/2/1,14/b/2/2,15/d/2/3,16/b/2/4,17/d/2/5,
+      18/a/3/0,19/b/3/1,
+      20/a/4/0,21/b/4/1,22/u/4/2,23/b/4/3,24/d/4/4,25/t/4/5,26/b/4/6,27/d/4/7}{
+    \pgfmathsetmacro{\px}{\p*0.95}
+    \edef\gc{\ifcase\s blue!15\or purple!18\or green!22\or orange!25\or pink!30\fi}
+    \node[font=\scriptsize,gray] at (\px,0.55){\p};
+    \node[c2,fill=\gc]    at (\px,\yc){\texttt{\ch}};
+    \node[c2,fill=gray!6] at (\px,\yo){\oo};}
+  % occurs_ab : positions where ab occurs (o-local start of an ab match)
+  \foreach \p in {0,...,27}{\pgfmathsetmacro{\px}{\p*0.95}\node[c2,fill=gray!12] at (\px,\yzab){0};}
+  \foreach \p in {0,6,20}{\pgfmathsetmacro{\px}{\p*0.95}\node[c2,fill=orange!35] at (\px,\yzab){1};}
+  % occurs_bd
+  \foreach \p in {0,...,27}{\pgfmathsetmacro{\px}{\p*0.95}\node[c2,fill=gray!12] at (\px,\yzbd){0};}
+  \foreach \p in {2,4,7,9,14,16,23,26}{\pgfmathsetmacro{\px}{\p*0.95}\node[c2,fill=orange!35] at (\px,\yzbd){1};}
+  % offset'_ab (broadcast of word-level offset_ab) : 0 everywhere
+  \foreach \p in {0,...,27}{\pgfmathsetmacro{\px}{\p*0.95}\node[c2,fill=gray!8] at (\px,\yobab){0};}
+  % offset'^(2)_bd : abbdbd=2, abdbdx=3, xxbdbd=0, ab=0, abubdtbd=3
+  \foreach \p in {0,...,5}{\pgfmathsetmacro{\px}{\p*0.95}\node[c2,fill=gray!8] at (\px,\yobb){2};}
+  \foreach \p in {6,...,11}{\pgfmathsetmacro{\px}{\p*0.95}\node[c2,fill=gray!8] at (\px,\yobb){3};}
+  \foreach \p in {12,...,19}{\pgfmathsetmacro{\px}{\p*0.95}\node[c2,fill=gray!8] at (\px,\yobb){0};}
+  \foreach \p in {20,...,27}{\pgfmathsetmacro{\px}{\p*0.95}\node[c2,fill=gray!8] at (\px,\yobb){3};}
+  % offset'^(3)_bd : abbdbd=4, abdbdx=3, xxbdbd=0, ab=0, abubdtbd=6
+  \foreach \p in {0,...,5}{\pgfmathsetmacro{\px}{\p*0.95}\node[c2,fill=gray!8] at (\px,\yobc){4};}
+  \foreach \p in {6,...,11}{\pgfmathsetmacro{\px}{\p*0.95}\node[c2,fill=gray!8] at (\px,\yobc){3};}
+  \foreach \p in {12,...,19}{\pgfmathsetmacro{\px}{\p*0.95}\node[c2,fill=gray!8] at (\px,\yobc){0};}
+  \foreach \p in {20,...,27}{\pgfmathsetmacro{\px}{\p*0.95}\node[c2,fill=gray!8] at (\px,\yobc){6};}
+  % allowed_offset (o >= frontier of previous factor); active only on the dropped candidate abdbdx (pos 6--11)
+  % allowed_offset_ab: frontier 0  -> allowed at every offset
+  \foreach \p in {0,...,27}{\pgfmathsetmacro{\px}{\p*0.95}\node[c2,fill=gray!12] at (\px,\yalab){0};}
+  \foreach \p in {6,...,11}{\pgfmathsetmacro{\px}{\p*0.95}\node[c2,fill=orange!25] at (\px,\yalab){1};}
+  % allowed_offset^(2)_bd: frontier 2 -> allowed at offsets >=2 (pos 8--11)
+  \foreach \p in {0,...,27}{\pgfmathsetmacro{\px}{\p*0.95}\node[c2,fill=gray!12] at (\px,\yalb){0};}
+  \foreach \p in {8,...,11}{\pgfmathsetmacro{\px}{\p*0.95}\node[c2,fill=orange!25] at (\px,\yalb){1};}
+  % allowed_offset^(3)_bd: frontier 5 -> allowed only at offset 5 (pos 11); no bd occurs there, so the scan is stuck
+  \foreach \p in {0,...,27}{\pgfmathsetmacro{\px}{\p*0.95}\node[c2,fill=gray!12] at (\px,\yalc){0};}
+  \node[c2,fill=orange!25] at ({11*0.95},\yalc){1};
+  % unused_offset (o < offset'_{p_j}); active only on abdbdx. allowed_offset * unused_offset = the window
+  % unused_offset_ab: offset'_ab=0, so o<0 never -> all zero
+  \foreach \p in {0,...,27}{\pgfmathsetmacro{\px}{\p*0.95}\node[c2,fill=gray!12] at (\px,\ybpab){0};}
+  % unused_offset^(2)_bd: offset'^(2)_bd=3 -> o<3 (pos 6,7,8)
+  \foreach \p in {0,...,27}{\pgfmathsetmacro{\px}{\p*0.95}\node[c2,fill=gray!12] at (\px,\ybpb){0};}
+  \foreach \p in {6,7,8}{\pgfmathsetmacro{\px}{\p*0.95}\node[c2,fill=purple!20] at (\px,\ybpb){1};}
+  % unused_offset^(3)_bd: offset'^(3)_bd=3 -> o<3 (pos 6,7,8)
+  \foreach \p in {0,...,27}{\pgfmathsetmacro{\px}{\p*0.95}\node[c2,fill=gray!12] at (\px,\ybpc){0};}
+  \foreach \p in {6,7,8}{\pgfmathsetmacro{\px}{\p*0.95}\node[c2,fill=purple!20] at (\px,\ybpc){1};}
+  % is_ordered'_2 : abbdbd=1, abdbdx=1, xxbdbd=0, ab=0, abubdtbd=1
+  \foreach \p in {0,...,11}{\pgfmathsetmacro{\px}{\p*0.95}\node[c2,fill=green!30] at (\px,\yordb){1};}
+  \foreach \p in {12,...,19}{\pgfmathsetmacro{\px}{\p*0.95}\node[c2,fill=gray!12] at (\px,\yordb){0};}
+  \foreach \p in {20,...,27}{\pgfmathsetmacro{\px}{\p*0.95}\node[c2,fill=green!30] at (\px,\yordb){1};}
+  % is_ordered'_3 : abbdbd=1, abdbdx=0 (stuck), xxbdbd=0, ab=0, abubdtbd=1
+  \foreach \p in {0,...,5}{\pgfmathsetmacro{\px}{\p*0.95}\node[c2,fill=green!30] at (\px,\yordc){1};}
+  \foreach \p in {6,...,19}{\pgfmathsetmacro{\px}{\p*0.95}\node[c2,fill=gray!12] at (\px,\yordc){0};}
+  \foreach \p in {20,...,27}{\pgfmathsetmacro{\px}{\p*0.95}\node[c2,fill=green!30] at (\px,\yordc){1};}
+  % d_h' : abdbdx=1 (the only dropped candidate), all others 0 -- the activator of the check
+  \foreach \p in {0,...,27}{\pgfmathsetmacro{\px}{\p*0.95}\node[c2,fill=gray!12] at (\px,\ydc){0};}
+  \foreach \p in {6,...,11}{\pgfmathsetmacro{\px}{\p*0.95}\node[c2,fill=red!30] at (\px,\ydc){1};}
+  % highlight the stuck 3rd factor on abdbdx: no bd occurrence at or past the frontier -> is_ordered'_3=0
+  \draw[red!70,thick,rounded corners=1pt] (5.18,{\yordc+0.34}) rectangle (10.97,{\yordc-0.34});
+  % row labels
+  \node[rowlab] at (-0.6,0.55){pos};
+  \node[rowlab] at (-0.6,\yc){$\mathsf{c}$};
+  \node[rowlab] at (-0.6,\yo){$\mathsf{o}$};
+  \node[rowlab] at (-0.6,\yzab){$\mathsf{occurs_{ab}}$};
+  \node[rowlab] at (-0.6,\yzbd){$\mathsf{occurs_{bd}}$};
   \node[rowlab] at (-0.6,\yobab){$\mathsf{offset}'_{ab}$};
   \node[rowlab] at (-0.6,\yobb){$\mathsf{offset}^{\prime(2)}_{bd}$};
   \node[rowlab] at (-0.6,\yobc){$\mathsf{offset}^{\prime(3)}_{bd}$};
@@ -609,6 +642,53 @@ Now, the greediness of the offsets can be established by a zerocheck on the mult
   \node[rowlab] at (-0.6,\yordc){$\mathsf{is\_ordered}'_3$};
   \node[rowlab] at (-0.6,\ydc){$\mathsf{d_h}'$};
 \end{tikzpicture}}
-\caption{TODO}
-\label{fig:two-infix}
+\caption{The Greedy Check (\cref{piop:greedy-check}) on the discarded candidate \texttt{abdbdx} of \cref{fig:two-infix}. The check runs once per factor on the character-level (broadcasted) columns and is active only where $\mathsf{d_h}'=1$. For each factor it intersects $\mathsf{occurs}$ with the window $\mathsf{allowed\_offset}\cdot\mathsf{unused\_offset}=[\,\mathsf{offset}'_{p_{j-1}}+|p_{j-1}|,\ \mathsf{offset}'_{p_j})$ to confirm the recorded placement is the earliest one. On \texttt{abdbdx} the third factor \texttt{bd} has frontier $5$, so its only allowed offset is $5$ (position \texttt{x}); since no \texttt{bd} occurs there the scan is genuinely stuck and $\mathsf{is\_ordered}'_3=0$ (highlighted).}
+\label{fig:greedy-check}
 \ifsp\end{figure*}\else\end{figure}\fi
+
+
+The remaining task---certifying that $\mathsf{a^{new}_h}$ retains exactly the words of $\mathsf{a^{\cap}_h}$ in which the factors embed \emph{in order}---is packaged as a standalone check, run once at the end of the protocol above. It has two halves: a false-positive check, establishing that every surviving word ($\mathsf{a^{new}_h}=1$) admits an in-order placement of the factors; and a false-negative check, establishing that every discarded word (one in $\mathsf{d_h}:=\mathsf{a^{\cap}_h}-\mathsf{a^{new}_h}$) admits none, using the greedy placement audited by \cref{piop:greedy-check}.
+
+\begin{DefinePIOP}{Greedy Check}{greedy-check}[GreedyCheck]
+  \emph{Inputs:} $\Oracle{\MLE{\mathsf{occurs}_{p_j}}}, \Oracle{\MLE{\mathsf{o}}}, \Oracle{\MLE{\mathsf{offset}_{p_{j-1}}}}, \Oracle{\MLE{\mathsf{offset}_{p_j}}}, \Oracle{\MLE{\mathsf{is\_ordered}_{p_j}}}, \Oracle{\MLE{\mathsf{d_h}}}$, and the length $|p_{j-1}|$.
+  \begin{enumerate}[nosep]
+    \item (\emph{broadcasting}) $\PIOPProver$ sends the broadcasted columns $\mathsf{d_h}'$, $\mathsf{offset}'_{p_{j-1}}$, $\mathsf{offset}'_{p_j}$, and $\mathsf{is\_ordered}'_{p_j}$ (with the conventions $\mathsf{offset}_{p_0}:=0$ and $\mathsf{is\_ordered}_{p_1}:=\mathbf{1}$), where $x'$ denotes the broadcasted version of $x$, and the parties invoke \cref{piop:broadcast} on them;
+    \item a $\mathsf{NonNeg}$ \cref{piop:sign-check} on $\mathsf{o}-\bigl(\mathsf{offset}'_{p_{j-1}}+|p_{j-1}|\bigr)$, giving a boolean column $\mathsf{allowed\_offset}_{p_j}$ marking $\mathsf{o}\ge\mathsf{offset}'_{p_{j-1}}+|p_{j-1}|$ (the offsets at or past the frontier);
+    \item a $\mathsf{Neg}$ \cref{piop:sign-check} on $\mathsf{o}-\mathsf{offset}'_{p_j}$, giving a boolean column $\mathsf{unused\_offset}_{p_j}$ marking $\mathsf{o}<\mathsf{offset}'_{p_j}$ (the offsets strictly before the claimed placement; together, $\mathsf{allowed\_offset}_{p_j}\cdot\mathsf{unused\_offset}_{p_j}$ picks out the window $\mathsf{offset}'_{p_{j-1}}+|p_{j-1}|\le\mathsf{o}<\mathsf{offset}'_{p_j}$);
+    \item \label[step]{greedy:verdict}\emph{(greediness verdict)} $\PIOPProver$ and $\PIOPVerifier$ invoke
+      \begin{enumerate}[nosep]
+        \item \label[step]{greedy:ordered}\cref{piop:zerocheck} on $\mathsf{occurs}_{p_j}\cdot\mathsf{allowed\_offset}_{p_j}\cdot\mathsf{unused\_offset}_{p_j}$, with activator $\mathsf{d_h}'\,\mathsf{is\_ordered}'_{p_j}$;
+        \item \label[step]{greedy:unordered}\cref{piop:zerocheck} on $\mathsf{occurs}_{p_j}\cdot\mathsf{allowed\_offset}_{p_j}$, with activator $\mathsf{d_h}'\,(1-\mathsf{is\_ordered}'_{p_j})$.
+      \end{enumerate}
+  \end{enumerate}
+\end{DefinePIOP}
+
+
+To enforce greedy offsetting, the core idea is to keep track of three things: \begin{enumerate*}[label=(\roman*)]
+  \item \emph{all} occurrences of the factors, which is denoted by $\mathsf{occurs_p}$ masking polynomial.
+  \item The set of allowed offsets that a factor can get, which starts when the previous factor is completely finished, i.e. $\mathsf{offset}{p_{j-1}}+|p_{j-1}|$, which is denoted by $\mathsf{allowed\_offset}$ masking polynomial.
+  \item The set of offsets that could have been used for the factor $p_j$ but was not used, which is denoted by $\mathsf{unused\_offset}$ masking polynomial.
+\end{enumerate*}
+Now, the greediness of the offsets can be established by a zerocheck on the multiplication on these three polynomials which means: It's impossible for a factor $p_j$ to occur in an allowed offset which is smaller than the recorded offset. This is checked in \cref{greedy:verdict}.
+
+
+If the prover claims that $p_j$ is placed in order relative to the previous factor, then $p_j$ must be matched at its \emph{earliest} possible occurrence, as greediness requires. This is enforced by checking that $p_j$ has no occurrence (marked by $\mathsf{occurs}_{p_j}$) at any offset that was available to it (marked by $\mathsf{allowed\_offset}_{p_j}$) yet lies before its recorded placement (marked by $\mathsf{unused\_offset}_{p_j}$). This is checked via \cref{greedy:ordered}.
+
+If the prover claims that $p_j$ is cannot be placed in order, i.e. there is no match for $p_j$ in the available characters, then it should prove that there isn't any occurrence (marked by $\mathsf{occurs}_{p_j}$) at any offset that was available to it (marked by $\mathsf{allowed\_offset}_{p_j}$). This is checked via \cref{greedy:unordered}.
+
+
+We package this greedy-placement test as a standalone check, the \emph{Greedy Check}, run once per factor $p_j$. It takes the occurrence column $\mathsf{occurs}_{p_j}$, the offsets $\mathsf{o}$, the previous placement $\mathsf{offset}_{p_{j-1}}$ together with the length $|p_{j-1}|$ (which fix the frontier $\mathsf{offset}_{p_{j-1}}+|p_{j-1}|$), the claimed placement $\mathsf{offset}_{p_j}$, the placement flag $\mathsf{is\_ordered}_{p_j}$, and the activator $\mathsf{d_h}$; it first broadcasts the word-level columns to character level (their broadcasted versions are written with a prime) and then proves that on every active word the placement obeys the greedy rule:
+\begin{displaymath}
+\NPRelation_{\mathsf{Greedy}} = \left\{
+\begin{aligned}
+  & \NPInstance = |p_{j-1}|,\; \\
+  & \NPInstancey = (\Oracle{\MLE{\mathsf{occurs}_{p_j}}}, \Oracle{\MLE{\mathsf{o}}}, \Oracle{\MLE{\mathsf{offset}'_{p_{j-1}}}}, \\
+  & \qquad\qquad\ \Oracle{\MLE{\mathsf{offset}'_{p_j}}}, \Oracle{\MLE{\mathsf{is\_ordered}'_{p_j}}}, \Oracle{\MLE{\mathsf{d_h}'}}),\; \\
+  & \NPWitness = (\mathsf{occurs}_{p_j}, \mathsf{o}, \mathsf{offset}'_{p_{j-1}}, \mathsf{offset}'_{p_j}, \mathsf{is\_ordered}'_{p_j}, \mathsf{d_h}') \\
+  & \;\big|\;\; \text{writing } \mathsf{f}:=\mathsf{offset}'_{p_{j-1}}+|p_{j-1}|,\ \text{for every } c \text{ with } \mathsf{d_h}'[c]=\mathsf{occurs}_{p_j}[c]=1: \\
+  & \phantom{\;\big|\;\;} \mathsf{is\_ordered}'_{p_j}[c]=1 \Rightarrow \mathsf{o}[c]<\mathsf{f}[c]\ \text{or}\ \mathsf{o}[c]\ge\mathsf{offset}'_{p_j}[c], \\
+  & \phantom{\;\big|\;\;} \mathsf{is\_ordered}'_{p_j}[c]=0 \Rightarrow \mathsf{o}[c]<\mathsf{f}[c]
+\end{aligned}
+\right\}.
+\end{displaymath}
+In words: when $p_j$ is placed ($\mathsf{is\_ordered}'_{p_j}=1$) no occurrence lies in the window $[\,\mathsf{offset}'_{p_{j-1}}+|p_{j-1}|,\ \mathsf{offset}'_{p_j})$, so $\mathsf{offset}'_{p_j}$ is the earliest occurrence at or past the frontier; and when it is not ($\mathsf{is\_ordered}'_{p_j}=0$) no occurrence lies at or past the frontier at all, so the placement is genuinely stuck.
