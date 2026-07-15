@@ -1,0 +1,151 @@
+\doclearpage
+\section{String Toolbox}
+
+We present a collection of protocols that serve as building blocks for the string-matching protocols of later sections, and that can be reused elsewhere as well.
+
+\subsection{Broadcast Check}
+\label{sec:broadcast}
+
+In some protocols, we need to expand a string-level column into a character-level one by copying each string's entry onto all of its characters; we call this operation \emph{broadcasting}. We package this as the relation
+\begin{displaymath}
+\NPRelation_{\mathsf{Bcast}} = \left\{\,
+  \begin{aligned}
+    \NPInstance &= \bot,\\
+    \NPInstancey &= (\Oracle{\MLE{\mathsf{orig\text{-}ind}}}, \Oracle{\MLE{\mathsf{d}}}, \Oracle{\MLE{\mathsf{d}'}}),\\
+    \NPWitness &= (\mathsf{orig\text{-}ind}, \mathsf{d}, \mathsf{d}')
+  \end{aligned}
+  \;\middle|\;
+    \mathsf{d}'[c] = \mathsf{d}[\mathsf{orig\text{-}ind}[c]]\ \text{for every character } c
+\,\right\}.
+\end{displaymath}
+The following PIOP checks this broadcast relationship.
+\begin{DefinePIOP}{Broadcast Check}{broadcast}
+  \emph{Inputs:} $\Oracle{\MLE{\mathsf{orig\text{-}ind}}}, \Oracle{\MLE{\mathsf{ind}}}, \Oracle{\MLE{\mathsf{d}}}, \Oracle{\MLE{\mathsf{d}'}}$.
+  \begin{enumerate}[nosep]
+    \item $\PIOPVerifier$ samples a random $r \samples \F$ and sends it to $\PIOPProver$.
+    \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:lookup-check} on $(\mathbf{1},\, \mathsf{orig\text{-}ind} + r\,\mathsf{d}') \lookup (\mathbf{1},\, \mathsf{ind} + r\,\mathsf{d})$.
+  \end{enumerate}
+\end{DefinePIOP}
+
+\begin{proof}
+  TODO
+\end{proof}
+
+
+\subsection{Consistency-Checking protocols}
+\label{sec:consistency-checking}
+The auxiliary columns must stay trusted and in sync with each other and the main column at all times. Since the prover is untrusted, it cannot update them freely: every update must come with a proof of well-formedness. We therefore design protocols that prove the well-formedness of the auxiliary columns.
+
+A requirement that recurs across these protocols is the \emph{consistency} of a string column's two activators. Recall that a string column carries a string-level activator $\mathsf{a}$, marking which strings are active, and a character-level activator $\mathsf{char\text{-}act}$, marking which characters are active. The pair is consistent when both columns are boolean and every character inherits the active bit of the string it belongs to. We package this as the relation
+\begin{displaymath}
+\NPRelation_{\mathsf{Cons}} = \left\{\,
+  \begin{aligned}
+  \NPInstance &= \bot,\\
+  \NPInstancey &= (\Oracle{\MLE{\mathsf{char\text{-}act}}}, \Oracle{\MLE{\mathsf{a}}}),\\
+  \NPWitness &= (\mathsf{char\text{-}act}, \mathsf{a})
+  \end{aligned}
+  \;\middle|\;
+  \begin{aligned}
+    & \mathsf{char\text{-}act}[j], \mathsf{a}[i] \in \{0,1\}\ \text{for all } i,j,\ \text{and} \\
+    & \mathsf{char\text{-}act}[j] = \mathsf{a}[i]\ \text{for every character } j \text{ of string } i
+  \end{aligned}
+\,\right\}.
+\end{displaymath}
+Both the data-preserving and domain-preserving updates below reduce, in whole or in part, to establishing $\NPRelation_{\mathsf{Cons}}$ for a freshly materialized activator pair.
+
+Three kinds of updates arise in the system: \emph{data-preserving} (\cref{sec:data-preserving}), \emph{domain-preserving} (\cref{sec:domain-preserving}) and \emph{domain-altering}. The relational core of SQL falls almost entirely into the first two, with the third one confined to a handful of value-constructing expressions where all of the columns are freshly materialized and new strings are introduced: aggregates such as \texttt{STRING\_AGG}, and string constructors such as \texttt{CONCAT}, \texttt{SUBSTRING}, case mapping, casts, and literals.
+
+\subsubsection{Data-Preserving Update}
+\label{sec:data-preserving}
+In a data-preserving update, only the activators are freshly materialized, i.e. columns $\mathsf{a}$ and $\mathsf{char\text{-}act}$, while the remaining data columns are inherited unchanged. These are the operators that merely re-mark which rows are active---selection, projection, \texttt{DISTINCT}, and \texttt{LIMIT}.
+
+Before relying on the new activators, the verifier must confirm that the freshly materialized pair $(\mathsf{char\text{-}act}, \mathsf{a})$ lies in $\NPRelation_{\mathsf{Cons}}$: each column is boolean, and the character-level and string-level marks agree (every character of an active string is active, and every character of an inactive string inactive). The following protocol establishes this.
+% The booleanity condiction is symply verified by two \cref{piop:boolean-check}s. For the consistency condition, we observe that grouping the rows $(\mathsf{orig\text{-}ind}, \mathsf{char\text{-}act})$ by $\mathsf{orig\text{-}ind}$ and summing $\mathsf{char\text{-}act}$ within each group must reproduce $\mathsf{l}$ on the active strings (those marked by $\mathsf{a}$). Hence, treating $(\mathsf{orig\text{-}ind}, \mathsf{char\text{-}act})$ as an input table grouped by its key and $(\mathsf{ind}, \mathsf{l})$ with activator $\mathsf{a}$ as the grouped output, we invoke the \texttt{Group By Sum} protocol of \cite{cryptoeprint:2026/1260}, a single \cref{piop:keyedsumcheck} invocation.
+\begin{DefinePIOP}{Data-Preserving Update Check}{data-preserving-update-check}
+  \emph{Inputs:} $\Oracle{\MLE{\mathsf{char\text{-}act}}}, \Oracle{\MLE{\mathsf{a}}}, \Oracle{\MLE{\mathsf{orig\text{-}ind}}}, \Oracle{\MLE{\mathsf{ind}}}, \Oracle{\MLE{\mathsf{l}}}$.
+  \begin{enumerate}[nosep]
+    \item (\emph{booleanity}) $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:boolean-check} on $\mathsf{char\text{-}act}$ and on $\mathsf{a}$.
+    \item (\emph{consistency}) $\PIOPProver$ and $\PIOPVerifier$ define the table $\Left$ with key column $\Left.\key = \mathsf{orig\text{-}ind}$, value column $\Left.\val = \mathbf{1}$, and activator $\Left.\act = \mathsf{char\text{-}act}$, and the table $\Right$ with key column $\Right.\key = \mathsf{ind}$, value column $\Right.\val = \mathsf{l}$, and activator $\Right.\act = \mathsf{a}$. They then invoke \cref{piop:keyedsumcheck} on $\Left$ and $\Right$, which forces $\sum_{j:\,\mathsf{orig\text{-}ind}[j]=i}\mathsf{char\text{-}act}[j] = \mathsf{a}[i]\cdot\mathsf{l}[i]$ for every key $i$.
+  \end{enumerate}
+\end{DefinePIOP}
+
+\subsubsection{Domain-Preserving Update}
+\label{sec:domain-preserving}
+
+In a domain-preserving update, all of the main and auxiliary columns, including data and activators, are freshly materialized by the untrusted prover, yet every output string cell is a copy of some input cell, so no new string is introduced. This covers all join types, \texttt{UNION}, \texttt{INTERSECT}, \texttt{EXCEPT}, sorting, and value-selecting aggregates such as \texttt{MIN}, \texttt{MAX}, and \texttt{ANY\_VALUE}.
+
+
+Since the prover materializes every new column, the check must establish two things: that the new columns form a well-formed arithmetization, and that no new string is introduced. The second requirement is the expensive one---verified directly, it would require re-hashing the freshly materialized characters---but we obtain it \emph{for free} from the trusted old columns: matching each new string to its source row pins its hash, length, and characters to those of an old string, so the new hash is correct by inheritance and never recomputed. What does \emph{not} come for free is the \emph{structural} shape of the new columns---that $\mathsf{l^{new}}$ counts the characters of each new string and that $\mathsf{int\text{-}ind^{new}}$ enumerates their within-word positions without gaps or repeats. These constraints are self-referential to the new columns, untethered to the old ones, and left unchecked they let the prover reorder, duplicate, or drop characters while still passing the source lookups. We therefore certify the structure directly with a handful of cheap checks---no hashing---and only then transfer the content by provenance.
+
+
+
+\begin{DefinePIOP}{Full String Validity Check}{full-str-valid}
+  \emph{Inputs:} the old columns
+  $\Oracle{\MLE{\mathsf{h}}^{\mathsf{old}}}$,
+  $\Oracle{\MLE{\mathsf{l}}^{\mathsf{old}}}$,
+  $\Oracle{\MLE{\mathsf{a}}^{\mathsf{old}}}$,
+  $\Oracle{\MLE{\mathsf{char}}^{\mathsf{old}}}$,
+  $\Oracle{\MLE{\mathsf{orig\text{-}ind}}^{\mathsf{old}}}$,
+  $\Oracle{\MLE{\mathsf{int\text{-}ind}}^{\mathsf{old}}}$,
+  $\Oracle{\MLE{\mathsf{char\text{-}act}}^{\mathsf{old}}}$,
+  $\Oracle{\MLE{\mathsf{bnd}}^{\mathsf{old}}}$;
+  the new columns
+  $\Oracle{\MLE{\mathsf{h}}^{\mathsf{new}}}$,
+  $\Oracle{\MLE{\mathsf{l}}^{\mathsf{new}}}$,
+  $\Oracle{\MLE{\mathsf{a}}^{\mathsf{new}}}$,
+  $\Oracle{\MLE{\mathsf{char}}^{\mathsf{new}}}$,
+  $\Oracle{\MLE{\mathsf{orig\text{-}ind}}^{\mathsf{new}}}$,
+  $\Oracle{\MLE{\mathsf{int\text{-}ind}}^{\mathsf{new}}}$,
+  $\Oracle{\MLE{\mathsf{char\text{-}act}}^{\mathsf{new}}}$,
+  $\Oracle{\MLE{\mathsf{bnd}}^{\mathsf{new}}}$;
+  and potentially the source column $\Oracle{\MLE{\mathsf{src}}}$.
+  \begin{enumerate}[nosep]
+    \item \emph{(Activators and lengths)} $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:data-preserving-update-check} on the new columns $(\mathsf{char\text{-}act^{new}}, \mathsf{a_h^{new}},\allowbreak \mathsf{orig\text{-}ind^{new}}, \mathsf{ind}, \mathsf{l^{new}})$, establishing $\NPRelation_{\mathsf{Cons}}$ for the new activator pair.
+    \item \emph{(Offset enumeration)} $\PIOPVerifier$ samples $r \samples \F$ and sends it to $\PIOPProver$; the parties then invoke \cref{piop:nodup-check} on a column with data $\mathsf{orig\text{-}ind^{new}} + r\,\mathsf{int\text{-}ind^{new}}$ and activator $\mathsf{char\text{-}act^{new}}$.
+    \item \emph{(Source Column)} If there does not exist a trusted source column apriory:
+    \begin{enumerate}[nosep]
+      \item  $\PIOPProver$ creates $\Oracle{\MLE{\mathsf{src}}}$ and sends it to $\PIOPVerifier$. 
+      \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:lookup-check} on the statement $(\mathsf{\MLE{src}},\mathsf{\MLE{h}^{new}},\mathsf{\MLE{l}^{new}},\mathsf{\MLE{a}_h^{new}})\lookup(\mathsf{\MLE{idx}},\mathsf{\MLE{h}^{old}},\mathsf{\MLE{l}^{old}},\mathsf{\MLE{a}_h^{old}})$.
+    \end{enumerate}
+    \item $\PIOPProver$ broadcasts the $\mathsf{\MLE{src}}$ column of size $N$ to the column $\mathsf{\MLE{src}'}$ of size $M$, then $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:broadcast} on them.
+    \item \label[step]{full-str:char-lookup} $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:lookup-check} on the statement $(\mathsf{\MLE{src'}},\mathsf{\MLE{char}^{new}},\mathsf{\MLE{int\text{-}ind}^{new}})\lookup(\mathsf{\MLE{orig\text{-}ind}^{old}},\mathsf{\MLE{char}^{old}},\mathsf{\MLE{int\text{-}ind}^{old}})$.
+  \end{enumerate}
+\end{DefinePIOP}
+
+\begin{proof}
+  TODO
+\end{proof}
+
+
+
+\subsection{Length Filtering}
+\label{sec:length-filtering}
+
+Length filtering discards every string shorter than a threshold $k$, keeping only those of length at least $k$. This is the pruning needed in pattern matching: in every filter  a string can match only if it is at least as long as the pattern, so any shorter string is a guaranteed non-match and can be removed before the filter runs. As we will see in \cref{sec:single-factor-multi-char-pattern-matching,sec:prefix-suffix}, this is not merely an optimization: length filtering is necessary for the pattern-matching protocols to remain complete and sound. We define the length filtering relation as follows
+\begin{equation*}
+\NPRelation_{\mathsf{LenFilter}} = \left\{
+\begin{aligned}
+  & \NPInstance = k,\; \\
+  & \NPInstancey = (\Oracle{\MLE{\mathsf{l}}}, \Oracle{\MLE{\mathsf{a}}}, \Oracle{\MLE{\mathsf{char\text{-}act}}}, \Oracle{\MLE{\mathsf{a'}}}, \Oracle{\MLE{\mathsf{char\text{-}act'}}}),\; \\
+  & \NPWitness = (\mathsf{l}, \mathsf{a}, \mathsf{char\text{-}act}, \mathsf{a'}, \mathsf{char\text{-}act'})
+\end{aligned}
+   \;\middle|\; 
+    \begin{aligned}
+   \mathsf{a'}[i] = 1 \iff \bigl(\mathsf{a}[i] = 1 \ \text{and}\ \mathsf{l}[i]\geq k\bigr) \\
+    \mathsf{char\text{-}act'}[j] = \mathsf{a'}[i]\ \forall\text{ char } j \text{ of string } i
+    \end{aligned} 
+\right\}.
+\end{equation*}
+
+\begin{DefinePIOP}{Length Filtering Check}{len-filter}
+  \emph{Inputs:} $\Oracle{\MLE{\mathsf{orig\text{-}ind}}}, \Oracle{\MLE{\mathsf{l}}}, \Oracle{\MLE{\mathsf{a}}}, \Oracle{\MLE{\mathsf{char\text{-}act}}}$, threshold $k$.
+  \begin{enumerate}[nosep]
+    \item (\textit{Activator Update Validity}) $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:data-preserving-update-check} on $(\mathsf{char\text{-}act'}, \mathsf{a'}, \mathsf{orig\text{-}ind},\allowbreak \mathsf{ind}, \mathsf{l})$.
+    \item (\textit{Containment}) $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:zerocheck} on the column $\mathsf{a'}\cdot(1-\mathsf{a})$.
+    \item(\textit{False negative check}) $\PIOPProver$ and $\PIOPVerifier$ invoke the Negative \cref{piop:sign-check} on the column $(\mathsf{a}\cdot(1-\mathsf{a'}), \mathsf{l}-k)$.
+    \item (\textit{False Positive check}) $\PIOPProver$ and $\PIOPVerifier$ invoke the Non-Negative \cref{piop:sign-check} on the column $(\mathsf{a'}, \mathsf{l}-k)$.
+  \end{enumerate}
+\end{DefinePIOP}
+\begin{proof}
+  TODO
+\end{proof}

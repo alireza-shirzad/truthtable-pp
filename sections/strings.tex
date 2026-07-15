@@ -50,9 +50,9 @@ A single-factor multi-character pattern matches a single literal factor against 
 
 We present a single general protocol (\cref{piop:single-factor-multi-char-pattern-matching}) that proves all three of prefix, suffix and infix matching against a length-$k$ pattern $\mathsf{str}$. We first give the intuition for the infix case, which is the hardest, and then explain why prefix and suffix fall out as strictly easier special cases.
 
-\parhead{Proving infix} The verifier receives a new pair of activators $\mathsf{a_h^{new}},\mathsf{a_c^{new}}$ and must check that, relative to the old activators $\mathsf{a_h^{old}},\mathsf{a_c^{old}}$, they keep exactly the words containing $\mathsf{str}$ and switch off all the rest. The protocol does this in four steps. \begin{enumerate*}[label=(\roman*)]
+\parhead{Proving infix} The verifier receives a new pair of activators $\mathsf{a_h^{new}},\mathsf{char\text{-}act^{new}}$ and must check that, relative to the old activators $\mathsf{a_h^{old}},\mathsf{char\text{-}act^{old}}$, they keep exactly the words containing $\mathsf{str}$ and switch off all the rest. The protocol does this in four steps. \begin{enumerate*}[label=(\roman*)]
   \item \emph{Validity.} The verifier first checks that the new activators are well-formed: boolean, mutually consistent (a word is on iff all of its characters are on), and contained in the old activators (no inactive word is revived).
-  \item \emph{Localization.} A match of $\mathsf{str}$ can begin at any of the $\mathsf{l}-k+1$ positions of a word, so naively the verifier would have to inspect a whole window of $k$ characters at every position. To collapse each window to a single slot, the verifier draws random coefficients $r_0,\dots,r_{k-1}$ and the parties form the \emph{window fingerprint} $\mathsf{wf} := \sum_{\delta} r_\delta\,\mathsf{c}^{(\delta)}$ (a random linear combination of the rotations of the character column) and the \emph{pattern fingerprint} $\mathsf{pf} := \sum_{\delta} r_\delta\,\mathsf{str}[\delta]$. Their difference $\mathsf{diff} := \mathsf{wf}-\mathsf{pf}$ then has $\mathsf{diff}[p]=0$ exactly when the length-$k$ window starting at $p$ equals $\mathsf{str}$ (up to a negligible fingerprint collision). The whole question now reduces to where $\mathsf{diff}$ vanishes.
+  \item \emph{Localization.} A match of $\mathsf{str}$ can begin at any of the $\mathsf{l}-k+1$ positions of a word, so naively the verifier would have to inspect a whole window of $k$ characters at every position. To collapse each window to a single slot, the verifier draws random coefficients $r_0,\dots,r_{k-1}$ and the parties form the \emph{window fingerprint} $\mathsf{wf} := \sum_{\delta} r_\delta\,\mathsf{char}^{(\delta)}$ (a random linear combination of the rotations of the character column) and the \emph{pattern fingerprint} $\mathsf{pf} := \sum_{\delta} r_\delta\,\mathsf{str}[\delta]$. Their difference $\mathsf{diff} := \mathsf{wf}-\mathsf{pf}$ then has $\mathsf{diff}[p]=0$ exactly when the length-$k$ window starting at $p$ equals $\mathsf{str}$ (up to a negligible fingerprint collision). The whole question now reduces to where $\mathsf{diff}$ vanishes.
   \item \emph{No false negatives.} Every word that is switched off must really fail to contain $\mathsf{str}$. The verifier asks that $\mathsf{diff}$ have \emph{no} zero among the candidate slots of those words --- a single no-zero check --- which certifies that the pattern occurs nowhere inside them.
   \item \emph{No false positives.} Every word that is kept on must really contain $\mathsf{str}$, i.e. $\mathsf{diff}$ must have \emph{at least one} zero among its candidate slots. The difficulty is that this zero can sit anywhere in the word, so the prover points it out: it sends a selector that is $1$ on one matching slot of each kept word and $0$ elsewhere, and the verifier checks that $\mathsf{diff}$ indeed vanishes there. A short series of checks (booleanity, no duplicates, and a counting argument) then confirms the selector is honest --- it marks one genuine slot per kept word and nothing else.
 \end{enumerate*}
@@ -62,33 +62,33 @@ We present a single general protocol (\cref{piop:single-factor-multi-char-patter
 \label{sec:single-factor-multi-char-pattern-matching}
 \begin{DefinePIOP}{Single-Factor Multi-Character (SFMC) Pattern Matching}{single-factor-multi-char-pattern-matching}[SFMC Pattern Matching]
   \begin{enumerate}[nosep]
-    \item (\textit{Activator validity check}) $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:act-len-consistency} on $(\mathsf{a_c^{new}}, \mathsf{a_h^{new}}, \mathsf{orig}, \mathsf{ind}, \mathsf{l})$.
-    \item (\textit{Filtering by length}) $\PIOPProver$ computes $\mathsf{a_h^{old'}}$ and $\mathsf{a_c^{old'}}$ which is the result of filtering the strings with length less than $k$, then $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:len-filter} $(\mathsf{a_h^{old}}, \mathsf{a_c^{old}}, \mathsf{a_h^{old'}}, \mathsf{a_c^{old'}})$ with threshold $k$.
+    \item (\textit{Activator validity check}) $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:data-preserving-update-check} on $(\mathsf{char\text{-}act^{new}}, \mathsf{a_h^{new}}, \mathsf{orig\text{-}ind}, \mathsf{ind}, \mathsf{l})$.
+    \item (\textit{Filtering by length}) $\PIOPProver$ computes $\mathsf{a_h^{old'}}$ and $\mathsf{char\text{-}act^{old'}}$ which is the result of filtering the strings with length less than $k$, then $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:len-filter} $(\mathsf{a_h^{old}}, \mathsf{char\text{-}act^{old}}, \mathsf{a_h^{old'}}, \mathsf{char\text{-}act^{old'}})$ with threshold $k$.
     \item (\textit{Containment}) $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:zerocheck} on $\mathsf{a_h^{new}}\cdot(1-\mathsf{a_h^{old'}})$.
-    \item (\textit{Rotated character columns}) $\PIOPProver$ sends $\mathsf{c}^{(1)},\ldots,\mathsf{c}^{(k-1)}$, each $\mathsf{c}^{(\delta)}$ a rotation of $\mathsf{c}^{(\delta-1)}$ by $-1$ (so $\mathsf{c}^{(\delta)}[p] = \mathsf{c}[p+\delta]$) and $\mathsf{c}^{(0)} := \mathsf{c}$. Then the parties invoke \cref{piop:rotcheck} on each $(\mathsf{c}^{(\delta-1)}, \mathsf{c}^{(\delta)}, -1)$.
+    \item (\textit{Rotated character columns}) $\PIOPProver$ sends $\mathsf{char}^{(1)},\ldots,\mathsf{char}^{(k-1)}$, each $\mathsf{char}^{(\delta)}$ a rotation of $\mathsf{char}^{(\delta-1)}$ by $-1$ (so $\mathsf{char}^{(\delta)}[p] = \mathsf{char}[p+\delta]$) and $\mathsf{char}^{(0)} := \mathsf{char}$. Then the parties invoke \cref{piop:rotcheck} on each $(\mathsf{char}^{(\delta-1)}, \mathsf{char}^{(\delta)}, -1)$.
     \item (\textit{Window fingerprinting}) $\PIOPVerifier$ samples $r_0,\ldots,r_{k-1} \samples \F$ and sends them to $\PIOPProver$. 
     \begin{enumerate}[nosep]
-      \item $\PIOPProver$ and $\PIOPVerifier$ form the windowed fingerprint of the character polynomial as $\mathsf{wf} := \sum_{\delta=0}^{k-1} r_\delta\,\mathsf{c}^{(\delta)}$.
+      \item $\PIOPProver$ and $\PIOPVerifier$ form the windowed fingerprint of the character polynomial as $\mathsf{wf} := \sum_{\delta=0}^{k-1} r_\delta\,\mathsf{char}^{(\delta)}$.
       \item $\PIOPProver$ and $\PIOPVerifier$ form the fingerprint of the pattern as $\mathsf{pf} := \sum_{\delta=0}^{k-1} r_\delta\,\mathsf{str}[\delta]$
       \item $\PIOPProver$ and $\PIOPVerifier$ form the difference polynomial as $\mathsf{diff} := \mathsf{wf}-\mathsf{pf}$
     \end{enumerate} 
     \item (\textit{Attention mask}) $\PIOPProver$ and $\PIOPVerifier$ fix the attention mask $\mathsf{att\_mask}$ as follows:
     \begin{enumerate}[nosep]
-      \item if the pattern is \emph{prefix}, they set $\mathsf{att\_mask} := \mathsf{a_c^{old'}}\cdot\mathsf{s_b}$
-      \item else if the pattern is \emph{suffix}, $\PIOPProver$ computes $\mathsf{att\_mask} := \rho_{-k}(\mathsf{a_c^{old'}}\cdot\mathsf{s_b})$ and sends it to the verifier. Then the parties invoke \cref{piop:rotcheck} on $(\mathsf{a_c^{old'}}\cdot\mathsf{s_b},\,\mathsf{att\_mask},\,-k)$.
-      \item else (where the pattern is \emph{infix}), $\PIOPProver$ sends the rotated boundary selectors $\mathsf{s_b}^{(1)},\ldots,\mathsf{s_b}^{(k-1)}$ ($\mathsf{s_b}^{(0)}:=\mathsf{s_b}$, each a rotation of the previous by $-1$). Then the parties invoke \cref{piop:rotcheck} for each $(\mathsf{s_b}^{(j-1)},\mathsf{s_b}^{(j)},-1)$, and set $\mathsf{att\_mask} := \mathsf{a_c^{old'}}\cdot\bigl(1-\textstyle\sum_{j=1}^{k-1}\mathsf{s_b}^{(j)}\bigr)$.
+      \item if the pattern is \emph{prefix}, they set $\mathsf{att\_mask} := \mathsf{char\text{-}act^{old'}}\cdot\mathsf{bnd}$
+      \item else if the pattern is \emph{suffix}, $\PIOPProver$ computes $\mathsf{att\_mask} := \rho_{-k}(\mathsf{char\text{-}act^{old'}}\cdot\mathsf{bnd})$ and sends it to the verifier. Then the parties invoke \cref{piop:rotcheck} on $(\mathsf{char\text{-}act^{old'}}\cdot\mathsf{bnd},\,\mathsf{att\_mask},\,-k)$.
+      \item else (where the pattern is \emph{infix}), $\PIOPProver$ sends the rotated boundary markers $\mathsf{bnd}^{(1)},\ldots,\mathsf{bnd}^{(k-1)}$ ($\mathsf{bnd}^{(0)}:=\mathsf{bnd}$, each a rotation of the previous by $-1$). Then the parties invoke \cref{piop:rotcheck} for each $(\mathsf{bnd}^{(j-1)},\mathsf{bnd}^{(j)},-1)$, and set $\mathsf{att\_mask} := \mathsf{char\text{-}act^{old'}}\cdot\bigl(1-\textstyle\sum_{j=1}^{k-1}\mathsf{bnd}^{(j)}\bigr)$.
     \end{enumerate}
-    \item (\textit{False negative check}) $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:nozero-check} on the column with data $\mathsf{diff}$ and activator $\mathsf{att\_mask}\cdot(1-\mathsf{a_c^{new}})$.
+    \item (\textit{False negative check}) $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:nozero-check} on the column with data $\mathsf{diff}$ and activator $\mathsf{att\_mask}\cdot(1-\mathsf{char\text{-}act^{new}})$.
     \item (\textit{False positive check})
     \begin{enumerate}[nosep]
-      \item If the pattern is \emph{prefix} or \emph{suffix}, $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:zerocheck} on the column with data $\mathsf{diff}$ and activator $\mathsf{att\_mask}\cdot\mathsf{a_c^{new}}$.
+      \item If the pattern is \emph{prefix} or \emph{suffix}, $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:zerocheck} on the column with data $\mathsf{diff}$ and activator $\mathsf{att\_mask}\cdot\mathsf{char\text{-}act^{new}}$.
       \item If the pattern is \emph{infix}, $\PIOPProver$ sends a false-positive marker $\mathsf{m_{fp}}$, then
       \begin{enumerate}[nosep]
         \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:boolean-check} on $\mathsf{m_{fp}}$;
-        \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:zerocheck} on $\mathsf{m_{fp}}\cdot(1-\mathsf{a_c^{new}})$ and on $\mathsf{m_{fp}}\cdot(1-\mathsf{att\_mask})$.
+        \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:zerocheck} on $\mathsf{m_{fp}}\cdot(1-\mathsf{char\text{-}act^{new}})$ and on $\mathsf{m_{fp}}\cdot(1-\mathsf{att\_mask})$.
         \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:zerocheck} on the column with data $\mathsf{diff}$ and activator $\mathsf{m_{fp}}$;
         \item $\PIOPProver$ sends $n_{\mathsf{m}}$ to $\PIOPVerifier$, then $\PIOPProver$ and $\PIOPVerifier$ invoke invoke \cref{piop:sumcheck} twice, for $\sum_{\vec{x}}\mathsf{m_{fp}}(\vec{x})=n_{\mathsf{m}}$ and $\sum_{\vec{x}}\mathsf{a_h^{new}}(\vec{x})=n_{\mathsf{m}}$.
-        \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:nodup-check} on the column with data $\mathsf{orig}$ and activator $\mathsf{m_{fp}}$.
+        \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:nodup-check} on the column with data $\mathsf{orig\text{-}ind}$ and activator $\mathsf{m_{fp}}$.
       \end{enumerate}
     \end{enumerate}
   \end{enumerate}
@@ -199,19 +199,19 @@ We present a single general protocol (\cref{piop:single-factor-multi-char-patter
     \node at (\dx,\y){$\cdots$};}
   % row labels
   \node[rowlab] at (-0.4,0.62){pos};
-  \node[rowlab] at (-0.4,0){$\mathsf{c}$};
-  \node[rowlab] at (-0.4,\ysrc){$\mathsf{orig}$};
-  \node[rowlab] at (-0.4,\ysb){$\mathsf{s_b}$};
-  \node[rowlab] at (-0.4,\yaold){$\mathsf{a_c^{old}}$};
-  \node[rowlab] at (-0.4,\yaoldm){$\mathsf{a_c^{old'}}$};
+  \node[rowlab] at (-0.4,0){$\mathsf{char}$};
+  \node[rowlab] at (-0.4,\ysrc){$\mathsf{orig\text{-}ind}$};
+  \node[rowlab] at (-0.4,\ysb){$\mathsf{bnd}$};
+  \node[rowlab] at (-0.4,\yaold){$\mathsf{char\text{-}act^{old}}$};
+  \node[rowlab] at (-0.4,\yaoldm){$\mathsf{char\text{-}act^{old'}}$};
   \node[rowlab] at (-0.4,\ywf){$\mathsf{wf}$};
   \node[rowlab] at (-0.4,\ydiff){$\mathsf{diff}$};
   \node[rowlab] at (-0.4,\ymapre){$\mathsf{att\_mask}$\,\scriptsize\texttt{(rus\%)}};
-  \node[rowlab] at (-0.4,\ynewpre){$\mathsf{a_c^{new}}$};
+  \node[rowlab] at (-0.4,\ynewpre){$\mathsf{char\text{-}act^{new}}$};
   \node[rowlab] at (-0.4,\ymasuf){$\mathsf{att\_mask}$\,\scriptsize\texttt{(\%rus)}};
-  \node[rowlab] at (-0.4,\ynewsuf){$\mathsf{a_c^{new}}$};
+  \node[rowlab] at (-0.4,\ynewsuf){$\mathsf{char\text{-}act^{new}}$};
   \node[rowlab] at (-0.4,\ymainf){$\mathsf{att\_mask}$\,\scriptsize\texttt{(\%rus\%)}};
-  \node[rowlab] at (-0.4,\ynewinf){$\mathsf{a_c^{new}}$};
+  \node[rowlab] at (-0.4,\ynewinf){$\mathsf{char\text{-}act^{new}}$};
   \node[rowlab] at (-0.4,\ymfp){$\mathsf{m_{fp}}$};
 \end{tikzpicture}}
 \caption{SFMC example for factor \texttt{rus} ($k=3$)}
@@ -223,20 +223,20 @@ We present a single general protocol (\cref{piop:single-factor-multi-char-patter
 We argue completeness and soundness, assuming each invoked sub-PIOP is complete and sound for its relation. Call a string \emph{eligible} if it is active under $\mathsf{a_h^{old}}$ and has length at least $k$; by the soundness of \cref{piop:len-filter} these are exactly the strings marked by $\mathsf{a_h^{old'}}$, and we write $E := \{\,i : \mathsf{a_h^{old'}}[i]=1\,\}$. Let $\mathsf{att\_mask}$ be the attention mask of the chosen filter; a string \emph{matches} if one of its candidate windows (the positions $p$ in it with $\mathsf{att\_mask}[p]=1$) equals $\mathsf{str}$. The filter must keep exactly the eligible matching strings, and we write $M := \{\,i : \mathsf{a_h^{new}}[i]=1\,\}$ for the kept set.
 
 \parhead{Completeness}
-For an honest prover the rotation checks pass, so $\mathsf{c}^{(\delta)}[p]=\mathsf{c}[p+\delta]$, $\mathsf{diff}[p]=0$ exactly at the occurrences of $\mathsf{str}$, and $\mathsf{att\_mask}$ marks the candidate windows of each eligible string. The honest new activators keep exactly the eligible matching strings, so they are boolean, consistent, and contained in $\mathsf{a_h^{old'}}$, passing the activator-validity and containment checks. Every dropped eligible string is non-matching, so all of its candidate windows have $\mathsf{diff}\neq0$ and the false-negative no-zero check passes. For an anchored filter the single candidate of each kept string equals $\mathsf{str}$, so the false-positive zerocheck passes; for the infix filter the prover marks with $\mathsf{m_{fp}}$ one candidate window equal to $\mathsf{str}$ in each kept string --- boolean, satisfying $\mathsf{m_{fp}}\leq\mathsf{a_c^{new}}$ and $\mathsf{m_{fp}}\leq\mathsf{att\_mask}$, with $\mathsf{diff}=0$ on its support, one mark per kept string, matching the announced count $n_{\mathsf{m}}=|M|$ --- so the false-positive checks pass. Hence the honest transcript is accepted.
+For an honest prover the rotation checks pass, so $\mathsf{char}^{(\delta)}[p]=\mathsf{char}[p+\delta]$, $\mathsf{diff}[p]=0$ exactly at the occurrences of $\mathsf{str}$, and $\mathsf{att\_mask}$ marks the candidate windows of each eligible string. The honest new activators keep exactly the eligible matching strings, so they are boolean, consistent, and contained in $\mathsf{a_h^{old'}}$, passing the activator-validity and containment checks. Every dropped eligible string is non-matching, so all of its candidate windows have $\mathsf{diff}\neq0$ and the false-negative no-zero check passes. For an anchored filter the single candidate of each kept string equals $\mathsf{str}$, so the false-positive zerocheck passes; for the infix filter the prover marks with $\mathsf{m_{fp}}$ one candidate window equal to $\mathsf{str}$ in each kept string --- boolean, satisfying $\mathsf{m_{fp}}\leq\mathsf{char\text{-}act^{new}}$ and $\mathsf{m_{fp}}\leq\mathsf{att\_mask}$, with $\mathsf{diff}=0$ on its support, one mark per kept string, matching the announced count $n_{\mathsf{m}}=|M|$ --- so the false-positive checks pass. Hence the honest transcript is accepted.
 
 \parhead{Soundness}
-Suppose $\PIOPVerifier$ accepts. By the soundness of \cref{piop:len-filter} (\cref{sec:length-filtering}), $E=\{\,i:\mathsf{a_h^{old'}}[i]=1\,\}$ is exactly the set of eligible strings and $\mathsf{a_c^{old'}}$ is on exactly at their characters.
+Suppose $\PIOPVerifier$ accepts. By the soundness of \cref{piop:len-filter} (\cref{sec:length-filtering}), $E=\{\,i:\mathsf{a_h^{old'}}[i]=1\,\}$ is exactly the set of eligible strings and $\mathsf{char\text{-}act^{old'}}$ is on exactly at their characters.
 
-The rotation checks force $\mathsf{c}^{(\delta)}[p]=\mathsf{c}[p+\delta]$ for every $\delta$, so $\mathsf{wf}[p]=\sum_\delta r_\delta\,\mathsf{c}[p+\delta]$ is the fingerprint of the length-$k$ window of $\mathsf{c}$ at $p$ and $\mathsf{diff}[p]=\mathsf{wf}[p]-\mathsf{pf}$. A window equal to $\mathsf{str}$ gives $\mathsf{diff}[p]=0$ identically; a window differing from $\mathsf{str}$ gives $\mathsf{diff}[p]=0$ only when the verifier's $r_0,\ldots,r_{k-1}$ are a root of a fixed nonzero degree-$1$ polynomial, so by Schwartz--Zippel and a union bound over the $N$ positions, except with probability $N(k-1)/|\F|$,
-\[ \mathsf{diff}[p]=0 \iff \text{the length-$k$ window of $\mathsf{c}$ at $p$ equals }\mathsf{str},\qquad\text{for every }p. \]
-We condition on this event; note the direction $\mathsf{diff}[p]\neq0\Rightarrow$ window $\neq\mathsf{str}$ holds \emph{unconditionally}. The rotation checks on the boundary selectors make $\mathsf{att\_mask}$ the attention mask of the chosen filter: within each eligible string it marks the single anchored window (prefix, suffix) or all $\mathsf{l}-k+1$ valid starts (infix), with $\mathsf{att\_mask}\leq\mathsf{a_c^{old'}}$, and in every case $\mathsf{att\_mask}[p]=1$ guarantees that the window at $p$ lies entirely within the string $\mathsf{orig}[p]$.
+The rotation checks force $\mathsf{char}^{(\delta)}[p]=\mathsf{char}[p+\delta]$ for every $\delta$, so $\mathsf{wf}[p]=\sum_\delta r_\delta\,\mathsf{char}[p+\delta]$ is the fingerprint of the length-$k$ window of $\mathsf{char}$ at $p$ and $\mathsf{diff}[p]=\mathsf{wf}[p]-\mathsf{pf}$. A window equal to $\mathsf{str}$ gives $\mathsf{diff}[p]=0$ identically; a window differing from $\mathsf{str}$ gives $\mathsf{diff}[p]=0$ only when the verifier's $r_0,\ldots,r_{k-1}$ are a root of a fixed nonzero degree-$1$ polynomial, so by Schwartz--Zippel and a union bound over the $N$ positions, except with probability $N(k-1)/|\F|$,
+\[ \mathsf{diff}[p]=0 \iff \text{the length-$k$ window of $\mathsf{char}$ at $p$ equals }\mathsf{str},\qquad\text{for every }p. \]
+We condition on this event; note the direction $\mathsf{diff}[p]\neq0\Rightarrow$ window $\neq\mathsf{str}$ holds \emph{unconditionally}. The rotation checks on the boundary markers make $\mathsf{att\_mask}$ the attention mask of the chosen filter: within each eligible string it marks the single anchored window (prefix, suffix) or all $\mathsf{l}-k+1$ valid starts (infix), with $\mathsf{att\_mask}\leq\mathsf{char\text{-}act^{old'}}$, and in every case $\mathsf{att\_mask}[p]=1$ guarantees that the window at $p$ lies entirely within the string $\mathsf{orig\text{-}ind}[p]$.
 
-The activator-validity check makes $\mathsf{a_h^{new}},\mathsf{a_c^{new}}$ boolean and forces $\mathsf{a_c^{new}}[j]=\mathsf{a_h^{new}}[\mathsf{orig}[j]]$ for every character $j$, so $\mathsf{a_c^{new}}$ is constant on each string and equals its header bit. The containment zerocheck $\mathsf{a_h^{new}}(1-\mathsf{a_h^{old'}})=0$ forces $M\subseteq E$.
+The activator-validity check makes $\mathsf{a_h^{new}},\mathsf{char\text{-}act^{new}}$ boolean and forces $\mathsf{char\text{-}act^{new}}[j]=\mathsf{a_h^{new}}[\mathsf{orig\text{-}ind}[j]]$ for every character $j$, so $\mathsf{char\text{-}act^{new}}$ is constant on each string and equals its header bit. The containment zerocheck $\mathsf{a_h^{new}}(1-\mathsf{a_h^{old'}})=0$ forces $M\subseteq E$.
 
-\emph{No false positives.} For an anchored filter, $\mathsf{att\_mask}$ marks one candidate per eligible string, and the false-positive zerocheck forces $\mathsf{diff}=0$ wherever $\mathsf{att\_mask}\cdot\mathsf{a_c^{new}}=1$, i.e.\ at the candidate of each kept string; since that window lies within its string and $\mathsf{diff}=0$ means it equals $\mathsf{str}$, every kept string matches. For the infix filter, the two confinement zerochecks give $\mathsf{m_{fp}}\leq\mathsf{a_c^{new}}$ and $\mathsf{m_{fp}}\leq\mathsf{att\_mask}$, and the occurrence zerocheck gives $\mathsf{diff}=0$ on the support of $\mathsf{m_{fp}}$; thus every mark $p$ has $\mathsf{a_c^{new}}[p]=1$ (so $\mathsf{orig}[p]\in M$), $\mathsf{att\_mask}[p]=1$ (a candidate window lying inside $\mathsf{orig}[p]$), and $\mathsf{diff}[p]=0$ (that window equals $\mathsf{str}$), so $\mathsf{orig}[p]$ matches. The no-duplicate check on $(\mathsf{orig},\mathsf{m_{fp}})$ puts the marks in distinct strings, and the two sum checks give $\sum\mathsf{m_{fp}}=n_{\mathsf{m}}=\sum\mathsf{a_h^{new}}=|M|$, so the $|M|$ marks lie in distinct strings of $M$ and hit every string of $M$ exactly once. Either way, every kept string is an eligible match.
+\emph{No false positives.} For an anchored filter, $\mathsf{att\_mask}$ marks one candidate per eligible string, and the false-positive zerocheck forces $\mathsf{diff}=0$ wherever $\mathsf{att\_mask}\cdot\mathsf{char\text{-}act^{new}}=1$, i.e.\ at the candidate of each kept string; since that window lies within its string and $\mathsf{diff}=0$ means it equals $\mathsf{str}$, every kept string matches. For the infix filter, the two confinement zerochecks give $\mathsf{m_{fp}}\leq\mathsf{char\text{-}act^{new}}$ and $\mathsf{m_{fp}}\leq\mathsf{att\_mask}$, and the occurrence zerocheck gives $\mathsf{diff}=0$ on the support of $\mathsf{m_{fp}}$; thus every mark $p$ has $\mathsf{char\text{-}act^{new}}[p]=1$ (so $\mathsf{orig\text{-}ind}[p]\in M$), $\mathsf{att\_mask}[p]=1$ (a candidate window lying inside $\mathsf{orig\text{-}ind}[p]$), and $\mathsf{diff}[p]=0$ (that window equals $\mathsf{str}$), so $\mathsf{orig\text{-}ind}[p]$ matches. The no-duplicate check on $(\mathsf{orig\text{-}ind},\mathsf{m_{fp}})$ puts the marks in distinct strings, and the two sum checks give $\sum\mathsf{m_{fp}}=n_{\mathsf{m}}=\sum\mathsf{a_h^{new}}=|M|$, so the $|M|$ marks lie in distinct strings of $M$ and hit every string of $M$ exactly once. Either way, every kept string is an eligible match.
 
-\emph{No false negatives.} Let $i\in E\setminus M$ be a dropped eligible string. By consistency every character of $i$ has $\mathsf{a_c^{new}}=0$, so $\mathsf{att\_mask}\cdot(1-\mathsf{a_c^{new}})=\mathsf{att\_mask}$ on string $i$, which is $1$ at each of its candidate windows. The false-negative no-zero check therefore forces $\mathsf{diff}[p]\neq0$ there, so by the unconditional direction none of $i$'s candidate windows equals $\mathsf{str}$. Hence $i$ does not match. Contrapositively, every eligible matching string lies in $M$.
+\emph{No false negatives.} Let $i\in E\setminus M$ be a dropped eligible string. By consistency every character of $i$ has $\mathsf{char\text{-}act^{new}}=0$, so $\mathsf{att\_mask}\cdot(1-\mathsf{char\text{-}act^{new}})=\mathsf{att\_mask}$ on string $i$, which is $1$ at each of its candidate windows. The false-negative no-zero check therefore forces $\mathsf{diff}[p]\neq0$ there, so by the unconditional direction none of $i$'s candidate windows equals $\mathsf{str}$. Hence $i$ does not match. Contrapositively, every eligible matching string lies in $M$.
 
 Combining the two directions, $M$ is exactly the set of eligible matching strings --- the strings passing the chosen prefix, suffix, or infix filter --- except with the fingerprint-collision probability $N(k-1)/|\F|$ and the soundness errors of the invoked sub-PIOPs.
 \end{proof}
@@ -247,7 +247,7 @@ Combining the two directions, $M$ is exactly the set of eligible matching string
 
 A multi-factor multi-character pattern matches several literal factors against each value, with a wild-card \% between consecutive factors absorbing an arbitrary run of characters. Writing the pattern as $p_1 \% p_2 \% \dots \% p_t$, a value satisfies it iff the factors $\mathcal{P}=\{p_1,\dots,p_t\}$ all occur within it \emph{in this order}.
 
-The objective of the protocol is to establish that the updated activators $\mathsf{a_h^{new}}$ and $\mathsf{a_c^{new}}$ correctly capture the result of the pattern matching. As in \cref{piop:single-factor-multi-char-pattern-matching}, the first steps check the validity of the provided activators (\cref{mfmc:validity}), filter by length (\cref{mfmc:filter}), and enforce containment (\cref{mfmc:containment}).
+The objective of the protocol is to establish that the updated activators $\mathsf{a_h^{new}}$ and $\mathsf{char\text{-}act^{new}}$ correctly capture the result of the pattern matching. As in \cref{piop:single-factor-multi-char-pattern-matching}, the first steps check the validity of the provided activators (\cref{mfmc:validity}), filter by length (\cref{mfmc:filter}), and enforce containment (\cref{mfmc:containment}).
 
 A natural approach to checking a multi-factor pattern is to verify each factor individually: $\PIOPProver$ and $\PIOPVerifier$ run \cref{piop:single-factor-multi-char-pattern-matching} for every factor $p\in\mathcal{P}$, obtaining a separate activator $\mathsf{a^{new}_{h,p}}$, and test whether $\mathsf{a^{new}_{h}}$ equals their product $\mathsf{a^{\cap}_h}:=\prod_{p\in \mathcal{P}}\mathsf{a^{new}_{h,p}}$. This alone is insufficient, however, because the order of the factors matters: a string may contain every factor yet still fail the pattern, so in general $\mathsf{a^{new}_{h}}\neq\mathsf{a^{\cap}_h}$. For the pattern \texttt{\%ab\%cd\%}, for instance, the string \texttt{xabycdz} satisfies the predicate while \texttt{xcdyabz} does not---even though both contain \texttt{ab} and \texttt{cd}---because in the latter \texttt{cd} precedes \texttt{ab}. The matching words therefore form a subset of those active in every factor, a containment enforced in \cref{mfmc:cap-containment}. It remains to show that this subset is exactly right: the words deactivated between $\mathsf{a^{\cap}_h}$ and $\mathsf{a^{new}_{h}}$ admit no valid ordering (no false negatives), while the words surviving into $\mathsf{a^{new}_{h}}$ do (no false positives). This is the task of \cref{mfmc:ordering}, which invokes \cref{piop:factor-ordering}.
 
@@ -256,8 +256,8 @@ A natural approach to checking a multi-factor pattern is to verify each factor i
 \begin{DefinePIOP}{Multi-Factor Multi-Character (MFMC) Pattern Matching}{multi-factor-multi-char-pattern-matching}[MFMC Pattern Matching]
   \emergencystretch=3em\relax
   \begin{enumerate}[nosep]
-        \item (\emph{Activator validity})\label[step]{mfmc:validity} $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:act-len-consistency} on $(\mathsf{a_c^{new}}, \mathsf{a_h^{new}}, \mathsf{orig}, \mathsf{ind}, \mathsf{l})$.
-    \item (\emph{Length Filtering})\label[step]{mfmc:filter} $\PIOPProver$ computes $\mathsf{a_h^{old'}}$ and $\mathsf{a_c^{old'}}$, the result of filtering out strings shorter than $k:=\sum_{p\in\mathcal{P}}|p|$ (the least length a string can have while containing all factors without overlap), then $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:len-filter} $(\mathsf{a_h^{old}}, \mathsf{a_c^{old}}, \mathsf{a_h^{old'}}, \mathsf{a_c^{old'}})$ with threshold $k$.
+        \item (\emph{Activator validity})\label[step]{mfmc:validity} $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:data-preserving-update-check} on $(\mathsf{char\text{-}act^{new}}, \mathsf{a_h^{new}}, \mathsf{orig\text{-}ind}, \mathsf{ind}, \mathsf{l})$.
+    \item (\emph{Length Filtering})\label[step]{mfmc:filter} $\PIOPProver$ computes $\mathsf{a_h^{old'}}$ and $\mathsf{char\text{-}act^{old'}}$, the result of filtering out strings shorter than $k:=\sum_{p\in\mathcal{P}}|p|$ (the least length a string can have while containing all factors without overlap), then $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:len-filter} $(\mathsf{a_h^{old}}, \mathsf{char\text{-}act^{old}}, \mathsf{a_h^{old'}}, \mathsf{char\text{-}act^{old'}})$ with threshold $k$.
     \item (\emph{Containment in the input})\label[step]{mfmc:containment} $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:zerocheck} on $\mathsf{a_h^{new}}\cdot(1-\mathsf{a_h^{old'}})$.
     \item (\emph{Checking patterns separately})\label[step]{mfmc:separate} For each \emph{distinct} $p\in\mathcal{P}$:
     \begin{enumerate}[nosep]
@@ -290,7 +290,7 @@ To rule out this attack, the prover convinces the verifier that it matched all t
 
 \begin{DefinePIOP}{Factor Ordering Check}{factor-ordering}[FactorOrdering]
   \emergencystretch=3em\relax
-  \emph{Inputs:} the ordered factors $(p_1,\dots,p_t)$ with lengths $|p_j|$; the activators $\Oracle{\MLE{\mathsf{a^{new}_h}}}, \Oracle{\MLE{\mathsf{a^{\cap}_h}}}, \Oracle{\MLE{\mathsf{a^{\cap}_c}}}$; the per-factor occurrence columns $\Oracle{\MLE{\mathsf{occurs}_{p_j}}}$ for $j=1,\dots,t$; and the shared columns $\Oracle{\MLE{\mathsf{o}}}, \Oracle{\MLE{\mathsf{orig}}}, \Oracle{\MLE{\mathsf{ind}}}$.
+  \emph{Inputs:} the ordered factors $(p_1,\dots,p_t)$ with lengths $|p_j|$; the activators $\Oracle{\MLE{\mathsf{a^{new}_h}}}, \Oracle{\MLE{\mathsf{a^{\cap}_h}}}, \Oracle{\MLE{\mathsf{a^{\cap}_c}}}$; the per-factor occurrence columns $\Oracle{\MLE{\mathsf{occurs}_{p_j}}}$ for $j=1,\dots,t$; and the shared columns $\Oracle{\MLE{\mathsf{int\text{-}ind}}}, \Oracle{\MLE{\mathsf{orig\text{-}ind}}}, \Oracle{\MLE{\mathsf{ind}}}$.
   \begin{enumerate}[nosep]
     \item \label[step]{mfmc:false-pos} (\emph{False-positive check for factor ordering}) $\PIOPProver$ and $\PIOPVerifier$ proceed as follows:
     \begin{enumerate}[nosep]
@@ -305,11 +305,11 @@ To rule out this attack, the prover convinces the verifier that it matched all t
         \]
         $\PIOPProver$ sends $\mathsf{offset}_{p_j}$ to $\PIOPVerifier$.
 
-   \item \emph{(character-level offset marker)} For each $j=1,\dots,t$, $\PIOPProver$ sends a character-level boolean column $\mathsf{offset\_marker}_{p_j}$ (of size $M$) marking, in each matched word where $p_j$ is placed in order, the character at the placed start: for a character $c$ in word $i:=\mathsf{orig}[c]$,
+   \item \emph{(character-level offset marker)} For each $j=1,\dots,t$, $\PIOPProver$ sends a character-level boolean column $\mathsf{offset\_marker}_{p_j}$ (of size $M$) marking, in each matched word where $p_j$ is placed in order, the character at the placed start: for a character $c$ in word $i:=\mathsf{orig\text{-}ind}[c]$,
         \[
           \mathsf{offset\_marker}_{p_j}[c]:=
           \begin{cases}
-            1, & \mathsf{a^{\cap}_h}[i]=1,\ \mathsf{is\_ordered}_{p_j}[i]=1,\ \text{and}\ \mathsf{o}[c]=\mathsf{offset}_{p_j}[i],\\
+            1, & \mathsf{a^{\cap}_h}[i]=1,\ \mathsf{is\_ordered}_{p_j}[i]=1,\ \text{and}\ \mathsf{int\text{-}ind}[c]=\mathsf{offset}_{p_j}[i],\\
             0, & \text{otherwise.}
           \end{cases}
         \]
@@ -318,7 +318,7 @@ To rule out this attack, the prover convinces the verifier that it matched all t
         \item a \cref{piop:boolean-check} on $\mathsf{offset\_marker}_{p_j}$;
         \item a \cref{piop:zerocheck} on $\mathsf{offset\_marker}_{p_j}(1-\mathsf{occurs}_{p_j})$;
         \item a \cref{piop:zerocheck} on $\mathsf{offset\_marker}_{p_j}(1-\mathsf{a^{\cap}_c})$;
-        \item a \cref{piop:nodup-check} on $\mathsf{orig}$ with activator $\mathsf{offset\_marker}_{p_j}$;
+        \item a \cref{piop:nodup-check} on $\mathsf{orig\text{-}ind}$ with activator $\mathsf{offset\_marker}_{p_j}$;
         \item two \cref{piop:sumcheck}s for $\sum_{c}\mathsf{offset\_marker}_{p_j}[c]=n$ and $\sum_{i}\mathsf{a^{\cap}_h}[i]\,\mathsf{is\_ordered}_{p_j}[i]=n$, where $n$ is a count sent by $\PIOPProver$.
       \end{enumerate}
 
@@ -336,7 +336,7 @@ To rule out this attack, the prover convinces the verifier that it matched all t
         \item a $\mathsf{NonNeg}$ \cref{piop:sign-check} on $\mathsf{offset}_{p_j}-\mathsf{offset}_{p_{j-1}}-|p_{j-1}|$ with activator $\mathsf{a^{\cap}_h}\,\mathsf{is\_ordered}_{p_j}$;
       \end{itemize}
 
-      \item \emph{(consistency between the offset and offset marker)} $\PIOPVerifier$ then samples $\{r_j\}_{j=1}^{t}\samples\F$ and sends them to $\PIOPProver$, then they both run \cref{piop:mset} on $\bigcup_{j=1}^{t}\{\,\mathsf{ind}[i]+r_j\,\mathsf{offset}_{p_j}[i]\ :\ \mathsf{a^{\cap}_h}[i]=1\ \text{and}\ \mathsf{is\_ordered}_{p_j}[i]=1\,\}$ and $\bigcup_{j=1}^{t}\{\,\mathsf{orig}[c]+r_j\,\mathsf{o}[c]\ :\ \mathsf{offset\_marker}_{p_j}[c]=1\,\}$.
+      \item \emph{(consistency between the offset and offset marker)} $\PIOPVerifier$ then samples $\{r_j\}_{j=1}^{t}\samples\F$ and sends them to $\PIOPProver$, then they both run \cref{piop:mset} on $\bigcup_{j=1}^{t}\{\,\mathsf{ind}[i]+r_j\,\mathsf{offset}_{p_j}[i]\ :\ \mathsf{a^{\cap}_h}[i]=1\ \text{and}\ \mathsf{is\_ordered}_{p_j}[i]=1\,\}$ and $\bigcup_{j=1}^{t}\{\,\mathsf{orig\text{-}ind}[c]+r_j\,\mathsf{int\text{-}ind}[c]\ :\ \mathsf{offset\_marker}_{p_j}[c]=1\,\}$.
         \item \emph{(verdict)} For each $j=2,\dots,t$, the parties invoke a \cref{piop:zerocheck} on $\mathsf{a^{new}_h}\,(1-\mathsf{is\_ordered}_{p_j})$.
     \end{enumerate}
     \item \label[step]{mfmc:false-neg}(\emph{False-negative check for factor ordering}) $\PIOPProver$ and $\PIOPVerifier$ denote by $\mathsf{d_h}:=\mathsf{a^{\cap}_h}-\mathsf{a^{new}_h}$ the \emph{discarded candidates}.
@@ -519,12 +519,12 @@ To rule out this attack, the prover convinces the verifier that it matched all t
   \draw[blue,thick]  (24.225,0.32) rectangle (26.125,-0.32);
   % row labels
   \node[rowlab] at (-0.6,0.62){pos};
-  \node[rowlab] at (-0.6,\yc){$\mathsf{c}$};
-  \node[rowlab] at (-0.6,\ysrc){$\mathsf{orig}$};
-  \node[rowlab] at (-0.6,\yo){$\mathsf{o}$};
-  \node[rowlab] at (-0.6,\yaco){$\mathsf{a_c^{old}}$};
-  \node[rowlab] at (-0.6,\yacf){$\mathsf{a_c^{old'}}$};
-  \node[rowlab] at (-0.6,\yacn){$\mathsf{a_c^{new}}$};
+  \node[rowlab] at (-0.6,\yc){$\mathsf{char}$};
+  \node[rowlab] at (-0.6,\ysrc){$\mathsf{orig\text{-}ind}$};
+  \node[rowlab] at (-0.6,\yo){$\mathsf{int\text{-}ind}$};
+  \node[rowlab] at (-0.6,\yaco){$\mathsf{char\text{-}act^{old}}$};
+  \node[rowlab] at (-0.6,\yacf){$\mathsf{char\text{-}act^{old'}}$};
+  \node[rowlab] at (-0.6,\yacn){$\mathsf{char\text{-}act^{new}}$};
   \node[rowlab] at (-0.6,\yncab){$\mathsf{a^{new}_{c,ab}}$};
   \node[rowlab] at (-0.6,\yncbd){$\mathsf{a^{new}_{c,bd}}$};
   \node[rowlab] at (-0.6,\yncap){$\mathsf{a^{\cap}_c}$};
@@ -625,8 +625,8 @@ To rule out this attack, the prover convinces the verifier that it matched all t
   \draw[red!70,thick,rounded corners=1pt] (5.18,{\yordc+0.34}) rectangle (10.97,{\yordc-0.34});
   % row labels
   \node[rowlab] at (-0.6,0.55){pos};
-  \node[rowlab] at (-0.6,\yc){$\mathsf{c}$};
-  \node[rowlab] at (-0.6,\yo){$\mathsf{o}$};
+  \node[rowlab] at (-0.6,\yc){$\mathsf{char}$};
+  \node[rowlab] at (-0.6,\yo){$\mathsf{int\text{-}ind}$};
   \node[rowlab] at (-0.6,\yzab){$\mathsf{occurs_{ab}}$};
   \node[rowlab] at (-0.6,\yzbd){$\mathsf{occurs_{bd}}$};
   \node[rowlab] at (-0.6,\yobab){$\mathsf{offset}'_{ab}$};
@@ -650,11 +650,11 @@ To rule out this attack, the prover convinces the verifier that it matched all t
 The remaining task---certifying that $\mathsf{a^{new}_h}$ retains exactly the words of $\mathsf{a^{\cap}_h}$ in which the factors embed \emph{in order}---is packaged as a standalone check, run once at the end of the protocol above. It has two halves: a false-positive check, establishing that every surviving word ($\mathsf{a^{new}_h}=1$) admits an in-order placement of the factors; and a false-negative check, establishing that every discarded word (one in $\mathsf{d_h}:=\mathsf{a^{\cap}_h}-\mathsf{a^{new}_h}$) admits none, using the greedy placement audited by \cref{piop:greedy-check}.
 
 \begin{DefinePIOP}{Greedy Check}{greedy-check}[GreedyCheck]
-  \emph{Inputs:} $\Oracle{\MLE{\mathsf{occurs}_{p_j}}}, \Oracle{\MLE{\mathsf{o}}}, \Oracle{\MLE{\mathsf{offset}_{p_{j-1}}}}, \Oracle{\MLE{\mathsf{offset}_{p_j}}}, \Oracle{\MLE{\mathsf{is\_ordered}_{p_j}}}, \Oracle{\MLE{\mathsf{d_h}}}$, and the length $|p_{j-1}|$.
+  \emph{Inputs:} $\Oracle{\MLE{\mathsf{occurs}_{p_j}}}, \Oracle{\MLE{\mathsf{int\text{-}ind}}}, \Oracle{\MLE{\mathsf{offset}_{p_{j-1}}}}, \Oracle{\MLE{\mathsf{offset}_{p_j}}}, \Oracle{\MLE{\mathsf{is\_ordered}_{p_j}}}, \Oracle{\MLE{\mathsf{d_h}}}$, and the length $|p_{j-1}|$.
   \begin{enumerate}[nosep]
     \item (\emph{broadcasting}) $\PIOPProver$ sends the broadcasted columns $\mathsf{d_h}'$, $\mathsf{offset}'_{p_{j-1}}$, $\mathsf{offset}'_{p_j}$, and $\mathsf{is\_ordered}'_{p_j}$ (with the conventions $\mathsf{offset}_{p_0}:=0$ and $\mathsf{is\_ordered}_{p_1}:=\mathbf{1}$), where $x'$ denotes the broadcasted version of $x$, and the parties invoke \cref{piop:broadcast} on them;
-    \item a $\mathsf{NonNeg}$ \cref{piop:sign-check} on $\mathsf{o}-\bigl(\mathsf{offset}'_{p_{j-1}}+|p_{j-1}|\bigr)$, giving a boolean column $\mathsf{allowed\_offset}_{p_j}$ marking $\mathsf{o}\ge\mathsf{offset}'_{p_{j-1}}+|p_{j-1}|$ (the offsets at or past the frontier);
-    \item a $\mathsf{Neg}$ \cref{piop:sign-check} on $\mathsf{o}-\mathsf{offset}'_{p_j}$, giving a boolean column $\mathsf{unused\_offset}_{p_j}$ marking $\mathsf{o}<\mathsf{offset}'_{p_j}$ (the offsets strictly before the claimed placement; together, $\mathsf{allowed\_offset}_{p_j}\cdot\mathsf{unused\_offset}_{p_j}$ picks out the window $\mathsf{offset}'_{p_{j-1}}+|p_{j-1}|\le\mathsf{o}<\mathsf{offset}'_{p_j}$);
+    \item a $\mathsf{NonNeg}$ \cref{piop:sign-check} on $\mathsf{int\text{-}ind}-\bigl(\mathsf{offset}'_{p_{j-1}}+|p_{j-1}|\bigr)$, giving a boolean column $\mathsf{allowed\_offset}_{p_j}$ marking $\mathsf{int\text{-}ind}\ge\mathsf{offset}'_{p_{j-1}}+|p_{j-1}|$ (the offsets at or past the frontier);
+    \item a $\mathsf{Neg}$ \cref{piop:sign-check} on $\mathsf{int\text{-}ind}-\mathsf{offset}'_{p_j}$, giving a boolean column $\mathsf{unused\_offset}_{p_j}$ marking $\mathsf{int\text{-}ind}<\mathsf{offset}'_{p_j}$ (the offsets strictly before the claimed placement; together, $\mathsf{allowed\_offset}_{p_j}\cdot\mathsf{unused\_offset}_{p_j}$ picks out the window $\mathsf{offset}'_{p_{j-1}}+|p_{j-1}|\le\mathsf{int\text{-}ind}<\mathsf{offset}'_{p_j}$);
     \item \label[step]{greedy:verdict}\emph{(greediness verdict)} $\PIOPProver$ and $\PIOPVerifier$ invoke
       \begin{enumerate}[nosep]
         \item \label[step]{greedy:ordered}\cref{piop:zerocheck} on $\mathsf{occurs}_{p_j}\cdot\mathsf{allowed\_offset}_{p_j}\cdot\mathsf{unused\_offset}_{p_j}$, with activator $\mathsf{d_h}'\,\mathsf{is\_ordered}'_{p_j}$;
@@ -677,18 +677,20 @@ If the prover claims that $p_j$ is placed in order relative to the previous fact
 If the prover claims that $p_j$ is cannot be placed in order, i.e. there is no match for $p_j$ in the available characters, then it should prove that there isn't any occurrence (marked by $\mathsf{occurs}_{p_j}$) at any offset that was available to it (marked by $\mathsf{allowed\_offset}_{p_j}$). This is checked via \cref{greedy:unordered}.
 
 
-We package this greedy-placement test as a standalone check, the \emph{Greedy Check}, run once per factor $p_j$. It takes the occurrence column $\mathsf{occurs}_{p_j}$, the offsets $\mathsf{o}$, the previous placement $\mathsf{offset}_{p_{j-1}}$ together with the length $|p_{j-1}|$ (which fix the frontier $\mathsf{offset}_{p_{j-1}}+|p_{j-1}|$), the claimed placement $\mathsf{offset}_{p_j}$, the placement flag $\mathsf{is\_ordered}_{p_j}$, and the activator $\mathsf{d_h}$; it first broadcasts the word-level columns to character level (their broadcasted versions are written with a prime) and then proves that on every active word the placement obeys the greedy rule:
+We package this greedy-placement test as a standalone check, the \emph{Greedy Check}, run once per factor $p_j$. It takes the occurrence column $\mathsf{occurs}_{p_j}$, the offsets $\mathsf{int\text{-}ind}$, the previous placement $\mathsf{offset}_{p_{j-1}}$ together with the length $|p_{j-1}|$ (which fix the frontier $\mathsf{offset}_{p_{j-1}}+|p_{j-1}|$), the claimed placement $\mathsf{offset}_{p_j}$, the placement flag $\mathsf{is\_ordered}_{p_j}$, and the activator $\mathsf{d_h}$; it first broadcasts the word-level columns to character level (their broadcasted versions are written with a prime) and then proves that on every active word the placement obeys the greedy rule:
 \begin{displaymath}
 \NPRelation_{\mathsf{Greedy}} = \left\{
 \begin{aligned}
   & \NPInstance = |p_{j-1}|,\; \\
-  & \NPInstancey = (\Oracle{\MLE{\mathsf{occurs}_{p_j}}}, \Oracle{\MLE{\mathsf{o}}}, \Oracle{\MLE{\mathsf{offset}'_{p_{j-1}}}}, \\
+  & \NPInstancey = (\Oracle{\MLE{\mathsf{occurs}_{p_j}}}, \Oracle{\MLE{\mathsf{int\text{-}ind}}}, \Oracle{\MLE{\mathsf{offset}'_{p_{j-1}}}}, \\
   & \qquad\qquad\ \Oracle{\MLE{\mathsf{offset}'_{p_j}}}, \Oracle{\MLE{\mathsf{is\_ordered}'_{p_j}}}, \Oracle{\MLE{\mathsf{d_h}'}}),\; \\
-  & \NPWitness = (\mathsf{occurs}_{p_j}, \mathsf{o}, \mathsf{offset}'_{p_{j-1}}, \mathsf{offset}'_{p_j}, \mathsf{is\_ordered}'_{p_j}, \mathsf{d_h}') \\
+  & \NPWitness = (\mathsf{occurs}_{p_j}, \mathsf{int\text{-}ind}, \mathsf{offset}'_{p_{j-1}}, \mathsf{offset}'_{p_j}, \mathsf{is\_ordered}'_{p_j}, \mathsf{d_h}') \\
   & \;\big|\;\; \text{writing } \mathsf{f}:=\mathsf{offset}'_{p_{j-1}}+|p_{j-1}|,\ \text{for every } c \text{ with } \mathsf{d_h}'[c]=\mathsf{occurs}_{p_j}[c]=1: \\
-  & \phantom{\;\big|\;\;} \mathsf{is\_ordered}'_{p_j}[c]=1 \Rightarrow \mathsf{o}[c]<\mathsf{f}[c]\ \text{or}\ \mathsf{o}[c]\ge\mathsf{offset}'_{p_j}[c], \\
-  & \phantom{\;\big|\;\;} \mathsf{is\_ordered}'_{p_j}[c]=0 \Rightarrow \mathsf{o}[c]<\mathsf{f}[c]
+  & \phantom{\;\big|\;\;} \mathsf{is\_ordered}'_{p_j}[c]=1 \Rightarrow \mathsf{int\text{-}ind}[c]<\mathsf{f}[c]\ \text{or}\ \mathsf{int\text{-}ind}[c]\ge\mathsf{offset}'_{p_j}[c], \\
+  & \phantom{\;\big|\;\;} \mathsf{is\_ordered}'_{p_j}[c]=0 \Rightarrow \mathsf{int\text{-}ind}[c]<\mathsf{f}[c]
 \end{aligned}
 \right\}.
 \end{displaymath}
 In words: when $p_j$ is placed ($\mathsf{is\_ordered}'_{p_j}=1$) no occurrence lies in the window $[\,\mathsf{offset}'_{p_{j-1}}+|p_{j-1}|,\ \mathsf{offset}'_{p_j})$, so $\mathsf{offset}'_{p_j}$ is the earliest occurrence at or past the frontier; and when it is not ($\mathsf{is\_ordered}'_{p_j}=0$) no occurrence lies at or past the frontier at all, so the placement is genuinely stuck.
+
+

@@ -2,21 +2,162 @@
 \doclearpage
 \section{Arithmetization}
 \label{sec:arithmetization}
-\textsc{Truth Table}~\cite{cryptoeprint:2026/1260} arithmetizes a string-typed column as a single hash column, which we adopt as our main column. Hashing, however, is opaque: beyond equality testing---which it preserves---it supports no operation on the underlying strings. To enable white-box operations on the string contents, we augment the hash column with a group of auxiliary columns, likewise generated and committed to by the data owner; hence, are trusted:
+
+
+We now describe how we represent columns and tables as polynomials for use with the PIOPs of the following sections. 
+We briefly review the general arithmetization of tables and columns in \cref{sec:general-approach}, which we adopt from $\truthtable$~\cite{cryptoeprint:2026/1260}, and then turn in \cref{sec:string-arith} to the arithmetization of strings---the focus of our paper and absent from $\truthtable$.
+
+\subsection{General Approach}
+\label{sec:general-approach}
+Throughout, tables and columns are encoded as multilinear polynomials over the Boolean hypercube $\BoolHCube{\mu}$, with arithmetic in a finite field $\F$ of large prime characteristic $p$.
+
+\parhead{Notation: arithmetized objects}
+A concrete table or column is written plainly as $\Table$ or $\col$, and its \emph{arithmetized} polynomial form carries a hat, $\hat{\Table}$ or $\hat{\col}$. A concrete object is indexed by integers in square brackets, as in $\col[i]$ or $\Table.\key[i]$ for $i \in [|\Table|]$, whereas its arithmetization is evaluated at hypercube points in parentheses, as in $\hat{\Table}.\key(x)$ for $x \in \BoolHCube{\mu}$.
+
+\parhead{Representing table data as field elements}
+We map each column into the prime field $\F$ according to its declared type. For all non-string types---integers, booleans, durations, intervals, dates, and timestamps---we follow $\truthtable$~\cite{cryptoeprint:2026/1260}, to which we refer the reader for the encodings.
+The encoding of strings as field elements is the subject of \cref{sec:string-arith}.
+
+\parhead{Columns}
+A column $\col$ of $n$ entries lives in $\BoolHCube{\mu}$ for any $\mu \ge \lceil \log_2 n \rceil$, and its arithmetization splits into two multilinear polynomials, $\hat{\col} := (\hat{\col}.\act,\, \hat{\col}.\data)$. The \emph{activator} $\hat{\col}.\act \colon \F^{\mu} \to \{0,1\}$ flags the $n$ \emph{active} indices---those carrying real rows rather than padding---while the \emph{data} polynomial $\hat{\col}.\data \colon \F^{\mu} \to \F$ holds the entries at those indices. Where the column is clear from context, we abbreviate the two to $\act$ and $\data$.
+
+\parhead{Tables}
+A $k$-column table $\Table$ with $n$ rows arithmetizes to $\hat{\Table} := (\hat{\Table}.\act,\, [\hat{\Table}.\data_1, \dots, \hat{\Table}.\data_k])$: a single activator $\hat{\Table}.\act$, active at $n$ points of $\BoolHCube{\mu}$, shared across all $k$ data polynomials. Each active point $x$---one with $\hat{\Table}.\act(x) = 1$---then yields a row $(\hat{\Table}.\data_1(x),\dots,\hat{\Table}.\data_k(x))$ of $\Table$. A column is just the $k=1$ case, and we reuse the $\hat{\Table}.\act$, $\hat{\Table}.\data_i$ notation for tables.
+
+\parhead{Active indices and layouts.}
+The \emph{active set} of $\hat{\col}$ (or $\hat{\Table}$) gathers its active points, $\actset(\hat{\col}) := \{x \in \BoolHCube{\mu} \mid \hat{\col}.\act(x) = 1\}$, and for a value $k \in \F$ we single out those carrying it as $\actset_k(\hat{\col}) := \{x \in \actset(\hat{\col}) \mid \hat{\col}.\data(x) = k\}$.
+
+We use one of two layouts for the active set. In the default \emph{contiguous} layout, $\actset(\hat\Table) = \{0, \dots, n - 1\}$, so the activator is the closed-form $n$-contiguous polynomial $\contig_{\mu,n}$ (\cref{sec:prelims}) that the prover need neither commit to nor prove boolean. In the \emph{sparse} layout the active indices are scattered arbitrarily, and the prover must commit to the activator and prove its booleanity.
+
+
+\parhead{Arithmetized relations}
+Every operator PIOP proves membership in a \emph{table language}
+$\Language{\op} = \{(x, \{\hat{\TableIn}\}, \{\hat{\TableOut}\})\}$, the input and output tables linked by the operator $\op$. Its \emph{arithmetized} counterpart replaces each concrete table with its polynomial form, $
+\hat{\mathcal{L}}_\op := \{
+    (\NPInstance = x,
+    \NPInstancey = (\{\hat{\TableIn}\}, \hat{\TableOut}))
+  \;|\;
+  ((x, \{\TableIn\}, \TableOut), \bot ) \in \Language{\op}
+\}
+$,
+where each $\hat{\Table} \in \{\hat{\TableIn}\} \cup \{\hat{\TableOut}\}$ is the arithmetization of the corresponding concrete table $\Table$.
+
+\subsection{String Arithmetization}
+\label{sec:string-arith}
+
+We now describe how we arithmetize a string-typed column. This string arithmetization is a contribution of our work, and is designed so that the PIOP protocols of the following sections can operate directly on the contents of the strings.
+
+We start with the approach of $\truthtable$~\cite{cryptoeprint:2026/1260} which arithmetizes a string-typed column as a single hash column $(\act,\mathsf{h})$, which we adopt as our main column. Hashing, however, is opaque: beyond equality testing---which it preserves---it supports no operation on the underlying strings. To enable white-box operations on the string contents, we augment the hash column with a group of auxiliary columns. These auxiliary columns come in two lengths:
+
+\parhead{Type 1: String-level auxiliary columns} These are columns of length $N$---the length of the hash column, with one entry per string:
 \begin{itemize}[nosep]
-    \item Length column $\mathsf{l}$ is of the same length as $\col$, with $\mathsf{l}[i]$ being the length $|\col[i]|$ of the $i$-th string in $\col$.
-    \item Data column $\mathsf{c}$ is of size $\sum_{s \in \col} |s|$ and contains the concatenation of all strings in $\col$.
-    \item Origin column $\mathsf{orig}$ is of the same length as $\mathsf{c}$, with $\mathsf{orig}[j]$ being the index of the string in $\col$ to which the $j$-th character of $\mathsf{c}$ belongs.
-    \item Within-word index column $\mathsf{o}$ is of the same length as $\mathsf{c}$, with $\mathsf{o}[j]$ being the position of the $j$-th character of $\mathsf{c}$ within its own string, counting from $0$. Equivalently, $\mathsf{o}$ resets to $0$ at every string boundary and increments by one across the characters of each string, so it reads $0,1,2,\,0,1,2,3,4,\,0,1,2,3,4,5,\,0,1,\dots$ over consecutive strings.
-    \item Data activator column $\mathsf{a_c}$ is of the same length as $\mathsf{c}$, with $\mathsf{a_c}[j]$ being $1$ if the $j$-th character of $\mathsf{c}$ is active, and $0$ otherwise.
-    \item Hash/boundary activator column $\mathsf{a_h}$ is of the same length as $\col$, with $\mathsf{a_h}[i]$ being $1$ if the $i$-th string in $\col$ is active, and $0$ otherwise.
-    \item Boundary selector column $\mathsf{s_b}$ is of the same length as $\mathsf{c}$, with $\mathsf{s_b}[j]$ being $1$ if the $j$-th character of $\mathsf{c}$ is the first character of a string (a string boundary), and $0$ otherwise.
+    \item \emph{Length column $\mathsf{l}$}, with $\mathsf{l}[i]$ being the length $|\col[i]|$ of the $i$-th string in $\col$.
     \end{itemize}
+    \parhead{Type 2: Character-level auxiliary columns} These are columns of length $M := \sum_{s \in \col} |s|$, the total number of characters in the column:
+   \begin{itemize}[nosep]
+    \item \emph{Character column $\mathsf{char}$} contains the concatenation of all strings in $\col$.
+    \item \emph{Origin index column $\mathsf{orig\text{-}ind}$}, with $\mathsf{orig\text{-}ind}[j]$ being the index of the string in $\col$ to which the $j$-th character of $\mathsf{char}$ belongs.
+    \item \emph{Internal index column $\mathsf{int\text{-}ind}$}, with $\mathsf{int\text{-}ind}[j]$ being the position of the $j$-th character of $\mathsf{char}$ within its own string, counting from $0$. Equivalently, $\mathsf{int\text{-}ind}$ resets to $0$ at every string boundary and increments by one across the characters of each string.
+    \item \emph{Character activator column $\mathsf{char\text{-}act}$}, with $\mathsf{char\text{-}act}[j]$ being $1$ if the $j$-th character of $\mathsf{char}$ is active, and $0$ otherwise.
+    \item \emph{Boundary marker column $\mathsf{bnd}$}, with $\mathsf{bnd}[j]$ being $1$ if the $j$-th character of $\mathsf{char}$ is the first character of a string (a string boundary), and $0$ otherwise.
+    \end{itemize}
+\cref{fig:string-arith-example} illustrates this arithmetization on a sample four-row string-typed column.
+
+\ifsp\begin{figure*}[tp]\else\begin{figure}[h!]\fi
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[
+    cell/.style={draw, minimum size=6mm, inner sep=0pt, font=\small},
+    rowlab/.style={font=\small\itshape, anchor=east},
+    hd/.style={font=\small\bfseries}
+  ]
+
+  %==================== Panel 1: string-level columns ====================
+  \node[hd, anchor=west] at (-0.6,5.2) {$\mathsf{s}$};
+  \node[hd] at (1.3,5.2) {$\mathsf{a}$};
+  \node[hd] at (1.9,5.2) {$\mathsf{h}$};
+  \node[hd] at (3.6,5.2) {$\mathsf{l}$};
+
+  % i / string / length / a_h ; row 2 ("cherry") is inactive.
+  \foreach \i/\s/\ll/\ah in {0/apple/5/1, 1/orange/6/1, 2/cherry/6/0, 3/banana/6/1}{
+    \pgfmathsetmacro{\yy}{4.6 - \i*0.6}
+    \node[font=\small\ttfamily, anchor=west] at (-0.6,\yy) {\s};
+    \node[cell] at (1.3,\yy) {\ah};
+    \node[cell] at (1.9,\yy) {$h_{\i}$};
+    \node[cell] at (3.6,\yy) {\ll};
+  }
+
+  % dotted box bundling the main column (its activator and hash data)
+  \draw[blue, thick, densely dotted, rounded corners=2pt] (0.95,5.7) rectangle (2.25,2.2);
+  \node[font=\scriptsize\itshape, blue] at (1.6,1.7) {main columns};
+
+  % dotted box around the string-level auxiliary column (length)
+  \draw[blue, thick, densely dotted, rounded corners=2pt] (3.25,5.7) rectangle (3.95,2.2);
+  \node[font=\scriptsize\itshape, blue, align=center] at (3.6,1.7) {String-level\\Auxiliary column};
+
+  %==================== Panel 2: character-level columns (placed to the right) ====================
+  \begin{scope}[xshift=6.7cm, yshift=5.2cm]
+  % group (string) labels above the char row
+  \foreach \cx/\nm in {2/apple, 7.5/orange, 13.5/cherry, 19.5/banana}{
+    \node[font=\small\ttfamily] at (\cx*0.6, 1.30) {\nm};
+  }
+
+  % row labels
+  \node[rowlab] at (-0.5, 0.00){$\mathsf{char}$};
+  \node[rowlab] at (-0.5,-0.62){$\mathsf{orig\text{-}ind}$};
+  \node[rowlab] at (-0.5,-1.24){$\mathsf{int\text{-}ind}$};
+  \node[rowlab] at (-0.5,-1.86){$\mathsf{char\text{-}act}$};
+  \node[rowlab] at (-0.5,-2.48){$\mathsf{bnd}$};
+
+  % pos / char / orig / o / a_c / s_b ; cherry (orig 2) is inactive so a_c=0 there.
+  \foreach \x/\ch/\og/\oo/\ac/\sb in {
+     0/a/0/0/1/1,  1/p/0/1/1/0,  2/p/0/2/1/0,  3/l/0/3/1/0,  4/e/0/4/1/0,
+     5/o/1/0/1/1,  6/r/1/1/1/0,  7/a/1/2/1/0,  8/n/1/3/1/0,  9/g/1/4/1/0, 10/e/1/5/1/0,
+    11/c/2/0/0/1, 12/h/2/1/0/0, 13/e/2/2/0/0, 14/r/2/3/0/0, 15/r/2/4/0/0, 16/y/2/5/0/0,
+    17/b/3/0/1/1, 18/a/3/1/1/0, 19/n/3/2/1/0, 20/a/3/3/1/0, 21/n/3/4/1/0, 22/a/3/5/1/0}{
+    \pgfmathsetmacro{\px}{\x*0.6}
+    \node[font=\scriptsize, gray] at (\px,0.80) {\x};
+    \node[cell] at (\px, 0.00) {\texttt{\ch}};
+    \node[cell] at (\px,-0.62) {\og};
+    \node[cell] at (\px,-1.24) {\oo};
+    \node[cell] at (\px,-1.86) {\ac};
+    \node[cell] at (\px,-2.48) {\sb};
+  }
+
+  % padding tail: one padding slot, an ellipsis, then the final index
+  % (31 = last cell of the size-32 hypercube that M=23 pads up to).
+  \node[font=\scriptsize, gray] at (23*0.6,0.80) {23};
+  \foreach \yy in {0.00,-0.62,-1.24,-1.86,-2.48}{
+    \node[cell] at (23*0.6,\yy) {0};
+  }
+  \foreach \yy in {0.00,-0.62,-1.24,-1.86,-2.48}{
+    \node at (24*0.6,\yy) {$\cdots$};
+  }
+  \node[font=\scriptsize, gray] at (25*0.6,0.80) {31};
+  \foreach \yy in {0.00,-0.62,-1.24,-1.86,-2.48}{
+    \node[cell] at (25*0.6,\yy) {0};
+  }
+
+  % dotted box around the character-level auxiliary columns
+  \draw[blue, thick, densely dotted, rounded corners=2pt] (-2.3,0.50) rectangle (15.4,-2.95);
+  \node[font=\scriptsize\itshape, blue] at (6.55,-3.3) {Character-level Auxiliary columns};
+  \end{scope}
+
+\end{tikzpicture}%
+}
+\caption{String arithmetization of a four-row column
+$\col=(\texttt{apple},\texttt{orange},\texttt{cherry},\texttt{banana})$ with
+\texttt{cherry} inactive.}
+\label{fig:string-arith-example}
+\ifsp\end{figure*}\else\end{figure}\fi
 
 
-    \parhead{When can we drop the auxiliary columns?} The final result check needs only the hash column, so the auxiliary columns need not be carried all the way through the plan. Deciding \emph{how long} to keep them matters for efficiency: every extra column makes the downstream operations more expensive, especially the character-level columns, which can be far larger than the original string column. The best place to drop them is the earliest point past which the plan performs no further white-box string operation.
 
-    This motivates the planner to push string-filtering operations as far down the plan as possible, so the auxiliary columns can be released early. As \cref{fig:like-query-plans} illustrates, such push-down is possible in some plans but not in others.
+
+    \parhead{Dropping Auxiliary Columns}
+    The final result check needs only the hash column for the opening process, so the auxiliary columns need not be carried all the way through the plan. Deciding \emph{how long} to keep them matters for efficiency: every extra column makes the downstream operations more expensive, especially the character-level columns, which can be far larger than the original string column. The best place to drop them is the earliest point past which the plan performs no further white-box string operation.
+
+    This motivates the planner to push string-filtering operations as far down the plan as possible, so the auxiliary columns can be released early. As \cref{fig:like-query-plans} illustrates, such push-down is possible in some plans but not in others. Plan~(a) applies a \textsc{not like} predicate to \texttt{o\_comment} above a \textsc{left join}: since the join's right input is nullable, filtering the base \texttt{orders} table is not equivalent to filtering after the join, so the predicate is stuck above the join and the string auxiliary columns must be carried through it. Plans~(b) and~(c), by contrast, apply a \textsc{like} predicate to the base column \texttt{p\_name} across an inner \textsc{join}, where the filter commutes with the join; the optimizer therefore pushes it down to the base scan (b~$\to$~c), letting the auxiliary columns be released before the join.
 
 
 
@@ -43,7 +184,8 @@
   % ---- group (a): single left-join-query plan ----
   \draw[gray!65, dash pattern=on 4pt off 2pt, line width=1pt, rounded corners=10pt]
        (-3.3,-1.9) rectangle (3.3,9.5);
-  % ===================== Plan (b): naive join plan =====================
+  % ===================== Plans (b),(c): grouped, shifted left to sit closer to (a) =====================
+  \begin{scope}[xshift=-1.7cm]
   \node[tbl] (b_line) at (7.0,0)   {\ttfamily lineitem};
   \node[tbl] (b_part) at (9.4,0)   {\ttfamily part};
   \node[op]  (b_join) at (8.2,2.2) {\textbf{Join}\\[1pt]\ttfamily l\_partkey = p\_partkey};
@@ -75,122 +217,8 @@
   \draw[-{Stealth[length=3mm,width=3mm]}, line width=1.4pt, gray!55]
        (10.7,4.3) -- node[above=1pt, font=\footnotesize, text=black, align=center]
        {optimize\\ \scriptsize(filter push-down)} (13.4,4.3);
-  % ===================== SQL queries below each group =====================
-  \node[anchor=north, align=left, font=\scriptsize\ttfamily] at (0,-2.25)
-    {\textbf{SELECT} c\_custkey, o\_orderkey\\
-     \textbf{FROM} customer \textbf{LEFT JOIN} orders \textbf{ON} c\_custkey = o\_custkey\\
-     \textbf{WHERE} o\_comment \textbf{NOT LIKE} '\%special\%requests\%';};
-  \node[anchor=north, align=left, font=\scriptsize\ttfamily] at (12.8,-2.25)
-    {\textbf{SELECT} l.l\_orderkey, p.p\_name\\
-     \textbf{FROM} lineitem l \textbf{JOIN} part p \textbf{ON} l.l\_partkey = p.p\_partkey\\
-     \textbf{WHERE} p.p\_name \textbf{LIKE} '\%green\%';};
+  \end{scope}
 \end{tikzpicture}}
-\caption{TODO}
+\caption{Two \textsc{like} query plans: the filter in~(a) cannot be pushed below the join, whereas the one in~(b,c) can (b~$\to$~c).}
 \label{fig:like-query-plans}
 \ifsp\end{figure*}\else\end{figure}\fi
-
-
-\subsection{Updating the auxiliary columns} The auxiliary columns must stay trusted and in sync with the main column at all times. Since the prover is untrusted, it cannot update them freely: every update must come with a proof of well-formedness. We therefore design protocols that prove the auxiliary columns remain consistent with the main column. Three cases arise in the system: (i)~\emph{column-preserving}---only the activators $\mathsf{a_h}$ and $\mathsf{a_c}$ are freshly materialized, while the remaining columns are inherited unchanged, e.g. the output of a filter operation (\cref{sec:col-preserving}); (ii)~\emph{domain-preserving}---all of the main and auxiliary columns are freshly materialized by the untrusted prover, but no new string is introduced and all the strings are a subset of the input strings, e.g.\ the output of a join operation (\cref{sec:domain-preserving}); and (iii)~\emph{domain-altering}---all of the main and auxiliary columns are freshly materialized by the untrusted prover, and new strings are introduced, e.g.\ the output of a string aggregation operation or a concatenation expression.
-
-Note that the relational algebra core of SQL is (almost) entirely domain-preserving. Selection, projection (restricted to column references, without scalar expressions), all join types (with a caveat below), union, intersect, except, distinct, sort, and limit cannot produce a string that is not present in the input: every string cell in their output is a verbatim copy of some string cell in the input. Grouping and aggregation preserve the domain as well, provided the aggregate functions are value-selecting (e.g., \texttt{MIN}, \texttt{MAX}, \texttt{ANY\_VALUE}) rather than value-constructing (e.g., \texttt{STRING\_AGG}, which concatenates its inputs into a fresh string). Domain alteration in SQL thus arises almost exclusively from the scalar expression language embedded in operators---string constructors such as \texttt{CONCAT} and \texttt{SUBSTRING}, case mapping, casts, and literals---rather than from the relational operators themselves.
-The caveat concerns outer joins: LEFT, RIGHT, and FULL joins pad non-matching rows with NULL, a value not present in the input column. We therefore define the active domain of a column to include NULL [or: handle NULL via a per-cell validity flag], under which outer joins are domain-preserving as well.
-
-\subsubsection{Column-Preserving Update}
-\label{sec:col-preserving}
-As described in \cref{sec:arithmetization}, a string column carries two activators: $\mathsf{a_h}$, marking the active strings on the hash polynomial, and $\mathsf{a_c}$, marking the active characters on the data polynomial. Many of the protocols that follow have the prover commit a fresh pair of such activators, so before relying on it the verifier must confirm that the pair is \emph{valid}: each column is boolean, and the character-level and string-level marks agree (every character of an active string is active, and every character of an inactive string inactive). We package these two requirements as the relation
-\begin{displaymath}
-\NPRelation_{\mathsf{ActValid}} = \left\{\,
-  \NPInstance = \bot,\;
-  \NPInstancey = (\Oracle{\MLE{\mathsf{a_c}}}, \Oracle{\MLE{\mathsf{a_h}}}),\;
-  \NPWitness = (\mathsf{a_c}, \mathsf{a_h})
-  \;\middle|\;
-  \begin{aligned}
-    & \mathsf{a_c}[j], \mathsf{a_h}[i] \in \{0,1\}\ \text{for all } i,j,\ \text{and} \\
-    & \mathsf{a_c}[j] = \mathsf{a_h}[i]\ \text{for every character } j \text{ of string } i
-  \end{aligned}
-\,\right\}.
-\end{displaymath}
-Booleanity is two \cref{piop:boolean-check}s. For consistency we observe that grouping the rows $(\mathsf{orig}, \mathsf{a_c})$ by $\mathsf{orig}$ and summing $\mathsf{a_c}$ within each group must reproduce $\mathsf{l}$ on the active strings (those marked by $\mathsf{a_h}$). Hence, treating $(\mathsf{orig}, \mathsf{a_c})$ as an input table grouped by its key and $(\mathsf{ind}, \mathsf{l})$ with activator $\mathsf{a_h}$ as the grouped output, we invoke the \texttt{Group By Sum} protocol of \cite{cryptoeprint:2026/1260}, a single \cref{piop:keyedsumcheck} invocation.
-\begin{DefinePIOP}{Activator \& Length Consistency Check}{act-len-consistency}
-  \emph{Inputs:} $\Oracle{\MLE{\mathsf{a_c}}}, \Oracle{\MLE{\mathsf{a_h}}}, \Oracle{\MLE{\mathsf{orig}}}, \Oracle{\MLE{\mathsf{ind}}}, \Oracle{\MLE{\mathsf{l}}}$.
-  \begin{enumerate}[nosep]
-    \item (\emph{booleanity}) $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:boolean-check} on $\mathsf{a_c}$ and on $\mathsf{a_h}$.
-    \item (\emph{consistency}) $\PIOPProver$ and $\PIOPVerifier$ define the table $\Left$ with key column $\Left.\key = \mathsf{orig}$, value column $\Left.\val = \mathbf{1}$, and activator $\Left.\act = \mathsf{a_c}$, and the table $\Right$ with key column $\Right.\key = \mathsf{ind}$, value column $\Right.\val = \mathsf{l}$, and activator $\Right.\act = \mathsf{a_h}$. They then invoke \cref{piop:keyedsumcheck} on $\Left$ and $\Right$, which forces $\sum_{j:\,\mathsf{orig}[j]=i}\mathsf{a_c}[j] = \mathsf{a_h}[i]\cdot\mathsf{l}[i]$ for every key $i$.
-  \end{enumerate}
-\end{DefinePIOP}
-
-\subsubsection{Domain-Preserving Update}
-\label{sec:domain-preserving}
-
-
-A domain-preserving update, such as an inner join, re-materializes the full set of main and auxiliary columns of a string column, subject to the guarantee that it introduces no new string into the column. This guarantee is equivalent to the existence of a \emph{source} column $\mathsf{src}$, of the same length as the hash column, that maps each new row back to the row it originates from in the input column. In some cases this source column is already available and trusted---for instance, in the inner-join protocol---while in others it does not exist a priori, so the prover must materialize it, send it freshly, and convince the verifier of its well-formedness, as in the order-by protocol.
-
-Since the prover materializes every new column, the check must establish two things: that the new columns form a well-formed arithmetization, and that no new string is introduced. The second requirement is the expensive one---verified directly, it would require re-hashing the freshly materialized characters---but we obtain it \emph{for free} from the trusted old columns: matching each new string to its source row pins its hash, length, and characters to those of an old string, so the new hash is correct by inheritance and never recomputed. What does \emph{not} come for free is the \emph{structural} shape of the new columns---that $\mathsf{l^{new}}$ counts the characters of each new string and that $\mathsf{o^{new}}$ enumerates their within-word positions without gaps or repeats. These constraints are self-referential to the new columns, untethered to the old ones, and left unchecked they let the prover reorder, duplicate, or drop characters while still passing the source lookups. We therefore certify the structure directly with a handful of cheap checks---no hashing---and only then transfer the content by provenance.
-
-
-
-\begin{DefinePIOP}{Full String Validity Check}{full-str-valid}
-  \emph{Inputs:} the old columns
-  $\Oracle{\MLE{\mathsf{h}}^{\mathsf{old}}}$,
-  $\Oracle{\MLE{\mathsf{l}}^{\mathsf{old}}}$,
-  $\Oracle{\MLE{\mathsf{a_h}}^{\mathsf{old}}}$,
-  $\Oracle{\MLE{\mathsf{c}}^{\mathsf{old}}}$,
-  $\Oracle{\MLE{\mathsf{orig}}^{\mathsf{old}}}$,
-  $\Oracle{\MLE{\mathsf{o}}^{\mathsf{old}}}$,
-  $\Oracle{\MLE{\mathsf{a_c}}^{\mathsf{old}}}$,
-  $\Oracle{\MLE{\mathsf{s_b}}^{\mathsf{old}}}$;
-  the new columns
-  $\Oracle{\MLE{\mathsf{h}}^{\mathsf{new}}}$,
-  $\Oracle{\MLE{\mathsf{l}}^{\mathsf{new}}}$,
-  $\Oracle{\MLE{\mathsf{a_h}}^{\mathsf{new}}}$,
-  $\Oracle{\MLE{\mathsf{c}}^{\mathsf{new}}}$,
-  $\Oracle{\MLE{\mathsf{orig}}^{\mathsf{new}}}$,
-  $\Oracle{\MLE{\mathsf{o}}^{\mathsf{new}}}$,
-  $\Oracle{\MLE{\mathsf{a_c}}^{\mathsf{new}}}$,
-  $\Oracle{\MLE{\mathsf{s_b}}^{\mathsf{new}}}$;
-  and potentially the source column $\Oracle{\MLE{\mathsf{src}}}$.
-  \begin{enumerate}[nosep]
-    \item \emph{(Activators and lengths)} $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:act-len-consistency} on the new columns $(\mathsf{a_c^{new}}, \mathsf{a_h^{new}}, \mathsf{orig^{new}}, \mathsf{ind}, \mathsf{l^{new}})$.
-    \item \emph{(Offset enumeration)} $\PIOPVerifier$ samples $r \samples \F$ and sends it to $\PIOPProver$; the parties then invoke \cref{piop:nodup-check} on a column with data $\mathsf{orig^{new}} + r\,\mathsf{o^{new}}$ and activator $\mathsf{a_c^{new}}$.
-    \item \emph{(Source Column)} If there does not exist a trusted source column apriory:
-    \begin{enumerate}[nosep]
-      \item  $\PIOPProver$ creates $\Oracle{\MLE{\mathsf{src}}}$ and sends it to $\PIOPVerifier$. 
-      \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:lookup-check} on the statement $(\mathsf{\MLE{src}},\mathsf{\MLE{h}^{new}},\mathsf{\MLE{l}^{new}},\mathsf{\MLE{a}_h^{new}})\lookup(\mathsf{\MLE{idx}},\mathsf{\MLE{h}^{old}},\mathsf{\MLE{l}^{old}},\mathsf{\MLE{a}_h^{old}})$.
-    \end{enumerate}
-    \item $\PIOPProver$ broadcasts the $\mathsf{\MLE{src}}$ column of size $N$ to the column $\mathsf{\MLE{src}'}$ of size $M$, then $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:broadcast} on them.
-    \item \label[step]{full-str:char-lookup} $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:lookup-check} on the statement $(\mathsf{\MLE{src'}},\mathsf{\MLE{c}^{new}},\mathsf{\MLE{o}^{new}})\lookup(\mathsf{\MLE{orig}^{old}},\mathsf{\MLE{c}^{old}},\mathsf{\MLE{o}^{old}})$.
-  \end{enumerate}
-\end{DefinePIOP}
-
-\begin{proof}
-We assume the old columns are trusted and form a well-formed arithmetization of an input column: for each old string index $s$, letting $S_s$ denote the $s$-th input string, $\mathsf{l^{old}}[s]=|S_s|$, the characters $j'$ with $\mathsf{orig^{old}}[j']=s$ realize the within-word offsets $\mathsf{o^{old}}[j']\in\{0,\dots,|S_s|-1\}$ bijectively with $\mathsf{c^{old}}[j']=S_s[\mathsf{o^{old}}[j']]$, and $\mathsf{h^{old}}[s]=\mathsf{Hash}(S_s)$. We show that if $\PIOPVerifier$ accepts then, except with probability the sum of the soundness errors of the invoked sub-PIOPs, every active new string equals some old string and the new columns $(\mathsf{h},\mathsf{l},\mathsf{a_h},\mathsf{c},\mathsf{orig},\mathsf{o},\mathsf{a_c})^{\mathsf{new}}$ form a well-formed arithmetization consistent with the new hash column. We condition on acceptance throughout.
-
-\parhead{Structural shape of the new columns}
-By the soundness of \cref{piop:act-len-consistency}, the activators $\mathsf{a_c^{new}},\mathsf{a_h^{new}}$ are boolean, satisfy $\mathsf{a_c^{new}}[j]=\mathsf{a_h^{new}}[\mathsf{orig^{new}}[j]]$ for every character $j$, and obey the length-count identity
-\[ \#\{\,j:\mathsf{orig^{new}}[j]=i,\ \mathsf{a_c^{new}}[j]=1\,\}=\mathsf{a_h^{new}}[i]\cdot\mathsf{l^{new}}[i]\qquad\text{for every }i. \]
-For an active new string $i$ (one with $\mathsf{a_h^{new}}[i]=1$) write $C_i:=\{\,j:\mathsf{orig^{new}}[j]=i,\ \mathsf{a_c^{new}}[j]=1\,\}$ and $L_i:=\mathsf{l^{new}}[i]$; then $|C_i|=L_i$, and by consistency every active character belongs to an active string. By the soundness of \cref{piop:nodup-check} on the column with data $\mathsf{orig^{new}}+r\,\mathsf{o^{new}}$ and activator $\mathsf{a_c^{new}}$, these packed values are pairwise distinct over the active characters; two active characters sharing the pair $(\mathsf{orig^{new}},\mathsf{o^{new}})$ would produce equal packed values, so the pairs are themselves pairwise distinct. In particular the offsets $\mathsf{o^{new}}[j]$ are pairwise distinct within each $C_i$. (The random $r$ is needed only for completeness, so that an honest prover's distinct pairs do not accidentally collide.)
-
-\parhead{Provenance of each string}
-By the soundness of the source lookup (the \cref{piop:lookup-check} of the source-column step), for every active new string $i$ the tuple $(\mathsf{src}[i],\mathsf{h^{new}}[i],\mathsf{l^{new}}[i],\mathsf{a_h^{new}}[i])$ occurs as an active old tuple $(\mathsf{idx}[k],\mathsf{h^{old}}[k],\mathsf{l^{old}}[k],\mathsf{a_h^{old}}[k])$. Since $\mathsf{idx}$ lists the old string indices without repetition, the match pins $k=\mathsf{src}[i]=:s$, whence
-\[ \mathsf{h^{new}}[i]=\mathsf{h^{old}}[s],\qquad \mathsf{l^{new}}[i]=\mathsf{l^{old}}[s]=|S_s|,\qquad \mathsf{a_h^{old}}[s]=1, \]
-so $L_i=|S_s|$ and $s=\mathsf{src}[i]$ is a valid old index. By the soundness of \cref{piop:broadcast}, $\mathsf{src'}[j]=\mathsf{src}[\mathsf{orig^{new}}[j]]$ for every character $j$; hence $\mathsf{src'}[j]=s$ for all $j\in C_i$. By the soundness of the character lookup (\cref{full-str:char-lookup}), each $j\in C_i$ matches an old character $j'$ with
-\[ \mathsf{orig^{old}}[j']=\mathsf{src'}[j]=s,\qquad \mathsf{o^{old}}[j']=\mathsf{o^{new}}[j],\qquad \mathsf{c^{old}}[j']=\mathsf{c^{new}}[j]. \]
-By the well-formedness of the old columns, the old characters of string $s$ exhaust the offsets $\{0,\dots,|S_s|-1\}$ with $\mathsf{c^{old}}[j']=S_s[\mathsf{o^{old}}[j']]$. Therefore, for every $j\in C_i$,
-\[ \mathsf{o^{new}}[j]\in\{0,\dots,L_i-1\}\qquad\text{and}\qquad \mathsf{c^{new}}[j]=S_s\!\left[\mathsf{o^{new}}[j]\right]. \]
-
-\parhead{Each new string equals its source}
-The offsets $\{\mathsf{o^{new}}[j]:j\in C_i\}$ are pairwise distinct (structural step) and contained in $\{0,\dots,L_i-1\}$ (provenance step), while $|C_i|=L_i$; hence $j\mapsto\mathsf{o^{new}}[j]$ is a bijection from $C_i$ onto $\{0,\dots,L_i-1\}$. Reading the characters of new string $i$ in offset order thus yields
-\[ \bigl(\mathsf{c^{new}}\text{ at offset }p\bigr)_{p=0}^{L_i-1}=\bigl(S_s[p]\bigr)_{p=0}^{L_i-1}=S_s. \]
-So new string $i$ equals old string $s=\mathsf{src}[i]$ character for character: no character can be foreign (each value must occur at the matching offset of $S_s$), duplicated, or dropped (the offsets exhaust $\{0,\dots,L_i-1\}$ exactly once). This is where the structural checks are load-bearing---without the length-count identity and the offset-distinctness the same lookups are satisfiable by a reordering, duplication, or truncation of $S_s$.
-
-\parhead{Validity and consistency of the new columns}
-Conditioned on acceptance, the following now hold for every active new string $i$, with $s=\mathsf{src}[i]$:
-\begin{itemize}[nosep]
-  \item \emph{Domain preservation.} New string $i$ equals old string $S_s$, so the update introduces no new string.
-  \item \emph{Hash consistency, inherited.} $\mathsf{h^{new}}[i]=\mathsf{h^{old}}[s]=\mathsf{Hash}(S_s)=\mathsf{Hash}(\text{new string }i)$; the new hash column is the correct hash of the new characters, and is never recomputed.
-  \item \emph{Length consistency.} $\mathsf{l^{new}}[i]=|S_s|$ equals the number of active characters of new string $i$.
-  \item \emph{Offset well-formedness.} $\mathsf{o^{new}}$ enumerates $0,\dots,\mathsf{l^{new}}[i]-1$ exactly once within string $i$.
-  \item \emph{Activator consistency.} $\mathsf{a_c^{new}}$ and $\mathsf{a_h^{new}}$ are boolean, and $\mathsf{a_c^{new}}$ is the broadcast of $\mathsf{a_h^{new}}$ along $\mathsf{orig^{new}}$.
-\end{itemize}
-Hence the new main and auxiliary columns are a well-formed arithmetization consistent with the new hash column, and all of its strings are drawn from the input column. Inactive new strings ($\mathsf{a_h^{new}}[i]=0$) carry only inactive characters and are otherwise unconstrained, as expected of padding. The total soundness error is the sum of the soundness errors of the invoked \cref{piop:act-len-consistency}, \cref{piop:nodup-check}, \cref{piop:broadcast}, and the two \cref{piop:lookup-check} instances. The boundary selector $\mathsf{s_b^{new}}$ and the contiguity of $\mathsf{orig^{new}}$ are not pinned down by this check; a downstream operator that relies on them must certify them separately.
-\end{proof}

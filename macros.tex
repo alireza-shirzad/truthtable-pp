@@ -1,5 +1,6 @@
 % !TEX root = paper.tex
 \newcommand{\papername}{TruthTable++}
+\newcommand{\truthtable}{\mathsf{TruthTable}}
 
 % FORMATTING
 \allowdisplaybreaks
@@ -55,6 +56,30 @@
 }
 \makeatother
 
+% ---- Algorithm boxes (adapted from the int-ext project) ----
+\newcounter{algnum}
+\setcounter{algnum}{0}
+\crefname{Alg}{Algorithm}{Algorithms}
+\Crefname{Alg}{Algorithm}{Algorithms}
+\makeatletter
+% Args: #1 title (shown in the box), #2 label key (alg:#2), #3 body.
+\newcommand{\DefineAlg}[3]{%
+  \begin{mdframed}[nobreak=true,leftline=false,rightline=false]
+    \small
+    \begin{center}
+      \vspace{0.5em}
+      \refstepcounter{algnum}%
+      \textbf{Algorithm \thealgnum:  #1}
+      \rule{\dimexpr\linewidth-\fboxsep-\fboxrule\relax}{0.4pt}
+      \protected@edef\@currentlabelname{#1}%
+      \label[Alg]{alg:#2}%
+    \end{center}
+    \noindent
+    #3
+  \end{mdframed}
+}
+\makeatother
+
 
 %%%%%%%%
 \newcommand{\F}{\mathbb{F}}
@@ -90,12 +115,15 @@
 \newcommand{\Yes}[1]{#1^{{\scriptscriptstyle\mathrm{YES}}}}
 \newcommand{\No}[1]{#1^{{\scriptscriptstyle\mathrm{NO}}}}
 
-
+\newcommand{\actset}{A}
+\newcommand{\act}{\mathsf{a}}
+\newcommand{\data}{\mathsf{d}}
 \newcommand{\col}{\mathsf{c}}
 \newcommand{\MLE}[1]{\tilde{#1}}
 
-
-
+\newcommand{\Relation}[1]{\mathcal{R}_{#1}}
+\newcommand{\Language}[1]{\mathcal{L}_{#1}}
+\newcommand{\op}{\mathsf{op}}
 
 \newcommand{\PIOPProver}{\bf{P}}
 \newcommand{\PIOPVerifier}{\bf{V}}
@@ -103,13 +131,15 @@
 \newcommand{\idxrot}{\idx^{\mathsf{rot}}_\mu}
 \newcommand{\Table}{\mathsf{T}}
 \newcommand{\BoolHCube}[1]{\mathscr{H}_{#1}}
-
+\newcommand{\TableIn}{{\mathsf{I}}}
+\newcommand{\TableOut}{{\mathsf{O}}}
+\newcommand{\TableLeft}{{\mathsf{L}}}
+\newcommand{\TableRight}{{\mathsf{R}}}
 % Low-level PIOP / keyed-sumcheck helpers
 \newcommand{\samples}{\overset{\$}{\leftarrow}}
 \newcommand{\mult}{\cdot}
 \newcommand{\key}{\mathsf{key}}
 \newcommand{\val}{\mathsf{val}}
-\newcommand{\act}{\mathsf{a}}
 \newcommand{\Left}{\mathsf{L}}
 \newcommand{\Right}{\mathsf{R}}
 \newcommand{\elem}{\kappa}
