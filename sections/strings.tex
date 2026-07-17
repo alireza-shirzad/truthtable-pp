@@ -38,42 +38,48 @@ In this section we develop PIOPs for SQL \emph{wild-card} pattern matching --- t
 The most common kind of string pattern matching in natural SQL workloads is a multi-character pattern of the form $p_1 \% p_2 \% \dots \% p_t$, where each factor $p_i$ is a literal string and \% matches an arbitrary-length run of characters; the predicate holds iff the factors occur \emph{in order} and \emph{without overlap} within the value, with the leading and trailing \% (or their absence) anchoring the match to the start and/or end. A \emph{single-factor} pattern is simply the case $t=1$, so we treat it as a special case of the general protocol rather than a separate construction.
 
 
-
-
-
 \begin{DefinePIOP}{Multi-Character Pattern Matching}{multi-char-pattern-matching}[Multi-Character Pattern Matching]
   \emergencystretch=3em\relax
+  \emph{Inputs:} the pattern factors $\mathcal{P}=(p_1,\dots,p_t)$, of total length $k:=\sum_{i=1}^{t}|p_i|$, together with their anchoring modes $\text{mode}_j$; the input activators $\Oracle{\MLE{\mathsf{a^{old}}}}$ and $\Oracle{\MLE{\mathsf{char\text{-}act^{old}}}}$; the claimed result activators $\Oracle{\MLE{\mathsf{a^{new}}}}$ and $\Oracle{\MLE{\mathsf{char\text{-}act^{new}}}}$; and the fixed columns $\Oracle{\MLE{\mathsf{char}}}, \Oracle{\MLE{\mathsf{bnd}}}, \Oracle{\MLE{\mathsf{orig\text{-}ind}}}, \Oracle{\MLE{\mathsf{int\text{-}ind}}}, \Oracle{\MLE{\mathsf{ind}}}, \Oracle{\MLE{\mathsf{l}}}$.
+  \vspace{2mm}
   \begin{enumerate}[nosep]
     \item (\emph{Activator validity})\label[step]{mc:validity} $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:data-preserving-update-check} on $(\mathsf{char\text{-}act^{new}}, \mathsf{a^{new}}, \mathsf{orig\text{-}ind}, \mathsf{ind}, \mathsf{l})$.
-    \item (\emph{Length filtering})\label[step]{mc:filter} $\PIOPProver$ computes $\mathsf{a^{old'}}, \mathsf{char\text{-}act^{old'}}$, the result of dropping strings shorter than $k:=\sum_{i=1}^{t}|p_i|$, and the parties invoke \cref{piop:len-filter} on $(\mathsf{a^{old}}, \mathsf{char\text{-}act^{old}}, \mathsf{a^{old'}}, \mathsf{char\text{-}act^{old'}})$ with threshold $k$.
+    \item (\emph{Length filtering})\label[step]{mc:filter} $\PIOPProver$ computes $\mathsf{a^{old'}}, \mathsf{char\text{-}act^{old'}}$, the result of dropping strings shorter than $k$, and the parties invoke \cref{piop:len-filter} on $(\mathsf{a^{old}}, \mathsf{char\text{-}act^{old}}, \mathsf{a^{old'}}, \mathsf{char\text{-}act^{old'}})$ with threshold $k$.
     \item (\emph{Containment})\label[step]{mc:containment} $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:zerocheck} on $\mathsf{a^{new}}\cdot(1-\mathsf{a^{old'}})$.
-    \item (\emph{Initialization})\label[step]{mc:init} The parties set $\mathsf{alive_h^{(0)}}:=\mathsf{a^{old'}}$ and $\mathsf{alive_c^{(0)}}:=\mathsf{char\text{-}act^{old'}}$.
-    \item (\emph{Sweep})\label[step]{mc:sweep} For $j=1,\dots,t$, $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:factor-placement} on $(p_j,\text{mode}_j)$ with input activators $(\mathsf{alive_h^{(j-1)}}, \mathsf{alive_c^{(j-1)}})$, obtaining the match indicator $\mathsf{match}_j$ and placement $\mathsf{start}_j$. $\PIOPProver$ then forms and commits the round-$j$ state
-    \begin{align*}
-      \mathsf{alive_h^{(j)}}[i] &:= \mathsf{alive_h^{(j-1)}}[i]\cdot\mathsf{match}_j[i], \\
-      \mathsf{alive_c^{(j)}}[c] &:= \mathsf{alive_c^{(j-1)}}[c]\cdot\mathsf{alive_h^{(j)}}[\mathsf{orig\text{-}ind}[c]]\cdot\mathbf{1}\bigl[\mathsf{int\text{-}ind}[c]\ge\mathsf{start}_j[\mathsf{orig\text{-}ind}[c]]+|p_j|\bigr],
-    \end{align*}
-    so a string stays alive iff it was alive and $p_j$ was placed, and a character stays available iff its string is still alive and it lies past the placement of $p_j$ (all characters of a dropped string switch off). The parties verify this by
+    \item (\emph{Sweep})\label[step]{mc:sweep} $\PIOPProver$ and $\PIOPVerifier$ invoke start sweeping patterns $p_1,\dots,p_t$ as follows:
     \begin{enumerate}[nosep]
-      \item a \cref{piop:zerocheck} on $\mathsf{alive_h^{(j)}}-\mathsf{alive_h^{(j-1)}}\cdot\mathsf{match}_j$;
-      \item $\PIOPProver$ broadcasts $\mathsf{alive_h^{(j)}}$ and $\mathsf{start}_j$ to character level (written with a prime); a \cref{piop:sign-check} forms $\mathbf{1}[\mathsf{int\text{-}ind}\ge\mathsf{start}_j'+|p_j|]$, and the parties invoke a \cref{piop:boolean-check} on $\mathsf{alive_c^{(j)}}$ and a \cref{piop:zerocheck} on $\mathsf{alive_c^{(j)}}-\mathsf{alive_c^{(j-1)}}\cdot\mathsf{alive_h^{(j)}}'\cdot\mathbf{1}[\mathsf{int\text{-}ind}\ge\mathsf{start}_j'+|p_j|]$.
-    \end{enumerate}
+    \item (\emph{Initialization})\label[step]{mc:init} $\PIOPProver$ and $\PIOPVerifier$ set $\mathsf{alive_h^{(0)}}:=\mathsf{a^{old'}}$ and $\mathsf{alive_c^{(0)}}:=\mathsf{char\text{-}act^{old'}}$.
+        \item For $j=1,\dots,t$, $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:factor-placement} on $(p_j, \mathsf{alive_h^{(j-1)}},\mathsf{alive_c^{(j-1)}},\Oracle{\MLE{\mathsf{char}}}, \Oracle{\MLE{\mathsf{bnd}}}, \allowbreak\Oracle{\MLE{\mathsf{orig\text{-}ind}}},\allowbreak \Oracle{\MLE{\mathsf{int\text{-}ind}}},\allowbreak \Oracle{\MLE{\mathsf{ind}}})$ obtaining the match indicator $\mathsf{match}_j$ and placement $\mathsf{start}_j$.
+    \item (\emph{Past-placement indicator})\label[step]{mc:past} $\PIOPProver$ broadcasts $\mathsf{start}_j$ to character level as $\mathsf{start}_j'$ via \cref{piop:broadcast}, and the parties invoke the Non-Negative \cref{piop:sign-check} on $\mathsf{int\text{-}ind}[c]-\mathsf{start}_{j}'[c]-|p_{j}|$, receiving the indicator we denote by $\mathsf{past}_{j}$, so that
+    \begin{align*}
+      \mathsf{past}_{j}[c] = \mathbf{1}\bigl[\mathsf{int\text{-}ind}[c]\ge\mathsf{start}_{j}'[c]+|p_{j}|\bigr],
+    \end{align*}
+    \end{enumerate} 
+    \item \emph{(Updating the activators)} $\PIOPProver$ and $\PIOPVerifier$ update the following columns:
+    \begin{align*}
+      \mathsf{alive_h^{(j)}}[i] &:= \mathsf{alive_h^{(j-1)}}[i]\cdot\mathsf{match}_j[i]\\
+      \mathsf{alive_c^{(j)}}[c] &:= \mathsf{alive_c^{(j-1)}}[c]\cdot\mathsf{alive_h^{(j)}}[\mathsf{orig\text{-}ind}[c]]\cdot\mathsf{past}_{j}[c],
+    \end{align*}
+      Then $\PIOPProver$ broadcasts $\mathsf{alive_h^{(j)}}$ to character level $\mathsf{alive_h^{(j)}}'$, and the parties invoke a \cref{piop:boolean-check} on $\mathsf{alive_c^{(j)}}$ and a \cref{piop:zerocheck} on $\mathsf{alive_c^{(j)}}-\mathsf{alive_c^{(j-1)}}\cdot\mathsf{alive_h^{(j)}}'\cdot\mathsf{past}_{j}$.
     \item (\emph{Verdict})\label[step]{mc:verdict} $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:zerocheck} on $\mathsf{a^{new}}\cdot(1-\mathsf{alive_h^{(t)}})$ and on $\mathsf{alive_h^{(t)}}\cdot(1-\mathsf{a^{new}})$, certifying $\mathsf{a^{new}}=\mathsf{alive_h^{(t)}}$.
   \end{enumerate}
 \end{DefinePIOP}
 
+the pattern $p=(\mathsf{str},\mathsf{mode})$ where $\mathsf{str}$ of length $\ell$ and a mode $\in\{\text{prefix},\text{suffix},\text{infix}\}$; the input activators $\Oracle{\MLE{\mathsf{a}}}$  and $\Oracle{\MLE{\mathsf{char\text{-}act}}}$  delimiting the active region; and the fixed columns $\Oracle{\MLE{\mathsf{char}}}, \Oracle{\MLE{\mathsf{bnd}}}, \Oracle{\MLE{\mathsf{orig\text{-}ind}}}, \Oracle{\MLE{\mathsf{int\text{-}ind}}}, \Oracle{\MLE{\mathsf{ind}}}$.
+
 \begin{DefinePIOP}{Factor Placement}{factor-placement}[Factor Placement]
-  \emph{Inputs:} the factor $\mathsf{str}$ of length $k$ and a mode $\in\{\text{prefix},\text{suffix},\text{infix}\}$; the input activators $\Oracle{\MLE{\mathsf{a}}}$ (string-level) and $\Oracle{\MLE{\mathsf{char\text{-}act}}}$ (character-level) delimiting the active region; and the fixed columns $\Oracle{\MLE{\mathsf{char}}}, \Oracle{\MLE{\mathsf{bnd}}}, \Oracle{\MLE{\mathsf{orig\text{-}ind}}}, \Oracle{\MLE{\mathsf{int\text{-}ind}}}, \Oracle{\MLE{\mathsf{ind}}}$. \emph{Outputs:} the match indicator $\mathsf{match}$ and the placement $\mathsf{start}$.
+  \emph{Inputs:} $p=(\mathsf{str},\mathsf{mode}), \Oracle{\MLE{\mathsf{a}}},\Oracle{\MLE{\mathsf{char\text{-}act}}},\Oracle{\MLE{\mathsf{char}}}, \Oracle{\MLE{\mathsf{bnd}}}, \Oracle{\MLE{\mathsf{orig\text{-}ind}}}, \Oracle{\MLE{\mathsf{int\text{-}ind}}}, \Oracle{\MLE{\mathsf{ind}}}$.
+  \vspace{2mm}
   \begin{enumerate}[nosep]
-    \item (\textit{Rotated character columns}) $\PIOPProver$ sends $\mathsf{char}^{(1)},\ldots,\mathsf{char}^{(k-1)}$, each $\mathsf{char}^{(\delta)}$ a rotation of $\mathsf{char}^{(\delta-1)}$ by $-1$ (so $\mathsf{char}^{(\delta)}[p] = \mathsf{char}[p+\delta]$) and $\mathsf{char}^{(0)} := \mathsf{char}$. Then the parties invoke \cref{piop:rotcheck} on each $(\mathsf{char}^{(\delta-1)}, \mathsf{char}^{(\delta)}, -1)$.
-    \item (\textit{Window fingerprinting}) $\PIOPVerifier$ samples $r_0,\ldots,r_{k-1} \samples \F$; the parties form $\mathsf{wf} := \sum_{\delta=0}^{k-1} r_\delta\,\mathsf{char}^{(\delta)}$, $\mathsf{pf} := \sum_{\delta=0}^{k-1} r_\delta\,\mathsf{str}[\delta]$, and $\mathsf{diff} := \mathsf{wf}-\mathsf{pf}$.
+    \item (\textit{Rotated character columns}) $\PIOPProver$ computes $\mathsf{char}^{(1)},\ldots,\mathsf{char}^{(\ell-1)}$ and sends them to $\PIOPVerifier$, where each $\mathsf{char}^{(\delta)}$ is a rotation of $\mathsf{char}^{(\delta-1)}$ by $-1$ (so $\mathsf{char}^{(\delta)}[p] = \mathsf{char}[p+\delta]$) and $\mathsf{char}^{(0)} := \mathsf{char}$.  Then for $\delta=1,\dots,\ell-1$, the parties invoke \cref{piop:rotcheck} on each pair $(\mathsf{char}^{(\delta-1)}, \mathsf{char}^{(\delta)}, -1)$.
+    \item (\textit{Window fingerprinting}) $\PIOPVerifier$ samples $r_0,\ldots,r_{\ell-1} \samples \F$; the parties form $\mathsf{wf} := \sum_{\delta=0}^{\ell-1} r_\delta\,\mathsf{char}^{(\delta)}$, $\mathsf{pf} := \sum_{\delta=0}^{\ell-1} r_\delta\,\mathsf{str}[\delta]$, and $\mathsf{diff} := \mathsf{wf}-\mathsf{pf}$.
     \item (\textit{Attention mask}) $\PIOPProver$ and $\PIOPVerifier$ fix the attention mask $\mathsf{att\_mask}$ according to the mode:
     \begin{enumerate}[nosep]
       \item \emph{prefix}: $\mathsf{att\_mask} := \mathsf{char\text{-}act}\cdot\mathsf{bnd}$;
-      \item \emph{suffix}: $\PIOPProver$ sends $\mathsf{att\_mask} := \rho_{-k}(\mathsf{char\text{-}act}\cdot\mathsf{bnd})$ and the parties invoke \cref{piop:rotcheck} on $(\mathsf{char\text{-}act}\cdot\mathsf{bnd},\,\mathsf{att\_mask},\,-k)$;
-      \item \emph{infix}: $\PIOPProver$ sends the rotated boundary markers $\mathsf{bnd}^{(1)},\ldots,\mathsf{bnd}^{(k-1)}$ ($\mathsf{bnd}^{(0)}:=\mathsf{bnd}$, each a rotation of the previous by $-1$); the parties invoke \cref{piop:rotcheck} for each $(\mathsf{bnd}^{(j-1)},\mathsf{bnd}^{(j)},-1)$ and set $\mathsf{att\_mask} := \mathsf{char\text{-}act}\cdot\bigl(1-\textstyle\sum_{j=1}^{k-1}\mathsf{bnd}^{(j)}\bigr)$.
+      \item \emph{suffix}: $\PIOPProver$ computes $\mathsf{att\_mask} := \rho_{-\ell}(\mathsf{char\text{-}act}\cdot\mathsf{bnd})$ and sends it to $\PIOPVerifier$. The parties then invoke \cref{piop:rotcheck} on $(\mathsf{char\text{-}act}\cdot\mathsf{bnd},\,\mathsf{att\_mask},\,-\ell)$;
+      \item \emph{infix}: $\PIOPProver$ computes the rotated boundary markers $\mathsf{bnd}^{(1)},\ldots,\mathsf{bnd}^{(\ell-1)}$ and sends them to $\PIOPVerifier$, where $\mathsf{bnd}^{(0)}:=\mathsf{bnd}$ and each $\mathsf{bnd}^{(j)}$ is a rotation of $\mathsf{bnd}^{(j-1)}$ by $-1$ (so $\mathsf{bnd}^{(j)}[i] = \mathsf{bnd}[i+j]$); the parties invoke \cref{piop:rotcheck} for each $(\mathsf{bnd}^{(j-1)},\mathsf{bnd}^{(j)},-1)$ and set $\mathsf{att\_mask} := \mathsf{char\text{-}act}\cdot\bigl(1-\textstyle\sum_{j=1}^{\ell-1}\mathsf{bnd}^{(j)}\bigr)$.
     \end{enumerate}
-    \item (\textit{Occurrence column})\label[step]{fp:occurs} $\PIOPProver$ sends $\mathsf{occurs}$, which is $1$ at the start of every occurrence of $\mathsf{str}$ among the candidate windows, and the parties establish its validity by
+    \item (\textit{Occurrence column})\label[step]{fp:occurs} $\PIOPProver$ computes $\mathsf{occurs}$ and sends it to $\PIOPVerifier$, which is $1$ at the start of every occurrence of $\mathsf{str}$ among the candidate windows, and the parties establish its validity by
     \begin{enumerate}[nosep]
       \item a \cref{piop:boolean-check} on $\mathsf{occurs}$;
       \item a \cref{piop:zerocheck} on $\mathsf{occurs}\cdot(1-\mathsf{att\_mask})$, so every mark is a candidate window;
@@ -98,127 +104,133 @@ The most common kind of string pattern matching in natural SQL workloads is a mu
   \end{enumerate}
 \end{DefinePIOP}
 
-\ifsp\begin{figure*}[t!]\else\begin{figure}[H]\fi
+\ifsp\begin{figure*}[p]\else\begin{figure}[p]\fi
 \centering
 \resizebox{\textwidth}{!}{%
 \begin{tikzpicture}[
-    cell/.style={draw, minimum size=6mm, inner sep=0pt, font=\small},
+    cell/.style={draw, minimum size=5.6mm, inner sep=0pt, font=\small},
+    scell/.style={draw, minimum size=5.6mm, inner sep=0pt, font=\small},
     rowlab/.style={font=\small\itshape, anchor=east},
     hd/.style={font=\small\bfseries}]
-  % Shared SFMC example. Column: ruse virus crust brus(inactive) to(short) cat ; str=rus, k=3.
-  %   ruse -> prefix match | virus -> suffix match | crust -> infix-only match
-  %   brus -> would match but INACTIVE (a_c^old=0) | to -> too short (a_c^old'=0) | cat -> non-match
-  %   diff=0 at every "rus" window: p = 0, 6, 10, 15 (15 is the inactive brus).
-  \def\ysrc{-0.62}\def\ysb{-1.24}\def\yaold{-1.86}\def\yaoldm{-2.48}
-  \def\ywf{-3.10}\def\ydiff{-3.72}
-  \def\ymapre{-4.34}\def\ynewpre{-4.96}
-  \def\ymasuf{-5.58}\def\ynewsuf{-6.20}
-  \def\ymainf{-6.82}\def\ynewinf{-7.44}\def\ymfp{-8.06}
-  %==================== Panel 1: string-level columns ====================
-  % headers
-  \node[hd] at (1.3,5.65){$\mathsf{h}$};
-  \node[hd] at (2.1,5.65){$\mathsf{l}$};
-  \node[hd] at (3.1,5.65){$\mathsf{a^{old}}$};
-  \node[hd] at (4.3,5.65){$\mathsf{a^{old'}}$};
-  \node[hd] at (6.8,6.05){$\mathsf{a^{new}}$};
-  \node[font=\scriptsize\ttfamily] at (5.6,5.62){rus\%};
-  \node[font=\scriptsize\ttfamily] at (6.8,5.62){\%rus};
-  \node[font=\scriptsize\ttfamily] at (8.0,5.62){\%rus\%};
-  % rows: i / name / b / l / m_h / a_h^old / a_h^old' / a_h^new(pre) / (suf) / (inf)
-  \foreach \i/\nm/\bb/\ll/\mh/\ao/\amm/\np/\ns/\nf in {%
-      0/ruse/0/4/0/1/1/1/0/1, 1/virus/4/5/0/1/1/0/1/1, 2/crust/9/5/0/1/1/0/0/1,
-      3/brus/14/4/0/0/0/0/0/0, 4/to/18/2/1/1/0/0/0/0, 5/cat/20/3/0/1/1/0/0/0}{
-    \pgfmathsetmacro{\yy}{5.0 - \i*0.6}
-    \edef\aof{\ifnum\ao=1 green!30\else gray!12\fi}
-    \edef\amf{\ifnum\amm=1 green!30\else gray!12\fi}
-    \edef\npf{\ifnum\np=1 green!30\else gray!12\fi}
-    \edef\nsf{\ifnum\ns=1 green!30\else gray!12\fi}
-    \edef\nff{\ifnum\nf=1 green!30\else gray!12\fi}
-    \node[font=\small\ttfamily, anchor=west] at (-0.5,\yy){\nm};
-    \node[cell,fill=gray!8] at (1.3,\yy){$h_{\i}$};
-    \node[cell,fill=gray!8] at (2.1,\yy){\ll};
-    \node[cell,fill=\aof]    at (3.1,\yy){\ao};
-    \node[cell,fill=\amf]    at (4.3,\yy){\amm};
-    \node[cell,fill=\npf]    at (5.6,\yy){\np};
-    \node[cell,fill=\nsf]    at (6.8,\yy){\ns};
-    \node[cell,fill=\nff]    at (8.0,\yy){\nf};
-  }
-  %==================== Panel 2: character-level columns ====================
-  % string-name headers
-  \foreach \cx/\nm in {0.9/ruse, 3.6/virus, 6.6/crust, 9.3/{brus}, 11.1/{to}, 12.6/cat}{
-    \node[font=\scriptsize\ttfamily] at (\cx,1.28){\nm};}
-  % char + src rows
-  \foreach \p/\ch/\s/\cc in {0/r/0/blue!15,1/u/0/blue!15,2/s/0/blue!15,3/e/0/blue!15,
-      4/v/1/green!18,5/i/1/green!18,6/r/1/green!18,7/u/1/green!18,8/s/1/green!18,
-      9/c/2/orange!18,10/r/2/orange!18,11/u/2/orange!18,12/s/2/orange!18,13/t/2/orange!18,
-      14/b/3/gray!28,15/r/3/gray!28,16/u/3/gray!28,17/s/3/gray!28,
-      18/t/4/purple!12,19/o/4/purple!12,
-      20/c/5/cyan!16,21/a/5/cyan!16,22/t/5/cyan!16}{
-    \pgfmathsetmacro{\px}{\p*0.6}
-    \node[font=\scriptsize,gray] at (\px,0.62){\p};
-    \node[cell,fill=\cc] at (\px,0){\texttt{\ch}};
-    \node[cell,fill=\cc] at (\px,\ysrc){\s};}
-  % s_b
-  \foreach \p in {0,...,22}{\pgfmathsetmacro{\px}{\p*0.6}\node[cell,fill=gray!12] at (\px,\ysb){0};}
-  \foreach \p in {0,4,9,14,18,20}{\pgfmathsetmacro{\px}{\p*0.6}\node[cell,fill=yellow!35] at (\px,\ysb){1};}
-  % a_c^old: 0 on inactive brus (14-17)
-  \foreach \p in {0,...,22}{\pgfmathsetmacro{\px}{\p*0.6}\node[cell,fill=green!30] at (\px,\yaold){1};}
-  \foreach \p in {14,15,16,17}{\pgfmathsetmacro{\px}{\p*0.6}\node[cell,fill=gray!15] at (\px,\yaold){0};}
-  % a_c^old': also drop short "to" (18-19)
-  \foreach \p in {0,...,22}{\pgfmathsetmacro{\px}{\p*0.6}\node[cell,fill=green!30] at (\px,\yaoldm){1};}
-  \foreach \p in {14,15,16,17,18,19}{\pgfmathsetmacro{\px}{\p*0.6}\node[cell,fill=gray!15] at (\px,\yaoldm){0};}
-  % wf trigrams
-  \foreach \p/\tg in {0/rus,1/use,2/sev,3/evi,4/vir,5/iru,6/rus,7/usc,8/scr,9/cru,10/rus,
-      11/ust,12/stb,13/tbr,14/bru,15/rus,16/ust,17/sto,18/toc,19/oca,20/cat,21/{at.},22/{t..}}{
-    \pgfmathsetmacro{\px}{\p*0.6}\node[cell,fill=gray!10] at (\px,\ywf){\scriptsize\texttt{\tg}};}
-  \foreach \p in {0,6,10,15}{\pgfmathsetmacro{\px}{\p*0.6}\node[cell,fill=orange!35] at (\px,\ywf){\scriptsize\texttt{rus}};}
-  % diff
-  \foreach \p in {0,...,22}{\pgfmathsetmacro{\px}{\p*0.6}\node[cell,fill=gray!10] at (\px,\ydiff){\scriptsize$\neq0$};}
-  \foreach \p in {0,6,10,15}{\pgfmathsetmacro{\px}{\p*0.6}\node[cell,fill=green!35] at (\px,\ydiff){0};}
-  % prefix att_mask + new
-  \foreach \p in {0,...,22}{\pgfmathsetmacro{\px}{\p*0.6}\node[cell,fill=gray!12] at (\px,\ymapre){0};}
-  \foreach \p in {0,4,9,20}{\pgfmathsetmacro{\px}{\p*0.6}\node[cell,fill=cyan!40] at (\px,\ymapre){1};}
-  \foreach \p in {0,...,22}{\pgfmathsetmacro{\px}{\p*0.6}\node[cell,fill=gray!12] at (\px,\ynewpre){0};}
-  \foreach \p in {0,1,2,3}{\pgfmathsetmacro{\px}{\p*0.6}\node[cell,fill=green!30] at (\px,\ynewpre){1};}
-  % suffix att_mask + new
-  \foreach \p in {0,...,22}{\pgfmathsetmacro{\px}{\p*0.6}\node[cell,fill=gray!12] at (\px,\ymasuf){0};}
-  \foreach \p in {1,6,11,20}{\pgfmathsetmacro{\px}{\p*0.6}\node[cell,fill=red!30] at (\px,\ymasuf){1};}
-  \foreach \p in {0,...,22}{\pgfmathsetmacro{\px}{\p*0.6}\node[cell,fill=gray!12] at (\px,\ynewsuf){0};}
-  \foreach \p in {4,5,6,7,8}{\pgfmathsetmacro{\px}{\p*0.6}\node[cell,fill=green!30] at (\px,\ynewsuf){1};}
-  % infix att_mask + new + m_fp
-  \foreach \p in {0,...,22}{\pgfmathsetmacro{\px}{\p*0.6}\node[cell,fill=gray!12] at (\px,\ymainf){0};}
-  \foreach \p in {0,1,4,5,6,9,10,11,20}{\pgfmathsetmacro{\px}{\p*0.6}\node[cell,fill=teal!35] at (\px,\ymainf){1};}
-  \foreach \p in {0,...,22}{\pgfmathsetmacro{\px}{\p*0.6}\node[cell,fill=gray!12] at (\px,\ynewinf){0};}
-  \foreach \p in {0,1,2,3,4,5,6,7,8,9,10,11,12,13}{\pgfmathsetmacro{\px}{\p*0.6}\node[cell,fill=green!30] at (\px,\ynewinf){1};}
-  \foreach \p in {0,...,22}{\pgfmathsetmacro{\px}{\p*0.6}\node[cell,fill=gray!12] at (\px,\ymfp){0};}
-  \foreach \p in {0,6,10}{\pgfmathsetmacro{\px}{\p*0.6}\node[cell,fill=green!55] at (\px,\ymfp){1};}
-  % match boxes on the char row: solid = kept matches, dashed = excluded inactive match
-  \foreach \p in {0,6,10}{\pgfmathsetmacro{\pxl}{\p*0.6-0.3}\pgfmathsetmacro{\pxr}{(\p+2)*0.6+0.3}%
-    \draw[red,thick] (\pxl,0.32) rectangle (\pxr,-0.32);}
-  \pgfmathsetmacro{\pxl}{15*0.6-0.3}\pgfmathsetmacro{\pxr}{17*0.6+0.3}
-  \draw[red,thick,dashed] (\pxl,0.32) rectangle (\pxr,-0.32);
-  % padding ellipsis
-  \pgfmathsetmacro{\dx}{23.4*0.6}
-  \foreach \y in {0,\ysrc,\ysb,\yaold,\yaoldm,\ywf,\ydiff,\ymapre,\ynewpre,\ymasuf,\ynewsuf,\ymainf,\ynewinf,\ymfp}{
-    \node at (\dx,\y){$\cdots$};}
-  % row labels
-  \node[rowlab] at (-0.4,0.62){pos};
-  \node[rowlab] at (-0.4,0){$\mathsf{char}$};
-  \node[rowlab] at (-0.4,\ysrc){$\mathsf{orig\text{-}ind}$};
-  \node[rowlab] at (-0.4,\ysb){$\mathsf{bnd}$};
-  \node[rowlab] at (-0.4,\yaold){$\mathsf{char\text{-}act^{old}}$};
-  \node[rowlab] at (-0.4,\yaoldm){$\mathsf{char\text{-}act^{old'}}$};
-  \node[rowlab] at (-0.4,\ywf){$\mathsf{wf}$};
-  \node[rowlab] at (-0.4,\ydiff){$\mathsf{diff}$};
-  \node[rowlab] at (-0.4,\ymapre){$\mathsf{att\_mask}$\,\scriptsize\texttt{(rus\%)}};
-  \node[rowlab] at (-0.4,\ynewpre){$\mathsf{char\text{-}act^{new}}$};
-  \node[rowlab] at (-0.4,\ymasuf){$\mathsf{att\_mask}$\,\scriptsize\texttt{(\%rus)}};
-  \node[rowlab] at (-0.4,\ynewsuf){$\mathsf{char\text{-}act^{new}}$};
-  \node[rowlab] at (-0.4,\ymainf){$\mathsf{att\_mask}$\,\scriptsize\texttt{(\%rus\%)}};
-  \node[rowlab] at (-0.4,\ynewinf){$\mathsf{char\text{-}act^{new}}$};
-  \node[rowlab] at (-0.4,\ymfp){$\mathsf{occurs}$\,\scriptsize\texttt{(\%rus\%)}};
+  % Sweep example: pattern ab%bd%ef, factors ab, bd, ef; words:
+  %   w0 ghiabkbd (drops R3), w1 abdabf (drops R2), w2 abbdef (INACTIVE), w3 abxbdgefk (matches).
+  \def\cw{0.58}
+  % ---- y coordinates ----
+  \def\ychar{0}\def\yorig{-0.6}\def\yint{-1.2}\def\ybnd{-1.8}\def\yacold{-2.4}\def\yac{-3.0}
+  \def\yocA{-5.1}\def\yaA{-5.7}
+  \def\yocB{-8.3}\def\yaB{-8.9}
+  \def\yocC{-11.5}\def\yaC{-12.1}
+  % ---- word-name headers over the character groups ----
+  \foreach \cx/\nm in {2.03/ghiabkbd, 5.51/abbd, 8.41/abdabf, 11.89/abbdef, 16.24/abxbdgefk}{
+    \node[font=\footnotesize\ttfamily] at (\cx,0.92){\nm};}
+  % ---- base rows: char / orig-ind / int-ind / bnd ----
+  \foreach \p/\ch/\o/\ii/\bb in {%
+      0/g/0/0/1,1/h/0/1/0,2/i/0/2/0,3/a/0/3/0,4/b/0/4/0,5/k/0/5/0,6/b/0/6/0,7/d/0/7/0,
+      8/a/1/0/1,9/b/1/1/0,10/b/1/2/0,11/d/1/3/0,
+      12/a/2/0/1,13/b/2/1/0,14/d/2/2/0,15/a/2/3/0,16/b/2/4/0,17/f/2/5/0,
+      18/a/3/0/1,19/b/3/1/0,20/b/3/2/0,21/d/3/3/0,22/e/3/4/0,23/f/3/5/0,
+      24/a/4/0/1,25/b/4/1/0,26/x/4/2/0,27/b/4/3/0,28/d/4/4/0,29/g/4/5/0,30/e/4/6/0,31/f/4/7/0,32/k/4/8/0}{
+    \pgfmathsetmacro{\px}{\p*\cw}
+    \edef\gc{\ifcase\o blue!15\or purple!16\or green!18\or black!12\or orange!22\fi}
+    \edef\bc{\ifnum\bb=1 yellow!35\else gray!8\fi}
+    \node[font=\scriptsize,gray] at (\px,0.52){\p};
+    \node[cell,fill=\gc]    at (\px,\ychar){\texttt{\ch}};
+    \node[cell,fill=\gc]    at (\px,\yorig){\o};
+    \node[cell,fill=gray!6] at (\px,\yint){\ii};
+    \node[cell,fill=\bc]    at (\px,\ybnd){\bb};}
+  % ---- char-act^{old} (pre-filter): active on w0,abbd,w2,w4; off only on inactive abbdef (w3) ----
+  \foreach \p in {0,...,32}{\pgfmathsetmacro{\px}{\p*\cw}\node[cell,fill=gray!14] at (\px,\yacold){0};}
+  \foreach \p in {0,...,17}{\pgfmathsetmacro{\px}{\p*\cw}\node[cell,fill=green!30] at (\px,\yacold){1};}
+  \foreach \p in {24,...,32}{\pgfmathsetmacro{\px}{\p*\cw}\node[cell,fill=green!30] at (\px,\yacold){1};}
+  % ---- char-act^{old'} = alive_c^{(0)} (post-filter): active on w0,w2,w4; off on filtered abbd (w1) and inactive abbdef (w3) ----
+  \foreach \p in {0,...,32}{\pgfmathsetmacro{\px}{\p*\cw}\node[cell,fill=gray!14] at (\px,\yac){0};}
+  \foreach \p in {0,...,7}{\pgfmathsetmacro{\px}{\p*\cw}\node[cell,fill=green!30] at (\px,\yac){1};}
+  \foreach \p in {12,...,17}{\pgfmathsetmacro{\px}{\p*\cw}\node[cell,fill=green!30] at (\px,\yac){1};}
+  \foreach \p in {24,...,32}{\pgfmathsetmacro{\px}{\p*\cw}\node[cell,fill=green!30] at (\px,\yac){1};}
+  % ==================== Round 1 : p1 = ab ====================
+  \draw[gray!55] (-2.6,-3.8) -- (23.0,-3.8);
+  \node[hd,anchor=west] at (-2.6,-4.3){Round 1: place $p_1=\texttt{ab}$};
+  \foreach \p in {0,...,32}{\pgfmathsetmacro{\px}{\p*\cw}\node[cell,fill=gray!8] at (\px,\yocA){0};}
+  \foreach \p in {3,12,15,24}{\pgfmathsetmacro{\px}{\p*\cw}\node[cell,fill=orange!45] at (\px,\yocA){1};}
+  \foreach \p in {0,...,32}{\pgfmathsetmacro{\px}{\p*\cw}\node[cell,fill=gray!14] at (\px,\yaA){0};}
+  \foreach \p in {5,6,7,14,15,16,17,26,27,28,29,30,31,32}{\pgfmathsetmacro{\px}{\p*\cw}\node[cell,fill=green!30] at (\px,\yaA){1};}
+  % ==================== Round 2 : p2 = bd ====================
+  \draw[gray!55] (-2.6,-7.0) -- (23.0,-7.0);
+  \node[hd,anchor=west] at (-2.6,-7.5){Round 2: place $p_2=\texttt{bd}$};
+  \foreach \p in {0,...,32}{\pgfmathsetmacro{\px}{\p*\cw}\node[cell,fill=gray!8] at (\px,\yocB){0};}
+  \foreach \p in {6,27}{\pgfmathsetmacro{\px}{\p*\cw}\node[cell,fill=orange!45] at (\px,\yocB){1};}
+  \foreach \p in {0,...,32}{\pgfmathsetmacro{\px}{\p*\cw}\node[cell,fill=gray!14] at (\px,\yaB){0};}
+  \foreach \p in {29,30,31,32}{\pgfmathsetmacro{\px}{\p*\cw}\node[cell,fill=green!30] at (\px,\yaB){1};}
+  % ==================== Round 3 : p3 = ef ====================
+  \draw[gray!55] (-2.6,-10.2) -- (23.0,-10.2);
+  \node[hd,anchor=west] at (-2.6,-10.7){Round 3: place $p_3=\texttt{ef}$};
+  \foreach \p in {0,...,32}{\pgfmathsetmacro{\px}{\p*\cw}\node[cell,fill=gray!8] at (\px,\yocC){0};}
+  \foreach \p in {30}{\pgfmathsetmacro{\px}{\p*\cw}\node[cell,fill=orange!45] at (\px,\yocC){1};}
+  \foreach \p in {0,...,32}{\pgfmathsetmacro{\px}{\p*\cw}\node[cell,fill=gray!14] at (\px,\yaC){0};}
+  \foreach \p in {32}{\pgfmathsetmacro{\px}{\p*\cw}\node[cell,fill=green!30] at (\px,\yaC){1};}
+  % ---- placement brackets on the char row of the surviving word w4 (ab|bd|ef) ----
+  \draw[black,thick,rounded corners=1pt] (24*\cw-0.30,0.30) rectangle (25*\cw+0.30,-0.30);
+  \draw[blue!70,thick,rounded corners=1pt] (27*\cw-0.30,0.30) rectangle (28*\cw+0.30,-0.30);
+  \draw[red!70,thick,rounded corners=1pt] (30*\cw-0.30,0.30) rectangle (31*\cw+0.30,-0.30);
+  % ---- character-panel row labels ----
+  \node[rowlab] at (-0.45,\ychar){$\mathsf{char}$};
+  \node[rowlab] at (-0.45,\yorig){$\mathsf{orig\text{-}ind}$};
+  \node[rowlab] at (-0.45,\yint){$\mathsf{int\text{-}ind}$};
+  \node[rowlab] at (-0.45,\ybnd){$\mathsf{bnd}$};
+  \node[rowlab] at (-0.45,\yacold){$\mathsf{char\text{-}act^{old}}$};
+  \node[rowlab] at (-0.45,\yac){$\mathsf{char\text{-}act^{old'}}$};
+  \node[font=\scriptsize\itshape,anchor=east] at (-0.45,-3.42){$=\mathsf{alive_c^{(0)}}$};
+  \node[rowlab] at (-0.45,\yocA){$\mathsf{occurs}$};
+  \node[rowlab] at (-0.45,\yaA){$\mathsf{alive_c^{(1)}}$};
+  \node[rowlab] at (-0.45,\yocB){$\mathsf{occurs}$};
+  \node[rowlab] at (-0.45,\yaB){$\mathsf{alive_c^{(2)}}$};
+  \node[rowlab] at (-0.45,\yocC){$\mathsf{occurs}$};
+  \node[rowlab] at (-0.45,\yaC){$\mathsf{alive_c^{(3)}}$};
+  %% ============ string-level columns, one 5-word block to the right of each round band ============
+  \def\lblx{20.9}
+  \def\colA{21.55}\def\colB{22.13}\def\colC{22.71}
+  \newcommand{\SB}[4]{\node[scell,fill=#3] at (#1,#2){#4};}
+  % vertical divider separating the character-level panel from the string-level blocks
+  \draw[gray!70,thick] (19.15,1.2) -- (19.15,-13.4);
+  % ===== input block (beside the base character rows); shows length filtering a^old -> a^old' =====
+  \foreach \yy/\nm in {0/ghiabkbd,-0.6/abbd,-1.2/abdabf,-1.8/abbdef,-2.4/abxbdgefk}{
+    \node[font=\scriptsize\ttfamily,anchor=east] at (\lblx,\yy){\nm};}
+  % column headers, once at the top (input meaning / round-$j$ meaning); columns align across all blocks
+  \foreach \c/\lab in {\colA/{$\mathsf{l}\,/\,\mathsf{match}_j$},\colB/{$\mathsf{a^{old}}\,/\,\mathsf{start}_j$},\colC/{$\mathsf{a^{old'}}\,/\,\mathsf{alive_h^{(j)}}$}}{
+    \node[font=\scriptsize,rotate=90,anchor=west] at (\c,0.4){\lab};}
+  \SB{\colA}{0}{gray!8}{8}\SB{\colB}{0}{green!30}{1}\SB{\colC}{0}{green!30}{1}
+  \SB{\colA}{-0.6}{gray!8}{4}\SB{\colB}{-0.6}{green!30}{1}\SB{\colC}{-0.6}{red!30}{0}
+  \SB{\colA}{-1.2}{gray!8}{6}\SB{\colB}{-1.2}{green!30}{1}\SB{\colC}{-1.2}{green!30}{1}
+  \SB{\colA}{-1.8}{gray!8}{6}\SB{\colB}{-1.8}{gray!15}{0}\SB{\colC}{-1.8}{gray!15}{0}
+  \SB{\colA}{-2.4}{gray!8}{9}\SB{\colB}{-2.4}{green!30}{1}\SB{\colC}{-2.4}{green!30}{1}
+  % ===== Round 1 block =====
+  \foreach \yy/\nm in {-4.2/ghiabkbd,-4.8/abbd,-5.4/abdabf,-6.0/abbdef,-6.6/abxbdgefk}{
+    \node[font=\scriptsize\ttfamily,anchor=east] at (\lblx,\yy){\nm};}
+  \SB{\colA}{-4.2}{green!30}{1}\SB{\colB}{-4.2}{gray!8}{3}\SB{\colC}{-4.2}{green!30}{1}
+  \SB{\colA}{-4.8}{gray!14}{--}\SB{\colB}{-4.8}{gray!14}{--}\SB{\colC}{-4.8}{gray!15}{0}
+  \SB{\colA}{-5.4}{green!30}{1}\SB{\colB}{-5.4}{gray!8}{0}\SB{\colC}{-5.4}{green!30}{1}
+  \SB{\colA}{-6.0}{gray!14}{--}\SB{\colB}{-6.0}{gray!14}{--}\SB{\colC}{-6.0}{gray!15}{0}
+  \SB{\colA}{-6.6}{green!30}{1}\SB{\colB}{-6.6}{gray!8}{0}\SB{\colC}{-6.6}{green!30}{1}
+  % ===== Round 2 block =====
+  \foreach \yy/\nm in {-7.4/ghiabkbd,-8.0/abbd,-8.6/abdabf,-9.2/abbdef,-9.8/abxbdgefk}{
+    \node[font=\scriptsize\ttfamily,anchor=east] at (\lblx,\yy){\nm};}
+  \SB{\colA}{-7.4}{green!30}{1}\SB{\colB}{-7.4}{gray!8}{6}\SB{\colC}{-7.4}{green!30}{1}
+  \SB{\colA}{-8.0}{gray!14}{--}\SB{\colB}{-8.0}{gray!14}{--}\SB{\colC}{-8.0}{gray!15}{0}
+  \SB{\colA}{-8.6}{red!30}{0}\SB{\colB}{-8.6}{gray!14}{--}\SB{\colC}{-8.6}{gray!15}{0}
+  \SB{\colA}{-9.2}{gray!14}{--}\SB{\colB}{-9.2}{gray!14}{--}\SB{\colC}{-9.2}{gray!15}{0}
+  \SB{\colA}{-9.8}{green!30}{1}\SB{\colB}{-9.8}{gray!8}{3}\SB{\colC}{-9.8}{green!30}{1}
+  % ===== Round 3 block; alive_h^{(3)} is the final output a^new =====
+  \foreach \yy/\nm in {-10.6/ghiabkbd,-11.2/abbd,-11.8/abdabf,-12.4/abbdef,-13.0/abxbdgefk}{
+    \node[font=\scriptsize\ttfamily,anchor=east] at (\lblx,\yy){\nm};}
+  \SB{\colA}{-10.6}{red!30}{0}\SB{\colB}{-10.6}{gray!14}{--}\SB{\colC}{-10.6}{gray!15}{0}
+  \SB{\colA}{-11.2}{gray!14}{--}\SB{\colB}{-11.2}{gray!14}{--}\SB{\colC}{-11.2}{gray!15}{0}
+  \SB{\colA}{-11.8}{gray!14}{--}\SB{\colB}{-11.8}{gray!14}{--}\SB{\colC}{-11.8}{gray!15}{0}
+  \SB{\colA}{-12.4}{gray!14}{--}\SB{\colB}{-12.4}{gray!14}{--}\SB{\colC}{-12.4}{gray!15}{0}
+  \SB{\colA}{-13.0}{green!30}{1}\SB{\colB}{-13.0}{gray!8}{6}\SB{\colC}{-13.0}{green!45}{1}
+  % closing line under round 3 (alive_h^{(3)} is the final output a^new; see caption)
+  \draw[gray!55] (-2.6,-13.4) -- (23.0,-13.4);
 \end{tikzpicture}}
-\caption{Factor Placement example for factor \texttt{rus} ($k=3$), shown in all three modes; the bottom row is the infix occurrence column.}
-\label{fig:infix-check}
+\caption{Worked example of the \textsc{Multi-Character Pattern Matching} sweep (\cref{piop:multi-char-pattern-matching}) on \texttt{LIKE 'ab\%bd\%ef'} (factors $\mathcal{P}=(\texttt{ab},\texttt{bd},\texttt{ef})$). The character-level rows span all $33$ positions; to the right of each round's character rows sits that round's string-level block, one row per word, so every sweep round gathers its character- and string-level polynomials together. Word \texttt{abbdef} is inactive from the start, and \texttt{abbd} is removed by length filtering ($\mathsf{a^{old}}=1$ but $\mathsf{a^{old'}}=0$, as its $4$ characters fall short of $k=6$), so neither enters the sweep; the $\mathsf{char\text{-}act^{old}}$ and $\mathsf{char\text{-}act^{old'}}$ rows show the same filtering at character level, the latter being $\mathsf{alive_c^{(0)}}$ that seeds the sweep. Round~1 places \texttt{ab} in every surviving word (all stay alive); Round~2 drops \texttt{abdabf}, which has no \texttt{bd} past its \texttt{ab}; Round~3 drops \texttt{ghiabkbd}, whose suffix is exhausted before an \texttt{ef}. Only \texttt{abxbdgefk} survives, so $\mathsf{a^{new}}=\mathsf{alive_h^{(3)}}$ keeps it alone; its in-order embedding \texttt{ab}$\mid$\texttt{bd}$\mid$\texttt{ef} is boxed on the character row. The $\mathsf{alive_c^{(j)}}$ rows show the working suffix of each word shrinking as factors are consumed.}
+\label{fig:sweep-example}
 \ifsp\end{figure*}\else\end{figure}\fi
 
