@@ -100,7 +100,7 @@ Since the prover materializes every new column, the check must establish two thi
   $\Oracle{\MLE{\mathsf{bnd}}^{\mathsf{new}}}$;
   and potentially the source column $\Oracle{\MLE{\mathsf{src}}}$.
   \begin{enumerate}[nosep]
-    \item \emph{(Activators and lengths)} $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:data-preserving-update-check} on the new columns $(\mathsf{char\text{-}act^{new}}, \mathsf{a_h^{new}},\allowbreak \mathsf{orig\text{-}ind^{new}}, \mathsf{ind}, \mathsf{l^{new}})$, establishing $\NPRelation_{\mathsf{Cons}}$ for the new activator pair.
+    \item \emph{(Activators and lengths)} $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:data-preserving-update-check} on the new columns $(\mathsf{char\text{-}act^{new}}, \mathsf{a^{new}},\allowbreak \mathsf{orig\text{-}ind^{new}}, \mathsf{ind}, \mathsf{l^{new}})$, establishing $\NPRelation_{\mathsf{Cons}}$ for the new activator pair.
     \item \emph{(Offset enumeration)} $\PIOPVerifier$ samples $r \samples \F$ and sends it to $\PIOPProver$; the parties then invoke \cref{piop:nodup-check} on a column with data $\mathsf{orig\text{-}ind^{new}} + r\,\mathsf{int\text{-}ind^{new}}$ and activator $\mathsf{char\text{-}act^{new}}$.
     \item \emph{(Source Column)} If there does not exist a trusted source column apriory:
     \begin{enumerate}[nosep]
@@ -121,7 +121,7 @@ Since the prover materializes every new column, the check must establish two thi
 \subsection{Length Filtering}
 \label{sec:length-filtering}
 
-Length filtering discards every string shorter than a threshold $k$, keeping only those of length at least $k$. This is the pruning needed in pattern matching: in every filter  a string can match only if it is at least as long as the pattern, so any shorter string is a guaranteed non-match and can be removed before the filter runs. As we will see in \cref{sec:single-factor-multi-char-pattern-matching,sec:prefix-suffix}, this is not merely an optimization: length filtering is necessary for the pattern-matching protocols to remain complete and sound. We define the length filtering relation as follows
+Length filtering discards every string shorter than a threshold $k$, keeping only those of length at least $k$. This is the pruning needed in pattern matching: in every filter  a string can match only if it is at least as long as the pattern, so any shorter string is a guaranteed non-match and can be removed before the filter runs. As we will see in \cref{sec:multi-char-pattern-matching,sec:prefix-suffix}, this is not merely an optimization: length filtering is necessary for the pattern-matching protocols to remain complete and sound. We define the length filtering relation as follows
 \begin{equation*}
 \NPRelation_{\mathsf{LenFilter}} = \left\{
 \begin{aligned}
