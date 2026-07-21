@@ -34,7 +34,7 @@ The following PIOP checks this broadcast relationship.
 
 \subsection{Consistency-Checking protocols}
 \label{sec:consistency-checking}
-The auxiliary columns must stay trusted and in sync with each other and the main column at all times. Since the prover is untrusted, it cannot update them freely: every update must come with a proof of well-formedness. We therefore design protocols that prove the well-formedness of the auxiliary columns.
+The auxiliary columns must remain trusted and in sync with one another and with the main column at all times. Since the prover is untrusted, it cannot update them freely: every update must come with a proof of well-formedness. We therefore design protocols that prove this well-formedness, beginning with \cref{mc:validity}.
 
 A requirement that recurs across these protocols is the \emph{consistency} of a string column's two activators. Recall that a string column carries a string-level activator $\mathsf{a}$, marking which strings are active, and a character-level activator $\mathsf{char\text{-}act}$, marking which characters are active. The pair is consistent when both columns are boolean and every character inherits the active bit of the string it belongs to. We package this as the relation
 \begin{displaymath}
