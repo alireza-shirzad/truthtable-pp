@@ -1,0 +1,22 @@
+% !TEX root = paper.tex
+\doclearpage
+\section{Implementation and Evaluation}
+\label{sec:impl-eval}
+
+\subsection{Implementation}
+\label{sec:implementation}
+
+We implement \papername{} by extending the open-source implementation of $\truthtable$~\cite{cryptoeprint:2026/1260} rather than building a new system. $\truthtable$ is realized as two Rust libraries: \texttt{truth-table}\footnote{\url{https://github.com/arkworks-rs/truth-table}}, an end-to-end verifiable query execution system of about 60K lines of Rust, and \texttt{ark-piop}\footnote{\url{https://github.com/alireza-shirzad/ark-piop}}, the underlying PIOP infrastructure of about 14K lines on which it relies. $\truthtable$ arithmetizes every column as an activator and a data vector, compiles each relational operator to a PIOP, and reduces all PIOPs to a common set of fundamental claims (sumcheck, zerocheck, nonzerocheck, evaluation, and lookup) that \texttt{ark-piop} batches and discharges. Its query planner extends the industry-grade planner of Apache DataFusion~\cite{datafusion}, and therefore inherits DataFusion's suite of query optimizations.
+
+\papername{} expands this code base to support string-typed columns, adding about 8K lines of Rust to \texttt{truth-table} and about 3K lines to \texttt{ark-piop}. Concretely, we add the following on top of $\truthtable$:
+\begin{itemize}[nosep]
+  \item \emph{String arithmetization.} A string-typed column is materialized as the hash column of $\truthtable$ augmented with the string-level and character-level auxiliary columns of \cref{sec:string-arith}, together with the fingerprint column of \cref{sec:prefilter-piop}. All auxiliary columns are computed once at ingestion and committed alongside the main column.
+  \item \emph{String protocols.} The string toolbox of \cref{sec:consistency-checking,sec:length-filtering}, which every string-aware operator invokes to keep the auxiliary columns in sync with the main column; the wild-card pattern-matching PIOPs of \cref{sec:piop-for-pattern-matching}, exposed to the planner as a \texttt{LIKE} predicate; and the pre-filtering and bitwise AND checks of \cref{sec:prefilter-piop,sec:bitwise-and}, which the planner inserts in front of every \texttt{LIKE} predicate. The bin partition of the alphabet is a per-column configuration parameter chosen at ingestion, e.g. from the instance-optimized partitions of~\cite{string_fingerprint}.
+\end{itemize}
+
+\subsection{Evaluation}
+\label{sec:evaluation}
+
+\parhead{Experimental setup} As in $\truthtable$, we instantiate \papername{} with the PST polynomial commitment scheme~\cite{PapamanthouST13} over the BN254 elliptic curve. We run all experiments on a machine with a 13th Gen Intel Core i7-13700 CPU with 16 hardware threads and 64\,GB of RAM, and report single-threaded prover time, verifier time, and proof size unless stated otherwise.
+
+\ali{Benchmarks and results to be added: (i) the TPC-H queries with \texttt{LIKE} predicates that $\truthtable$ omitted (Q9, Q13, Q14, Q16, Q20), (ii) microbenchmarks on synthetic string columns varying the column size, the pattern length and number of factors, and (iii) the effect of pre-filtering on the prover time of \cref{piop:multi-char-pattern-matching} as a function of the bin count $m$ and the false-positive rate.}

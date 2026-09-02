@@ -1,31 +1,21 @@
 \doclearpage
 \section{PIOPs for Wild-Card Pattern Matching}
+\label{sec:piop-for-pattern-matching}
 
-In this section we develop PIOPs for SQL \emph{wild-card} pattern matching --- the predicates written with the \texttt{LIKE} operator. A \texttt{LIKE} pattern may use two kinds of wild-card: the multi-character \texttt{\%}, which matches any (possibly empty) run of characters, and the single-character \texttt{\_}, which matches exactly one character. \Cref{fig:wildcard-taxonomy} shows the taxonomy of patterns we support: three kinds --- single-character, multi-character, and mixed --- where the single- and multi-character kinds each come in a single-factor and a multi-factor mode.
+In this section we develop PIOPs for SQL \emph{wild-card} pattern matching --- the predicates written with the \texttt{LIKE} operator. A \texttt{LIKE} pattern may use two kinds of wild-card: the multi-character \texttt{\%}, which matches any (possibly empty) run of characters, and the single-character \texttt{\_}, which matches exactly one character. \Cref{fig:wildcard-taxonomy} shows the taxonomy of patterns we support: three kinds --- single-character, multi-character, and mixed.
 
 \begin{figure}[H]
 \centering
 \resizebox{\ifsp\columnwidth\else\width\fi}{!}{%
 \begin{tikzpicture}[
-    level 1/.style={sibling distance=53mm, level distance=13mm},
-    level 2/.style={sibling distance=25mm, level distance=13mm},
+    level 1/.style={sibling distance=40mm, level distance=13mm},
     every node/.style={draw, rounded corners, align=center, font=\normalsize, inner sep=3pt},
     edge from parent/.style={draw, semithick}
   ]
   \node {Wild-card\\pattern matching}
-    child { node {Single-character}
-      child { node {Single-factor} }
-      child { node {Multi-factor} }
-    }
-    child { node {Multi-character}
-      child { node {Single-factor}
-      child[sibling distance=14mm] { node {Prefix} }
-      child[sibling distance=14mm] { node {Suffix} }
-      child[sibling distance=14mm] { node {Infix} }
-      }
-      child { node {Multi-factor} }
-    }
-    child[xshift=-20mm] { node {Mixed} };
+    child { node {Single-character\\{\small e.g.\ \texttt{a\_c}}} }
+    child { node {Multi-character\\{\small e.g.\ \texttt{ab\%bd\%ef}}} }
+    child { node {Mixed\\{\small e.g.\ \texttt{a\_b\%ef}}} };
 \end{tikzpicture}%
 }
 \caption{Taxonomy of wild-card pattern matching}
@@ -287,7 +277,6 @@ The per-round placement invoked above is carried out by \cref{piop:factor-placem
   % closing line under round 3 (alive_h^{(3)} is the final output a^new; see caption)
   \draw[gray!55] (-2.6,-15.2) -- (23.0,-15.2);
 \end{tikzpicture}}
-\caption{Worked example of the \textsc{Multi-Character Pattern Matching} sweep (\cref{piop:multi-char-pattern-matching}) on \texttt{LIKE 'ab\%bd\%ef'} (factors $\mathcal{P}=(\texttt{ab},\texttt{bd},\texttt{ef})$). The character-level rows span all $33$ positions; to the right of each round's character rows sits that round's string-level block, one row per word, so every sweep round gathers its character- and string-level polynomials together. Word \texttt{abbdef} is inactive from the start, and \texttt{abbd} is removed by length filtering ($\mathsf{a^{old}}=1$ but $\mathsf{a^{old'}}=0$, as its $4$ characters fall short of $k=6$), so neither enters the sweep; the $\mathsf{char\text{-}act^{old}}$ and $\mathsf{char\text{-}act^{old'}}$ rows show the same filtering at character level, the latter being $\mathsf{alive_c^{(0)}}$ that seeds the sweep. Round~1 places \texttt{ab} in every surviving word (all stay alive); Round~2 drops \texttt{abdabf}, which has no \texttt{bd} past its \texttt{ab}; Round~3 drops \texttt{ghiabkbd}, whose suffix is exhausted before an \texttt{ef}. Only \texttt{abxbdgefk} survives, so $\mathsf{a^{new}}=\mathsf{alive_h^{(3)}}$ keeps it alone; its in-order embedding \texttt{ab}$\mid$\texttt{bd}$\mid$\texttt{ef} is boxed on the character row. The $\mathsf{alive_c^{(j)}}$ rows show the working suffix of each word shrinking as factors are consumed. Each round's $\mathsf{att\_mask}$ row marks the candidate window starts (active positions where a full length-$\ell$ window fits within the word), and the $\mathsf{wf}$ row displays the length-$\ell$ window starting at each position (whose fingerprint is compared against the factor's); a boundary-crossing start is shown as \texttt{--}. The windows equal to that round's factor that also lie in the attention mask---i.e.\ its occurrences---are highlighted.}
 \label{fig:sweep-example}
 \ifsp\end{figure*}\else\end{figure}\fi
 

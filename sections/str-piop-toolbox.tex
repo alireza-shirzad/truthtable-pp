@@ -6,7 +6,7 @@ We present a collection of protocols that serve as building blocks for the strin
 \subsection{Broadcast Check}
 \label{sec:broadcast}
 
-In some protocols, we need to expand a string-level column into a character-level one by copying each string's entry onto all of its characters; we call this operation \emph{broadcasting}. We package this as the relation
+In some protocols, we need to expand a string-level column into a character-level one (see \cref{sec:string-arith} for definitions) by copying each string's entry onto all of its characters; we call this operation \emph{broadcasting}. We package this as the relation
 \begin{displaymath}
 \NPRelation_{\mathsf{Bcast}} = \left\{\,
   \begin{aligned}
@@ -27,16 +27,18 @@ The following PIOP checks this broadcast relationship.
   \end{enumerate}
 \end{DefinePIOP}
 
-\begin{proof}
-  TODO
-\end{proof}
-
 
 \subsection{Consistency-Checking protocols}
 \label{sec:consistency-checking}
-The auxiliary columns must remain trusted and in sync with one another and with the main column at all times. Since the prover is untrusted, it cannot update them freely: every update must come with a proof of well-formedness. We therefore design protocols that prove this well-formedness, beginning with \cref{mc:validity}.
+The auxiliary columns must remain trusted and in sync with one another and with the main column at all times. Since the prover is untrusted, it cannot update them freely: every update must come with a proof of well-formedness. We therefore design protocols that prove this well-formedness.
 
-A requirement that recurs across these protocols is the \emph{consistency} of a string column's two activators. Recall that a string column carries a string-level activator $\mathsf{a}$, marking which strings are active, and a character-level activator $\mathsf{char\text{-}act}$, marking which characters are active. The pair is consistent when both columns are boolean and every character inherits the active bit of the string it belongs to. We package this as the relation
+Three kinds of updates arise in the system: \emph{data-preserving} (\cref{sec:data-preserving}), \emph{domain-preserving} (\cref{sec:domain-preserving}) and \emph{domain-altering}. The relational core of SQL falls almost entirely into the first two, with the third one confined to a handful of value-constructing expressions where all of the columns are freshly materialized and new strings are introduced: aggregates such as \texttt{STRING\_AGG}, and string constructors such as \texttt{CONCAT}, \texttt{SUBSTRING}, case mapping, casts, and literals.
+
+\subsubsection{Data-Preserving Update}
+\label{sec:data-preserving}
+In a data-preserving update, only the activators are freshly materialized, i.e. columns $\mathsf{a}$ and $\mathsf{char\text{-}act}$, while the remaining data columns are inherited unchanged. These are the operators that merely re-mark which rows are active---selection, projection, \texttt{DISTINCT}, and \texttt{LIMIT}.
+
+Before relying on the new activators, the verifier must confirm that they are \emph{consistent}. Recall that a string column carries a string-level activator $\mathsf{a}$, marking which strings are active, and a character-level activator $\mathsf{char\text{-}act}$, marking which characters are active. The pair is consistent when both columns are boolean and every character inherits the active bit of the string it belongs to. We package this as the relation
 \begin{displaymath}
 \NPRelation_{\mathsf{Cons}} = \left\{\,
   \begin{aligned}
@@ -51,15 +53,7 @@ A requirement that recurs across these protocols is the \emph{consistency} of a 
   \end{aligned}
 \,\right\}.
 \end{displaymath}
-Both the data-preserving and domain-preserving updates below reduce, in whole or in part, to establishing $\NPRelation_{\mathsf{Cons}}$ for a freshly materialized activator pair.
-
-Three kinds of updates arise in the system: \emph{data-preserving} (\cref{sec:data-preserving}), \emph{domain-preserving} (\cref{sec:domain-preserving}) and \emph{domain-altering}. The relational core of SQL falls almost entirely into the first two, with the third one confined to a handful of value-constructing expressions where all of the columns are freshly materialized and new strings are introduced: aggregates such as \texttt{STRING\_AGG}, and string constructors such as \texttt{CONCAT}, \texttt{SUBSTRING}, case mapping, casts, and literals.
-
-\subsubsection{Data-Preserving Update}
-\label{sec:data-preserving}
-In a data-preserving update, only the activators are freshly materialized, i.e. columns $\mathsf{a}$ and $\mathsf{char\text{-}act}$, while the remaining data columns are inherited unchanged. These are the operators that merely re-mark which rows are active---selection, projection, \texttt{DISTINCT}, and \texttt{LIMIT}.
-
-Before relying on the new activators, the verifier must confirm that the freshly materialized pair $(\mathsf{char\text{-}act}, \mathsf{a})$ lies in $\NPRelation_{\mathsf{Cons}}$: each column is boolean, and the character-level and string-level marks agree (every character of an active string is active, and every character of an inactive string inactive). The following protocol establishes this.
+which the following protocol establishes it.
 % The booleanity condiction is symply verified by two \cref{piop:boolean-check}s. For the consistency condition, we observe that grouping the rows $(\mathsf{orig\text{-}ind}, \mathsf{char\text{-}act})$ by $\mathsf{orig\text{-}ind}$ and summing $\mathsf{char\text{-}act}$ within each group must reproduce $\mathsf{l}$ on the active strings (those marked by $\mathsf{a}$). Hence, treating $(\mathsf{orig\text{-}ind}, \mathsf{char\text{-}act})$ as an input table grouped by its key and $(\mathsf{ind}, \mathsf{l})$ with activator $\mathsf{a}$ as the grouped output, we invoke the \texttt{Group By Sum} protocol of \cite{cryptoeprint:2026/1260}, a single \cref{piop:keyedsumcheck} invocation.
 \begin{DefinePIOP}{Data-Preserving Update Check}{data-preserving-update-check}
   \emph{Inputs:} $\Oracle{\MLE{\mathsf{char\text{-}act}}}, \Oracle{\MLE{\mathsf{a}}}, \Oracle{\MLE{\mathsf{orig\text{-}ind}}}, \Oracle{\MLE{\mathsf{ind}}}, \Oracle{\MLE{\mathsf{l}}}$.
@@ -112,9 +106,6 @@ Since the prover materializes every new column, the check must establish two thi
   \end{enumerate}
 \end{DefinePIOP}
 
-\begin{proof}
-  TODO
-\end{proof}
 
 
 
@@ -146,6 +137,3 @@ Length filtering discards every string shorter than a threshold $k$, keeping onl
     \item (\textit{False Positive check}) $\PIOPProver$ and $\PIOPVerifier$ invoke the Non-Negative \cref{piop:sign-check} on the column $(\mathsf{a'}, \mathsf{l}-k)$.
   \end{enumerate}
 \end{DefinePIOP}
-\begin{proof}
-  TODO
-\end{proof}

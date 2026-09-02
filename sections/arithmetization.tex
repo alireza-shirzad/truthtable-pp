@@ -47,19 +47,19 @@ where each $\hat{\Table} \in \{\hat{\TableIn}\} \cup \{\hat{\TableOut}\}$ is the
 
 We now describe how we arithmetize a string-typed column. This string arithmetization is a contribution of our work, and is designed so that the PIOP protocols of the following sections can operate directly on the contents of the strings.
 
-We start with the approach of $\truthtable$~\cite{cryptoeprint:2026/1260} which arithmetizes a string-typed column as a single hash column $(\act,\mathsf{h})$, which we adopt as our main column. Hashing, however, is opaque: beyond equality testing---which it preserves---it supports no operation on the underlying strings. To enable white-box operations on the string contents, we augment the hash column with a group of auxiliary columns. These auxiliary columns come in two lengths:
+We start with the approach of $\truthtable$~\cite{cryptoeprint:2026/1260} which arithmetizes a string-typed column as a single hash column $(\act,\mathsf{h})$, which acts as a black box handle to the strings and allows no white-box operation on the strings. We denote this as our main column. However, to enable white-box operations on the string contents, we introduce \emph{auxiliary columns}. The auxiliary columns are augmented to the hash column and come in two types with two different lengths:
 
 \parhead{Type 1: String-level auxiliary columns} These are columns of length $N$---the length of the hash column, with one entry per string:
 \begin{itemize}[nosep]
-    \item \emph{Length column $\mathsf{l}$}, with $\mathsf{l}[i]$ being the length $|\col[i]|$ of the $i$-th string in $\col$.
+    \item \emph{Length column $\mathsf{l}$}, with $\mathsf{l}[i]$ being the length of the $i$-th string in $\col$.
     \end{itemize}
     \parhead{Type 2: Character-level auxiliary columns} These are columns of length $M := \sum_{s \in \col} |s|$, the total number of characters in the column:
    \begin{itemize}[nosep]
-    \item \emph{Character column $\mathsf{char}$} contains the concatenation of all strings in $\col$.
+    \item \emph{Character column $\mathsf{char}$} contains the individual characters of all strings in $\col$ concatenated to each other.
     \item \emph{Origin index column $\mathsf{orig\text{-}ind}$}, with $\mathsf{orig\text{-}ind}[j]$ being the index of the string in $\col$ to which the $j$-th character of $\mathsf{char}$ belongs.
     \item \emph{Internal index column $\mathsf{int\text{-}ind}$}, with $\mathsf{int\text{-}ind}[j]$ being the position of the $j$-th character of $\mathsf{char}$ within its own string, counting from $0$. Equivalently, $\mathsf{int\text{-}ind}$ resets to $0$ at every string boundary and increments by one across the characters of each string.
     \item \emph{Character activator column $\mathsf{char\text{-}act}$}, with $\mathsf{char\text{-}act}[j]$ being $1$ if the $j$-th character of $\mathsf{char}$ is active, and $0$ otherwise.
-    \item \emph{Boundary marker column $\mathsf{bnd}$}, with $\mathsf{bnd}[j]$ being $1$ if the $j$-th character of $\mathsf{char}$ is the first character of a string (a string boundary), and $0$ otherwise.
+    \item \emph{Boundary marker column $\mathsf{bnd}$}, with $\mathsf{bnd}[j]$ being $1$ if the $j$-th character of $\mathsf{char}$ is the first character of a string (a string boundary), and $0$ otherwise. \ali{This can be potentially removed from the arithmetization and be sent from the prover as int-ind==0 indicator. However, it comes with online prover cost.}
     \end{itemize}
 \cref{fig:string-arith-example} illustrates this arithmetization on a sample four-row string-typed column.
 
