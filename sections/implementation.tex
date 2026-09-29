@@ -10,8 +10,8 @@ We implement \papername{} by extending the open-source implementation of $\truth
 
 \papername{} expands this code base to support string-typed columns, adding about 8K lines of Rust to \texttt{truth-table} and about 3K lines to \texttt{ark-piop}. Concretely, we add the following on top of $\truthtable$:
 \begin{itemize}[nosep]
-  \item \emph{String arithmetization.} A string-typed column is materialized as the hash column of $\truthtable$ augmented with the string-level and character-level auxiliary columns of \cref{sec:string-arith}, together with the fingerprint column of \cref{sec:prefilter-piop}. All auxiliary columns are computed once at ingestion and committed alongside the main column.
-  \item \emph{String protocols.} The string toolbox of \cref{sec:consistency-checking,sec:length-filtering}, which every string-aware operator invokes to keep the auxiliary columns in sync with the main column; the wild-card pattern-matching PIOPs of \cref{sec:piop-for-pattern-matching}, exposed to the planner as a \texttt{LIKE} predicate; and the pre-filtering and bitwise AND checks of \cref{sec:prefilter-piop,sec:bitwise-and}, which the planner inserts in front of every \texttt{LIKE} predicate. The bin partition of the alphabet is a per-column configuration parameter chosen at ingestion, e.g. from the instance-optimized partitions of~\cite{string_fingerprint}.
+  \item \emph{String arithmetization.} A string-typed column is materialized as the hash column of $\truthtable$ augmented with the string-level and character-level auxiliary columns of \cref{sec:string-arith}, together with the fingerprint bin columns of \cref{sec:fp-design}. All auxiliary columns are computed once at ingestion and committed alongside the main column.
+  \item \emph{String protocols.} The string toolbox of \cref{sec:consistency-checking,sec:length-filtering}, which every string-aware operator invokes to keep the auxiliary columns in sync with the main column; the wild-card pattern-matching PIOPs of \cref{sec:piop-for-pattern-matching}, exposed to the planner as a \texttt{LIKE} predicate; and the fingerprint pre-filtering check of \cref{piop:prefilter-check}, which the planner inserts in front of every \texttt{LIKE} predicate. The bin partition of the alphabet is a per-column configuration parameter chosen at ingestion, e.g. from the instance-optimized partitions of~\cite{string_fingerprint}.
 \end{itemize}
 
 \subsection{Evaluation}
@@ -19,4 +19,41 @@ We implement \papername{} by extending the open-source implementation of $\truth
 
 \parhead{Experimental setup} As in $\truthtable$, we instantiate \papername{} with the PST polynomial commitment scheme~\cite{PapamanthouST13} over the BN254 elliptic curve. We run all experiments on a machine with a 13th Gen Intel Core i7-13700 CPU with 16 hardware threads and 64\,GB of RAM, and report single-threaded prover time, verifier time, and proof size unless stated otherwise.
 
-\ali{Benchmarks and results to be added: (i) the TPC-H queries with \texttt{LIKE} predicates that $\truthtable$ omitted (Q9, Q13, Q14, Q16, Q20), (ii) microbenchmarks on synthetic string columns varying the column size, the pattern length and number of factors, and (iii) the effect of pre-filtering on the prover time of \cref{piop:multi-char-pattern-matching} as a function of the bin count $m$ and the false-positive rate.}
+\parhead{No external baselines} We do not compare \papername{} against prior verifiable database systems. To the best of our knowledge, \papername{} is the first verifiable database system that supports white-box operations on string contents: prior systems either omit string predicates altogether or support only string equality, which reduces to comparing hashes. In particular, $\truthtable$ removes every \texttt{LIKE} predicate from the TPC-H queries it evaluates. Our evaluation therefore measures \papername{} on its own terms, and uses its own configurations, with and without pre-filtering, as points of comparison.
+\ali{Revisit whether to add a reference point from a general-purpose zkVM evaluating \texttt{LIKE}.}
+
+\parhead{Metrics} For every experiment we report the prover time, the verifier time, and the proof size. Since fingerprinting shifts work to the data owner, we also report the data owner's overheads: the time to extract features and commit to the bin polynomials (\cref{alg:fp-commit}), and the resulting storage, alongside the corresponding costs without fingerprints.
+
+\subsubsection{Pattern Matching and the Effect of Pre-Filtering}
+\label{sec:eval-prefilter}
+
+We first evaluate a single \texttt{LIKE} predicate over a synthetic string column, comparing two configurations: the naive filter, which runs \cref{piop:multi-char-pattern-matching} directly on the input column, and the pre-filtered filter, which first applies \cref{piop:prefilter-check} with the bins chosen by \cref{alg:greedy-bins} and runs the pattern-matching protocol only on the surviving rows.
+
+\parhead{Scaling with the column} We vary the number of rows $N$ and the total number of characters $M$, the latter both through $N$ and through the average string length, for a fixed pattern.
+\ali{Plot: prover time, verifier time, and proof size against $N$ (and $M$), naive vs.\ pre-filtered.}
+\ali{Discussion: linear scaling and the power-of-two steps predicted by the cost model of \cref{sec:cost-model}.}
+
+\parhead{Scaling with selectivity} We fix the column and vary the selectivity of the pattern, i.e.\ the fraction of rows that match it, from highly selective patterns to patterns that match most rows.
+\ali{Plot: speedup of the pre-filtered filter over the naive filter per selectivity regime.}
+\ali{Discussion: large speedups for selective patterns; for non-selective patterns the planner tests no bins and falls back to the naive filter, so pre-filtering never slows the prover down.}
+
+\parhead{Overheads} \ali{Table: data-owner commit time and storage with and without fingerprints; verifier time and proof size as a function of the number of tested bins.}
+
+\parhead{Takeaway} Pre-filtering substantially reduces proving time whenever the pattern is selective, and the planner disables it when it would not pay off. In the remainder of the evaluation, every string filter therefore runs in this regime: the planner applies pre-filtering whenever the cost model predicts that it reduces proving time.
+
+\subsubsection{Number of Factors}
+\label{sec:eval-factors}
+
+We next study how the cost of pattern matching grows with the structure of the pattern. We fix the column and vary the number of factors $n_\zeta$ of a multi-character pattern $p_1\%p_2\%\cdots\%p_{n_\zeta}$ from $1$ to \ali{max}, keeping the factor lengths fixed.
+\ali{Plot: prover time, verifier time, and proof size against $n_\zeta$.}
+\ali{Discussion: each factor adds one sweep round (\cref{piop:sweep-factors}), so the prover cost should grow roughly linearly in $n_\zeta$; relate the slope to the per-factor terms of the cost model.}
+
+\subsubsection{TPC-H with String Predicates}
+\label{sec:eval-tpch}
+
+$\truthtable$ evaluates TPC-H after removing every string predicate other than equality from the queries. Since \papername{} supports string predicates, we restore them and re-measure the benchmark, taking a step toward verifying the complete TPC-H suite end to end.
+\ali{List the queries whose string predicates are restored (\texttt{LIKE} appears in Q2, Q9, Q13, Q14, Q16 and Q20; Q13 and Q16 additionally need \texttt{NOT LIKE} and join types that $\truthtable$ does not support) and the scale factor.}
+
+\parhead{With and without string predicates} For each such query we compare the simplified query evaluated by $\truthtable$ with the full query evaluated by \papername{}, which isolates the cost of verifying the string predicates.
+\ali{Table or plot: prover time, verifier time, proof size, and data-owner overhead per query, simplified vs.\ full.}
+\ali{Discussion: the share of the total proving time spent on string predicates, and the contribution of pre-filtering.}

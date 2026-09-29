@@ -61,6 +61,19 @@ By the Schwartz--Zippel lemma, it suffices for the prover to convince the verifi
 
 \parhead{Rational Sumcheck}
 The \emph{rational sumcheck} takes two columns $p,q$ and a claimed sum $s$, and proves that $\sum_{x \in \BoolHCube{\mu}} p(x)/q(x) = s$ under the promise that $q(x) \neq 0$ for all $x \in \BoolHCube{\mu}$. We package this as the relation
+\ifsp
+%% S&P (two-column): tuple and condition stacked so the display fits one column.
+\begin{displaymath}
+\NPRelation_{\mathsf{RatSum}} = \left\{\,
+  \begin{aligned}
+    & \NPInstance = (\mu, s),\\
+    & \NPInstancey = (\Oracle{\MLE{p}}, \Oracle{\MLE{q}}),\\
+    & \NPWitness = (p, q)\\[2pt]
+    & \text{s.t.}\ \sum_{x \in \BoolHCube{\mu}} \frac{p(x)}{q(x)} = s
+  \end{aligned}
+\,\right\}.
+\end{displaymath}
+\else
 \begin{displaymath}
 \NPRelation_{\mathsf{RatSum}} = \left\{\,
   \NPInstance = (\mu, s),\;
@@ -70,6 +83,7 @@ The \emph{rational sumcheck} takes two columns $p,q$ and a claimed sum $s$, and 
     \sum_{x \in \BoolHCube{\mu}} \frac{p(x)}{q(x)} = s
 \,\right\}.
 \end{displaymath}
+\fi
 The prover constructs a polynomial $h(x)$ that equals $p(x)/q(x)$ on $\BoolHCube{\mu}$ and sends its oracle to the verifier, who can then be convinced that $h$ behaves like the intended rational function via a \cref{piop:zerocheck}. With a verified $h$ in hand, the parties reduce the problem to a standard \cref{piop:sumcheck} over $h$.
 \begin{DefinePIOP}{RatSumcheck}{ratsumcheck}
   \emph{Inputs:} $\Oracle{p}, \Oracle{q}, s$.

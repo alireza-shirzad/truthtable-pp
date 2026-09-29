@@ -65,41 +65,46 @@ We start with the approach of $\truthtable$~\cite{cryptoeprint:2026/1260} which 
 
 \ifsp\begin{figure*}[tp]\else\begin{figure}[h!]\fi
 \centering
-\resizebox{\textwidth}{!}{%
+% Text is set at the body font size: the picture is not rescaled; instead
+% the grid unit \u is chosen so the figure fits \textwidth.
+\ifsp\def\u{0.72}\else\def\u{0.67}\fi
 \begin{tikzpicture}[
-    cell/.style={draw, minimum size=6mm, inner sep=0pt, font=\small},
-    rowlab/.style={font=\small\itshape, anchor=east},
-    hd/.style={font=\small\bfseries}
+    x=\u cm, y=\u cm,
+    cell/.style={draw, minimum size=\u*6mm, inner sep=0pt},
+    rowlab/.style={font=\itshape, anchor=east},
+    hd/.style={font=\bfseries},
+    boxlab/.style={font=\itshape, blue, align=center, anchor=north},
+    idx/.style={font=\scriptsize, gray}
   ]
 
   %==================== Panel 1: string-level columns ====================
-  \node[hd, anchor=west] at (-0.6,5.2) {$\mathsf{s}$};
-  \node[hd] at (1.3,5.2) {$\mathsf{a}$};
-  \node[hd] at (1.9,5.2) {$\mathsf{h}$};
-  \node[hd] at (3.6,5.2) {$\mathsf{l}$};
+  \node[hd, anchor=west] at (-0.9,5.2) {$\mathsf{s}$};
+  \node[hd] at (2.1,5.2) {$\mathsf{a}$};
+  \node[hd] at (2.7,5.2) {$\mathsf{h}$};
+  \node[hd] at (4.4,5.2) {$\mathsf{l}$};
 
   % i / string / length / a_h ; row 2 ("cherry") is inactive.
   \foreach \i/\s/\ll/\ah in {0/apple/5/1, 1/orange/6/1, 2/cherry/6/0, 3/banana/6/1}{
     \pgfmathsetmacro{\yy}{4.6 - \i*0.6}
-    \node[font=\small\ttfamily, anchor=west] at (-0.6,\yy) {\s};
-    \node[cell] at (1.3,\yy) {\ah};
-    \node[cell] at (1.9,\yy) {$h_{\i}$};
-    \node[cell] at (3.6,\yy) {\ll};
+    \node[font=\ttfamily, anchor=west] at (-0.9,\yy) {\s};
+    \node[cell] at (2.1,\yy) {\ah};
+    \node[cell] at (2.7,\yy) {$h_{\i}$};
+    \node[cell] at (4.4,\yy) {\ll};
   }
 
   % dotted box bundling the main column (its activator and hash data)
-  \draw[blue, thick, densely dotted, rounded corners=2pt] (0.95,5.7) rectangle (2.25,2.2);
-  \node[font=\scriptsize\itshape, blue] at (1.6,1.7) {main columns};
+  \draw[blue, thick, densely dotted, rounded corners=2pt] (1.75,5.7) rectangle (3.05,2.2);
+  \node[boxlab, anchor=north east, align=right] at (3.05,2.05) {main\\columns};
 
   % dotted box around the string-level auxiliary column (length)
-  \draw[blue, thick, densely dotted, rounded corners=2pt] (3.25,5.7) rectangle (3.95,2.2);
-  \node[font=\scriptsize\itshape, blue, align=center] at (3.6,1.7) {String-level\\Auxiliary column};
+  \draw[blue, thick, densely dotted, rounded corners=2pt] (4.05,5.7) rectangle (4.75,2.2);
+  \node[boxlab, anchor=north west, align=left] at (4.05,2.05) {string-level\\aux.\ column};
 
   %==================== Panel 2: character-level columns (placed to the right) ====================
-  \begin{scope}[xshift=6.7cm, yshift=5.2cm]
+  \begin{scope}[xshift=8.1*\u cm, yshift=5.2*\u cm]
   % group (string) labels above the char row
   \foreach \cx/\nm in {2/apple, 7.5/orange, 13.5/cherry, 19.5/banana}{
-    \node[font=\small\ttfamily] at (\cx*0.6, 1.30) {\nm};
+    \node[font=\ttfamily] at (\cx*0.6, 1.55) {\nm};
   }
 
   % row labels
@@ -109,6 +114,9 @@ We start with the approach of $\truthtable$~\cite{cryptoeprint:2026/1260} which 
   \node[rowlab] at (-0.5,-1.86){$\mathsf{char\text{-}act}$};
   \node[rowlab] at (-0.5,-2.48){$\mathsf{bnd}$};
 
+  % position indices (set smaller than the body text)
+  \foreach \x in {0,...,22}{\node[idx] at (\x*0.6,0.85) {\x};}
+
   % pos / char / orig / o / a_c / s_b ; cherry (orig 2) is inactive so a_c=0 there.
   \foreach \x/\ch/\og/\oo/\ac/\sb in {
      0/a/0/0/1/1,  1/p/0/1/1/0,  2/p/0/2/1/0,  3/l/0/3/1/0,  4/e/0/4/1/0,
@@ -116,7 +124,6 @@ We start with the approach of $\truthtable$~\cite{cryptoeprint:2026/1260} which 
     11/c/2/0/0/1, 12/h/2/1/0/0, 13/e/2/2/0/0, 14/r/2/3/0/0, 15/r/2/4/0/0, 16/y/2/5/0/0,
     17/b/3/0/1/1, 18/a/3/1/1/0, 19/n/3/2/1/0, 20/a/3/3/1/0, 21/n/3/4/1/0, 22/a/3/5/1/0}{
     \pgfmathsetmacro{\px}{\x*0.6}
-    \node[font=\scriptsize, gray] at (\px,0.80) {\x};
     \node[cell] at (\px, 0.00) {\texttt{\ch}};
     \node[cell] at (\px,-0.62) {\og};
     \node[cell] at (\px,-1.24) {\oo};
@@ -126,25 +133,24 @@ We start with the approach of $\truthtable$~\cite{cryptoeprint:2026/1260} which 
 
   % padding tail: one padding slot, an ellipsis, then the final index
   % (31 = last cell of the size-32 hypercube that M=23 pads up to).
-  \node[font=\scriptsize, gray] at (23*0.6,0.80) {23};
+  \node[idx] at (23*0.6,0.85) {23};
   \foreach \yy in {0.00,-0.62,-1.24,-1.86,-2.48}{
     \node[cell] at (23*0.6,\yy) {0};
   }
   \foreach \yy in {0.00,-0.62,-1.24,-1.86,-2.48}{
-    \node at (24*0.6,\yy) {$\cdots$};
+    \node[font=\scriptsize] at (24*0.6,\yy) {$\cdots$};
   }
-  \node[font=\scriptsize, gray] at (25*0.6,0.80) {31};
+  \node[idx] at (25*0.6,0.85) {31};
   \foreach \yy in {0.00,-0.62,-1.24,-1.86,-2.48}{
     \node[cell] at (25*0.6,\yy) {0};
   }
 
   % dotted box around the character-level auxiliary columns
-  \draw[blue, thick, densely dotted, rounded corners=2pt] (-2.3,0.50) rectangle (15.4,-2.95);
-  \node[font=\scriptsize\itshape, blue] at (6.55,-3.3) {Character-level Auxiliary columns};
+  \draw[blue, thick, densely dotted, rounded corners=2pt] (-2.9,0.50) rectangle (15.4,-2.95);
+  \node[boxlab] at (6.25,-3.1) {character-level auxiliary columns};
   \end{scope}
 
-\end{tikzpicture}%
-}
+\end{tikzpicture}
 \caption{String arithmetization of a four-row column
 $\col=(\texttt{apple},\texttt{orange},\texttt{cherry},\texttt{banana})$ with
 \texttt{cherry} inactive.}

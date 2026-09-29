@@ -1,0 +1,13 @@
+% !TEX root = ../paper.tex
+\doclearpage
+\section{Prior Works}
+\label{sec:prior}
+\subsection{Fingerprint Design}
+\label{sec:fp-prior}
+Stoian et al.~\cite{string_fingerprint} consider only single-character features, i.e.\ ``does the string contain character \texttt{X}?'', and solve a mixed-integer linear program (MILP) over the string corpus to group these features into bins so as to minimize the false-positive rate on a synthetic workload derived from the corpus. We do not adopt this approach, for two reasons.
+\begin{enumerate}[label=(\alph*), nosep]
+  \item \emph{Different objective.} Their optimizer is given a fixed number of bins ($4$, $8$, or $16$) and asked for the grouping that minimizes the false-positive rate. We instead aim to minimize prover time directly, and the number of bins is not fixed in advance but is itself part of the trade-off.
+  \item \emph{Limited scalability.} Adding bins, moving beyond single characters to bigrams or trigrams, or enlarging the corpus quickly makes the MILP intractable.
+\end{enumerate}
+
+Follow-up work~\cite{string_fingerprint_entropy} addresses scalability by building the bins greedily: each bin is the \textsc{or} of the features that maximize its conditional entropy $H(Y_b \mid Y_1, \dots, Y_{b-1})$ given the previous bins, measured over the cells $C$ of rows that share a fingerprint so far. This, however, optimizes the wrong quantity for our setting. Entropy rewards telling rows apart, whereas the prover pays for the rows a pattern \emph{keeps}. A bin is most informative when it splits the rows roughly in half, so the rule favors features present in about half of the rows; such features separate rows well but prune the candidates of a selective pattern poorly. Conversely, the rare features that a selective pattern relies on carry little entropy and never receive a bin. Moreover, the procedure stops adding bins once all rows are distinguished, even if further bins would still reduce the prover's work.

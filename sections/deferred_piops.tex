@@ -5,6 +5,19 @@ This appendix collects the low-level PIOPs and relations used throughout \papern
 
 \subsection{NoZero Check}
 The \emph{NoZero Check} takes a column $\col = (\mathsf{d},\mathsf{a})$ and proves that every active entry of $\col$ is nonzero. We package this as the relation
+\ifsp
+%% S&P (two-column): tuple and condition stacked so the display fits one column.
+\begin{displaymath}
+\NPRelation_{\mathsf{NoZero}} = \left\{\,
+  \begin{aligned}
+    & \NPInstance = n,\\
+    & \NPInstancey = (\Oracle{\MLE{\col}}),\\
+    & \NPWitness = (\col)\\[2pt]
+    & \text{s.t.}\ \forall i,\, \mathsf{a}[i] = 1 \implies \col[i] \neq 0
+  \end{aligned}
+\,\right\}.
+\end{displaymath}
+\else
 \begin{displaymath}
 \NPRelation_{\mathsf{NoZero}} = \left\{\,
   \NPInstance = n,\;
@@ -14,6 +27,7 @@ The \emph{NoZero Check} takes a column $\col = (\mathsf{d},\mathsf{a})$ and prov
     \forall i,\, \mathsf{a}[i] = 1 \implies \col[i] \neq 0
 \,\right\}.
 \end{displaymath}
+\fi
 
 A field element is nonzero exactly when it has a multiplicative inverse. The prover sends an inverse column $\mathsf{inv}$ whose value at each active index is the inverse of the data there and which is $0$ at inactive indices. If $\mathsf{inv}$ is formed this way, then $\mathsf{d}\mult\mathsf{inv} = \mathsf{a}$ holds across the whole hypercube: at an active index both sides equal $1$, and at an inactive index both sides equal $0$ (since $\mathsf{inv}$ is $0$ there). A single \cref{piop:zerocheck} on $\mathsf{d}\mult\mathsf{inv} - \mathsf{a}$ certifies this, and forces every active entry to be invertible, hence nonzero.
 \begin{DefinePIOP}{NoZero Check}{nozero-check}
@@ -26,6 +40,19 @@ A field element is nonzero exactly when it has a multiplicative inverse. The pro
 
 \subsection{Booleanity Check}
 The \emph{Booleanity Check} takes a column $\col = (\mathsf{d},\mathsf{a})$ and proves that every active entry of $\col$ is $0$ or $1$. We package this as the relation
+\ifsp
+%% S&P (two-column): tuple and condition stacked so the display fits one column.
+\begin{displaymath}
+\NPRelation_{\mathsf{Bool}} = \left\{\,
+  \begin{aligned}
+    & \NPInstance = \bot,\\
+    & \NPInstancey = (\Oracle{\MLE{\col}}),\\
+    & \NPWitness = (\col)\\[2pt]
+    & \text{s.t.}\ \forall i,\, \mathsf{a}[i] = 1 \implies \mathsf{d}[i]\in\{0,1\}
+  \end{aligned}
+\,\right\}.
+\end{displaymath}
+\else
 \begin{displaymath}
 \NPRelation_{\mathsf{Bool}} = \left\{\,
   \NPInstance = \bot,\;
@@ -35,6 +62,7 @@ The \emph{Booleanity Check} takes a column $\col = (\mathsf{d},\mathsf{a})$ and 
     \forall i,\, \mathsf{a}[i] = 1 \implies \mathsf{d}[i]\in\{0,1\}
 \,\right\}.
 \end{displaymath}
+\fi
 Since $\mathsf{d}[i]\in\{0,1\}$ exactly when $\mathsf{d}[i]\bigl(1-\mathsf{d}[i]\bigr)=0$, the check is a single \cref{piop:zerocheck} on the column $\mathsf{a}\cdot\mathsf{d}\cdot(1-\mathsf{d})$, which vanishes everywhere iff every active entry is boolean.
 \begin{DefinePIOP}{Booleanity Check}{boolean-check}
   \emph{Inputs:} $\Oracle{\MLE{\col}} = (\Oracle{\MLE{\mathsf{a}}}, \Oracle{\MLE{\mathsf{d}}})$.
@@ -45,6 +73,20 @@ Since $\mathsf{d}[i]\in\{0,1\}$ exactly when $\mathsf{d}[i]\bigl(1-\mathsf{d}[i]
 
 \subsection{No-Duplicate Check}
 The \emph{No-Duplicate Check} takes a column $\col = (\mathsf{d},\mathsf{a})$ and proves that the active entries of $\col$ are pairwise distinct. We package this as the relation
+\ifsp
+%% S&P (two-column): tuple and condition stacked so the display fits one column.
+\begin{displaymath}
+\NPRelation_{\mathsf{NoDup}} = \left\{\,
+  \begin{aligned}
+    & \NPInstance = \bot,\\
+    & \NPInstancey = (\Oracle{\MLE{\col}}),\\
+    & \NPWitness = (\col)\\[2pt]
+    & \text{s.t.}\ \forall i\neq j,\; \mathsf{a}[i]=\mathsf{a}[j]=1 \implies{}\\
+    & \phantom{\text{s.t.}}\ \quad \mathsf{d}[i]\neq\mathsf{d}[j]
+  \end{aligned}
+\,\right\}.
+\end{displaymath}
+\else
 \begin{displaymath}
 \NPRelation_{\mathsf{NoDup}} = \left\{\,
   \NPInstance = \bot,\;
@@ -54,6 +96,7 @@ The \emph{No-Duplicate Check} takes a column $\col = (\mathsf{d},\mathsf{a})$ an
     \forall i\neq j,\; \mathsf{a}[i]=\mathsf{a}[j]=1 \implies \mathsf{d}[i]\neq\mathsf{d}[j]
 \,\right\}.
 \end{displaymath}
+\fi
 
 \begin{DefinePIOP}{No-Duplicate Check}{nodup-check}
     TODO
@@ -61,6 +104,19 @@ The \emph{No-Duplicate Check} takes a column $\col = (\mathsf{d},\mathsf{a})$ an
 
 \subsection{Limb Reconstruction Check}
 The \emph{Limb Reconstruction Check} takes 1 $n$-bit column $\col$ and $k$ columns $\col_0,\dots,\col_{k-1}$ each with $n/k$ bits and proves that each entry of $\col$ is the concatenation of the corresponding entries in $\col_0,\dots,\col_{k-1}$. We package this as the relation
+\ifsp
+%% S&P (two-column): tuple and condition stacked so the display fits one column.
+\begin{displaymath}
+\NPRelation_{\mathsf{Limb}} = \left\{\,
+  \begin{aligned}
+    & \NPInstance = n,\\
+    & \NPInstancey = (\Oracle{\MLE{\col}}, \Oracle{\MLE{\col_0}}, \dots, \Oracle{\MLE{\col_{k-1}}}),\\
+    & \NPWitness = (\col, \col_0, \dots, \col_{k-1})\\[2pt]
+    & \text{s.t.}\ \forall i,\, \col[i] = \sum_{j=0}^{k-1} 2^{(k-1-j)n/k} \col_j[i]
+  \end{aligned}
+\,\right\}.
+\end{displaymath}
+\else
 \begin{displaymath}
 \NPRelation_{\mathsf{Limb}} = \left\{\,
   \NPInstance = n,\;
@@ -70,6 +126,7 @@ The \emph{Limb Reconstruction Check} takes 1 $n$-bit column $\col$ and $k$ colum
     \forall i,\, \col[i] = \sum_{j=0}^{k-1} 2^{(k-1-j)n/k} \col_j[i]
 \,\right\}.
 \end{displaymath}
+\fi
 
 
 Reconstruction is a single linear identity over the hypercube: subtracting the weighted limbs from $\col$ must vanish at every row. A single \cref{piop:zerocheck} on $\col - \sum_{j=0}^{k-1} 2^{(k-1-j)n/k}\mult\col_j$ enforces exactly this, pinning down each entry of $\col$ as the concatenation of the corresponding limbs. The check certifies only the weighted-sum relationship; bounding each limb $\col_j$ to its $n/k$-bit width, when required, is done by a separate \cref{piop:range-check}.
@@ -82,6 +139,20 @@ Reconstruction is a single linear identity over the hypercube: subtracting the w
 
 \subsection{Lookup Check}
 The \emph{Lookup Check} takes two columns $\col_1 = (\mathsf{d}_1, \mathsf{a}_1)$ and $\col_2 = (\mathsf{d}_2, \mathsf{a}_2)$ and proves that every active value of $\col_1$ also occurs as an active value of $\col_2$, written $\col_1 \lookup \col_2$. We package this as the relation
+\ifsp
+%% S&P (two-column): tuple and condition stacked so the display fits one column.
+\begin{displaymath}
+\NPRelation_{\mathsf{Lookup}} = \left\{\,
+  \begin{aligned}
+    & \NPInstance = \bot,\\
+    & \NPInstancey = (\Oracle{\MLE{\col_1}}, \Oracle{\MLE{\col_2}}),\\
+    & \NPWitness = (\col_1, \col_2)\\[2pt]
+    & \text{s.t.}\ \forall i,\, \mathsf{a}_1[i] = 1 \implies \exists j:\\
+    & \phantom{\text{s.t.}}\ \quad \mathsf{a}_2[j] = 1 \wedge \mathsf{d}_1[i] = \mathsf{d}_2[j]
+  \end{aligned}
+\,\right\}.
+\end{displaymath}
+\else
 \begin{displaymath}
 \NPRelation_{\mathsf{Lookup}} = \left\{\,
   \NPInstance = \bot,\;
@@ -91,6 +162,7 @@ The \emph{Lookup Check} takes two columns $\col_1 = (\mathsf{d}_1, \mathsf{a}_1)
     \forall i,\, \mathsf{a}_1[i] = 1 \implies \exists j:\, \mathsf{a}_2[j] = 1 \wedge \mathsf{d}_1[i] = \mathsf{d}_2[j]
 \,\right\}.
 \end{displaymath}
+\fi
 We discharge the lookup with the LogUp technique~\cite{Habock22}: $\col_1 \lookup \col_2$ holds if and only if there is a \emph{multiplicity} column $\mathsf{m}$ over $\col_2$'s hypercube such that, with $\mu$ and $\nu$ the hypercube dimensions of $\MLE{\col_1}$ and $\MLE{\col_2}$,
 \begin{equation}
   \label{eq:lookup-logup}
@@ -111,6 +183,19 @@ as rational functions in $X$, where the activators zero out the inactive terms o
 
 \subsection{Range Check}
 The \emph{Range Check} takes a column $\col = (\mathsf{d}, \mathsf{a})$ and a width $n$, and proves that every active entry of $\col$ is a non-negative integer of bitwidth $n$, i.e.\ lies in $[0, 2^n - 1]$. We package this as the relation
+\ifsp
+%% S&P (two-column): tuple and condition stacked so the display fits one column.
+\begin{displaymath}
+\NPRelation_{\mathsf{Range}} = \left\{\,
+  \begin{aligned}
+    & \NPInstance = n,\\
+    & \NPInstancey = (\Oracle{\MLE{\col}}),\\
+    & \NPWitness = (\col)\\[2pt]
+    & \text{s.t.}\ \forall i,\, \mathsf{a}[i] = 1 \implies 0\leq \mathsf{d}[i] < 2^n
+  \end{aligned}
+\,\right\}.
+\end{displaymath}
+\else
 \begin{displaymath}
 \NPRelation_{\mathsf{Range}} = \left\{\,
   \NPInstance = n,\;
@@ -120,6 +205,7 @@ The \emph{Range Check} takes a column $\col = (\mathsf{d}, \mathsf{a})$ and a wi
     \forall i,\, \mathsf{a}[i] = 1 \implies 0\leq \mathsf{d}[i] < 2^n
 \,\right\}.
 \end{displaymath}
+\fi
 We assume $n < \log_2 |\F|$, so the range embeds unambiguously into $\F$. A direct approach proves $\col \lookup \mathsf{rng}_n := (\mathbf{1}, \idx_n)$, since the index polynomial $\idx_n$ ranges over exactly $\{0, \ldots, 2^n - 1\}$; but this lookup table has $2^n$ rows and is wasteful for large $n$. Instead we split each value into $16$-bit \emph{limbs} and range-check each limb against a small index column. Choosing $k$ and $\beta$ with $n = 16k + \beta$ and $\beta \leq 16$, the prover sends limb columns $\mathsf{d}_1, \ldots, \mathsf{d}_{k+1}$ satisfying
 \begin{displaymath}
   \mathsf{a}(x)\mult\mathsf{d}(x) = \sum_{i=1}^{k+1} 2^{16(i-1)}\mult\mathsf{d}_i(x), \qquad x \in \BoolHCube{\mu},
@@ -150,6 +236,20 @@ $(s_\sigma, \ell_\sigma)$ & $(+1, 0)$ & $(+1, 1)$ & $(-1, 0)$ & $(-1, 1)$ \\
 \end{tabular}
 \end{center}
 where negative values are taken in $\F$ via the additive inverse. In every mode the certified condition is $s_\sigma\mult\mathsf{d}[i] \in [\ell_\sigma, 2^\alpha-1]$, so we package the check as the relation
+\ifsp
+%% S&P (two-column): tuple and condition stacked so the display fits one column.
+\begin{displaymath}
+\NPRelation_{\mathsf{Sign}} = \left\{\,
+  \begin{aligned}
+    & \NPInstance = (n, \alpha, \sigma),\\
+    & \NPInstancey = (\Oracle{\MLE{\col}}),\\
+    & \NPWitness = (\col)\\[2pt]
+    & \text{s.t.}\ \forall i,\, \mathsf{a}[i] = 1 \implies{}\\
+    & \phantom{\text{s.t.}}\ \quad \ell_\sigma \leq s_\sigma\mult\mathsf{d}[i] \leq 2^\alpha - 1
+  \end{aligned}
+\,\right\}.
+\end{displaymath}
+\else
 \begin{displaymath}
 \NPRelation_{\mathsf{Sign}} = \left\{\,
   \NPInstance = (n, \alpha, \sigma),\;
@@ -159,6 +259,7 @@ where negative values are taken in $\F$ via the additive inverse. In every mode 
     \forall i,\, \mathsf{a}[i] = 1 \implies \ell_\sigma \leq s_\sigma\mult\mathsf{d}[i] \leq 2^\alpha - 1
 \,\right\}.
 \end{displaymath}
+\fi
 We assume $\alpha < \log_2 |\F|$, so the range embeds unambiguously into $\F$.
 
 The whole check reduces to a non-negativity check on the \emph{magnitude} column $\mathsf{m} := s_\sigma\mult\mathsf{d}$, which the verifier obtains by negating the oracle $\MLE{\mathsf{d}}$ in the negative-side modes. The index polynomial $\idx_\alpha$, evaluated over $\BoolHCube{\alpha}$, takes exactly the values $\{0, 1, \ldots, 2^\alpha - 1\}$. Treating it as the data of an $\alpha$-variable column with the all-ones activator gives a range column $\mathsf{rng}_\alpha := (\mathbf{1}, \idx_\alpha)$ whose value multiset is precisely $[0, 2^\alpha - 1]$, so a single \cref{piop:lookup-check} of $\mathsf{m}$ into $\mathsf{rng}_\alpha$ is already an exact range check. This naive lookup is wasteful when $\alpha$ is large, since $\mathsf{rng}_\alpha$ has $2^\alpha$ rows. We do better by splitting each entry into $16$-bit \emph{limbs} and range-checking each limb against a small index column. Choosing $k$ and $\beta$ with $\alpha = 16k + \beta$ and $\beta \leq 16$, the prover sends limb columns $\mathsf{m}_1, \ldots, \mathsf{m}_{k+1}$ satisfying
@@ -180,12 +281,34 @@ which a single \cref{piop:zerocheck} enforces; the activator on the left collaps
 
 \subsection{Keyed Sumcheck}
 The \emph{Keyed Sumcheck} takes two tables $\Left$ and $\Right$, each with a key column $\key$, a value column $\val$, and an activator column $\act$, and proves that for every possible key $\elem \in \F$, the sum of active values in $\Left$ with key $\elem$ equals the sum of active values in $\Right$ with key $\elem$. Define the keyed sums
+\ifsp
+%% S&P (two-column): the two keyed sums stacked so the display fits one column.
+\begin{align*}
+    S_\Left(\elem) &:= \sum_{\substack{i \in [|\Left|] \\ \Left.\key[i] = \elem}} \Left.\act[i]\mult\Left.\val[i]
+    \quad\text{and}\\
+    S_\Right(\elem) &:= \sum_{\substack{j \in [|\Right|] \\ \Right.\key[j] = \elem}} \Right.\act[j]\mult\Right.\val[j].
+\end{align*}
+\else
 \begin{displaymath}
     S_\Left(\elem) := \sum_{\substack{i \in [|\Left|] \\ \Left.\key[i] = \elem}} \Left.\act[i]\mult\Left.\val[i]
     \qquad\text{and}\qquad
     S_\Right(\elem) := \sum_{\substack{j \in [|\Right|] \\ \Right.\key[j] = \elem}} \Right.\act[j]\mult\Right.\val[j].
 \end{displaymath}
+\fi
 We package this as the relation
+\ifsp
+%% S&P (two-column): tuple and condition stacked so the display fits one column.
+\begin{displaymath}
+\NPRelation_{\mathsf{ksum}} = \left\{\,
+  \begin{aligned}
+    & \NPInstance = \bot,\\
+    & \NPInstancey = (\Oracle{\MLE{\Left}}, \Oracle{\MLE{\Right}}),\\
+    & \NPWitness = (\Left, \Right)\\[2pt]
+    & \text{s.t.}\ \forall\, \elem \in \F : S_\Left(\elem) = S_\Right(\elem)
+  \end{aligned}
+\,\right\}.
+\end{displaymath}
+\else
 \begin{displaymath}
 \NPRelation_{\mathsf{ksum}} = \left\{\,
   \NPInstance = \bot,\;
@@ -195,6 +318,7 @@ We package this as the relation
     \forall\, \elem \in \F : S_\Left(\elem) = S_\Right(\elem)
 \,\right\}.
 \end{displaymath}
+\fi
 
 \cref{piop:keyedsumcheck} reduces the per-key equality $\forall \elem : S_\Left(\elem) = S_\Right(\elem)$ to a single rational identity. The protocol is a generalization of the LogUp lookup protocol~\cite{Habock22}, and we derive its security from a core lemma about function equality that is implicit in LogUp.
 \begin{ilemma}[function equality~\cite{Habock22}]
@@ -224,6 +348,19 @@ We verify this rational identity by Schwartz--Zippel: the verifier samples a ran
 
 \subsection{Multiset Equality Check}
 The \emph{Multiset Equality Check} takes two columns $\col_\Left$ and $\col_\Right$ and proves that they hold the same multiset of active values. We package this as the relation
+\ifsp
+%% S&P (two-column): tuple and condition stacked so the display fits one column.
+\begin{displaymath}
+\NPRelation_{\mathsf{mset}} = \left\{\,
+  \begin{aligned}
+    & \NPInstance = \bot,\\
+    & \NPInstancey = (\Oracle{\MLE{\col_\Left}}, \Oracle{\MLE{\col_\Right}}),\\
+    & \NPWitness = (\col_\Left, \col_\Right)\\[2pt]
+    & \text{s.t.}\ \{\!\!\{\, \col_\Left[i] \,\}\!\!\}_i = \{\!\!\{\, \col_\Right[j] \,\}\!\!\}_j
+  \end{aligned}
+\,\right\}.
+\end{displaymath}
+\else
 \begin{displaymath}
 \NPRelation_{\mathsf{mset}} = \left\{\,
   \NPInstance = \bot,\;
@@ -233,6 +370,7 @@ The \emph{Multiset Equality Check} takes two columns $\col_\Left$ and $\col_\Rig
   \{\!\!\{\, \col_\Left[i] \,\}\!\!\}_i = \{\!\!\{\, \col_\Right[j] \,\}\!\!\}_j
 \,\right\}.
 \end{displaymath}
+\fi
 Two multisets agree exactly when every value $\elem \in \F$ occurs with the same multiplicity on both sides, i.e.\ $\forall\, \elem \in \F : \sum_{i:\,\col_\Left[i]=\elem} 1 = \sum_{j:\,\col_\Right[j]=\elem} 1$. This is precisely an $\elem$-keyed sum equality between two tables whose key is the column data and whose value is the constant $\mathbf{1}$. The parties locally form the auxiliary tables
 \begin{displaymath}
     \Left := \bigl(\act = \col_\Left.\act,\; \key = \col_\Left.\mathsf{data},\; \val = \mathbf{1}\bigr)
@@ -252,6 +390,20 @@ and a single \cref{piop:keyedsumcheck} on $\Left$ and $\Right$ closes out the pr
 
 \subsection{Rotation Check}
 The \emph{Rotation Check} takes two columns $\col$ and $\col'$ together with a shift $t \in \mathbb{Z}$, and proves that $\col'$ is the cyclic rotation of $\col$ by $t$ positions, written $\col' = \rho_t(\col)$, where $\rho_t$ sends the entry at index $p$ to index $p+t$ modulo the column length $s$. We package this as the relation
+\ifsp
+%% S&P (two-column): tuple and condition stacked so the display fits one column.
+\begin{displaymath}
+\NPRelation_{\mathsf{rot}} = \left\{\,
+  \begin{aligned}
+    & \NPInstance = t,\\
+    & \NPInstancey = (\Oracle{\MLE{\col}}, \Oracle{\MLE{\col'}}),\\
+    & \NPWitness = (\col, \col')\\[2pt]
+    & \text{s.t.}\ |\col| = |\col'| =: s,\\
+    & \phantom{\text{s.t.}}\ \forall\, q \in [s] : \col'[q] = \col[(q - t) \bmod s]
+  \end{aligned}
+\,\right\}.
+\end{displaymath}
+\else
 \begin{displaymath}
 \NPRelation_{\mathsf{rot}} = \left\{\,
   \NPInstance = t,\;
@@ -264,6 +416,7 @@ The \emph{Rotation Check} takes two columns $\col$ and $\col'$ together with a s
   \end{array}
 \,\right\}.
 \end{displaymath}
+\fi
 We first adopt the contiguous convention so that the active rows of both columns occupy hypercube indices $0, \ldots, s-1$, which the verifier enforces by asserting $\col.\act = \col'.\act = \contig_{\mu, s}$. We then reduce the rotation condition to a single multiset equality on \emph{position-tagged} columns: tag each entry of $\col$ with its own position, and tag each entry of $\col'$ with the position it should occupy in $\col$. Concretely, the parties locally construct the tagged tables
 \begin{displaymath}
   \Table := \bigl(\col.\act,\; \col.\mathsf{data},\; \idx_\mu\bigr)

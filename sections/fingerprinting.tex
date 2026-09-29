@@ -8,10 +8,32 @@ To this end, we borrow the \emph{fingerprinting} technique from the database lit
 Although fingerprinting was originally proposed to speed up the \emph{execution} of pattern matching, we find that it speeds up its \emph{verification} just as effectively. Before presenting the verification mechanism, we first describe how fingerprint-based pre-filtering works.
 
 \subsection{Pre-Filtering via Fingerprinting}
+\label{sec:prefilter-fp}
 
-The idea of fingerprinting is to replace the full representation of a string with a handful of \emph{bins}, each bin holding a single bit that is $1$ if and only if the string satisfies a fixed property. The fingerprint of a string is the vector of its bin values.
+The idea of fingerprinting is to replace the full representation of a string with a handful of \emph{bins}, each bin holding a single bit that is $1$ if and only if the string satisfies a fixed feature. The fingerprint of a string is the vector of its bin values.
 
 For example, suppose we have $m=4$ bins, where bin $i\in\{1,2,3,4\}$ is computed by its own predicate $\mathsf{fp}_i: \mathsf{Strings} \to \{0,1\}$ defined as follows:
+\ifsp
+%% S&P (two-column): one predicate per row so the display fits one column.
+\begin{align*}
+ \mathsf{fp}_1(\mathsf{s}) &= \begin{cases}
+  1 & \text{if $\mathsf{s}$ contains `a', `b', or `c'}\\
+  0 & \text{otherwise}
+ \end{cases}\\
+ \mathsf{fp}_2(\mathsf{s}) &= \begin{cases}
+  1 & \text{if $\mathsf{s}$ contains any of `d', `e', \dots, `l'}\\
+  0 & \text{otherwise}
+ \end{cases}\\
+ \mathsf{fp}_3(\mathsf{s}) &= \begin{cases}
+  1 & \text{if $\mathsf{s}$ contains `m' or `n'}\\
+  0 & \text{otherwise}
+ \end{cases}\\
+ \mathsf{fp}_4(\mathsf{s}) &= \begin{cases}
+  1 & \text{if $\mathsf{s}$ contains any of `o', `p', \dots, `z'}\\
+  0 & \text{otherwise}
+ \end{cases}
+\end{align*}
+\else
 \begin{align*}
  &\mathsf{fp}_1(\mathsf{s}) = \begin{cases}
   1 & \text{if $\mathsf{s}$ contains `a', `b', or `c'}\\
@@ -33,147 +55,355 @@ For example, suppose we have $m=4$ bins, where bin $i\in\{1,2,3,4\}$ is computed
   0 & \text{otherwise}
  \end{cases}
 \end{align*}
+\fi
 
 Now suppose we want to evaluate the filter \texttt{\%dar\%} on the strings \texttt{darling}, \texttt{zebra}, and \texttt{lemon}. Fingerprinting the pattern's literal \texttt{dar} and the three strings yields
+\ifsp
+%% S&P (two-column): two fingerprints per row so the display fits one column.
+\begin{align*}
+ \texttt{dar} &\to 1101, & \texttt{darling} &\to 1111,\\
+ \texttt{zebra} &\to 1101, & \texttt{lemon} &\to 0111.
+\end{align*}
+\else
 \begin{equation*}
  \texttt{dar}\to 1101,\qquad \texttt{darling} \to 1111,\qquad \texttt{zebra} \to 1101,\qquad \texttt{lemon}\to 0111.
 \end{equation*}
+\fi
 
 A string can match \texttt{\%dar\%} only if it contains every character of \texttt{dar}, so every bin that is active in the pattern's fingerprint must also be active in the string's fingerprint. The first bin is active in the pattern but inactive in \texttt{lemon}: \texttt{lemon} contains none of `a', `b', `c', so it cannot contain \texttt{dar} and is discarded immediately. Both \texttt{darling} and \texttt{zebra}, on the other hand, activate every bin that the pattern does, so both survive the filter. Of these, \texttt{darling} is a genuine match, whereas \texttt{zebra} does not satisfy the predicate and is a \emph{false positive} that only the exact protocol can remove.
 
-\subsection{A PIOP for Pre-Filtering}
-\label{sec:prefilter-piop}
+\subsection{Fingerprint Design}
+\label{sec:fp-design}
+The effectiveness of pre-filtering hinges on the features assigned to each bin, so a crucial question is how to choose them. Prior works (see \cref{sec:fp-prior}) mostly aim to minimize the execution time of the fingerprinting-based filtering; However, our objective is to minimze the prover effort to certify ther this process. Therefore, we design our own fingerprinting as follows: Given a string column $\col$ as the corpus, the data owner extracts (1) the single-character, (2) bigram, (3) trigram, and (4) precedence features occurring in the corpus, where a string has the precedence feature $(a, b)$ for alphanumerics $a$ and $b$ if some occurrence of $a$ lies before the last occurrence of $b$, with the followin two restrictions:
+\begin{itemize}[nosep]
+  \item  A feature present in every row does not help us in filtering task, hence discarded;
+\item If more than $m_{\max}$ features remain, the data owner keeps the $m_{\max}$ that occur in the most rows ($m_{\max} = 2048$ in our implementation).
+\end{itemize}
 
-\parhead{Fingerprints as field elements} We pack the $m$ bins of a fingerprint into a single field element by reading the bin vector as an $m$-bit unsigned integer, bin $1$ being the most significant bit:
-\begin{equation*}
-  \mathsf{fp}(\mathsf{s}) := \sum_{i=1}^{m} 2^{m-i}\,\mathsf{fp}_i(\mathsf{s}) \in [0, 2^m-1].
-\end{equation*}
-A pattern $\zeta$ is fingerprinted through its literal characters only: the wild-cards are dropped and the characters of all factors are pooled, so $\mathsf{fp}(\zeta)$ is the fingerprint of the string obtained by concatenating the factors. Throughout this subsection we write $\phi := \mathsf{fp}(\zeta)$ for this public constant. Since every character of $\zeta$ must appear in any string that matches it, the subset condition of the previous subsection is precisely the bitwise identity
-\begin{equation*}
-  \mathsf{fp}(\mathsf{s}) \land \phi = \phi,
-\end{equation*}
-where $\land$ denotes bitwise AND. This is the operation that the Bitwise AND check of \cref{sec:bitwise-and} proves, and it is the sole non-linear ingredient of the protocol below.
+% Bigrams and trigrams are read over an alphabet that keeps the alphanumerics and the space and merges every other character into a single symbol, so that an n-gram can also record where a word starts or ends, as patterns such as \texttt{\% i\%} require.
+Every feature receives its own bin, i.e.\ $\mathsf{fp}_i(\mathsf{s}) = 1$ if and only if the string $\mathsf{s}$ has the $i$-th feature. This yields the fingerprint $\mathcal{F}_\col=\{\mathsf{fp_1},\dots,\mathsf{fp}_m\}$ where $m\leq m_{\max}$. 
 
-\parhead{The fingerprint column} We extend the string arithmetization of \cref{sec:string-arith} with one more string-level auxiliary column, the \emph{fingerprint column} $\mathsf{fp}$, with $\mathsf{fp}[i] = \mathsf{fp}(\col[i])$ the $m$-bit fingerprint of the $i$-th string. Like the length column $\mathsf{l}$, it is computed once by data owner and then carried along by the consistency-checking protocols of \cref{sec:consistency-checking}: a data-preserving update inherits it unchanged, and a domain-preserving update copies it from the source row through the same lookup that transfers $\mathsf{h}$ and $\mathsf{l}$. Hence, by the time a pattern-matching query arrives, $\mathsf{fp}$ is trusted.
+Note that no optimization takes place at fingerprinting time; the data owner only extracts features. Instead, all bins are made available to the prover, who selects the most useful subset for the workload at hand, namely the pattern given at query time.
 
-\parhead{The relation} Pre-filtering is itself a data-preserving update: the prover freshly materializes the activators $\mathsf{a'}$ and $\mathsf{char\text{-}act'}$, keeping exactly the active strings whose fingerprint passes the subset test, and every other column is inherited. We package this as the relation
+For each bin $i$, the data owner forms the binary \emph{bin column} $\mathsf{bin}_i = \bigl(\mathsf{fp}_i(\col[j])\bigr)_{j=1}^{N}$ and commits to its multilinear extension, the \emph{bin polynomial} $\MLE{\mathsf{bin}}_i$, separately; instead of publishing the $m$ commitments it publishes only the root of a Merkle tree whose $i$-th leaf is the commitment to $\MLE{\mathsf{bin}}_i$ (\cref{alg:fp-commit}). The published commitment therefore grows by a single hash per column, however large $m$ is. 
+
+\begin{algorithm}[h]
+\caption{Fingerprint construction by the data owner.}
+\label{alg:fp-commit}
+\begin{algorithmic}[1]
+\Require string column $\col$ with $N$ rows; feature categories $\mathcal{K}$ (here $\mathcal{K} = \{\textsc{char}, \textsc{bigram}, \textsc{trigram}, \textsc{prec}\}$); bin budget $m_{\max}$
+\Ensure the fingerprint $\mathcal{F}_\col = \{\mathsf{fp}_1, \dots, \mathsf{fp}_m\}$, the commitments $\mathsf{com}_1, \dots, \mathsf{com}_m$ to the bin polynomials $\MLE{\mathsf{bin}}_1, \dots, \MLE{\mathsf{bin}}_m$, and their Merkle root $\rho_\col$
+\State $\mathcal{F}_\col \gets \emptyset$;\quad $\mathrm{cnt}[\cdot] \gets 0$
+% \Comment{features seen, and rows having each}
+\For{$i = 1, \dots, N$}
+  \For{$f \in \mathrm{features}_{\mathcal{K}}(\col[i])$}
+  % \Comment{each distinct feature of the row, once}
+    \State $\mathcal{F}_\col \gets \mathcal{F}_\col \cup \{f\}$;\quad $\mathrm{cnt}[f] \gets \mathrm{cnt}[f] + 1$
+  \EndFor
+\EndFor
+\State $\mathcal{F}_\col \gets \{f \in \mathcal{F}_\col : \mathrm{cnt}[f] < N\}$
+% \Comment{a feature in every row discards no row}
+\State sort $\mathcal{F}_\col$ by $\mathrm{cnt}$, descending
+% \Comment{ties broken by a fixed order on features}
+\State $m \gets \min(|\mathcal{F}_\col|, m_{\max})$;\quad $(f_1, \dots, f_m) \gets$ the first $m$ features of $\mathcal{F}_\col$
+\For{$b = 1, \dots, m$} \Comment{one binary column per bin}
+  \State $\mathsf{fp}_b(\mathsf{s}) := [\,f_b \in \mathrm{features}_{\mathcal{K}}(\mathsf{s})\,]$ \Comment{bin predicate}
+  \State $\mathsf{bin}_b \gets \bigl(\mathsf{fp}_b(\col[i])\bigr)_{i=1}^{N}$;\quad $\mathsf{com}_b \gets \mathsf{Commit}(\MLE{\mathsf{bin}}_b)$
+\EndFor
+\State $\rho_\col \gets \mathsf{MerkleRoot}(\mathsf{com}_1, \dots, \mathsf{com}_m)$
+\State \Return $\mathcal{F}_\col \gets \{\mathsf{fp}_1, \dots, \mathsf{fp}_m\}$, $(\mathsf{com}_1, \dots, \mathsf{com}_m)$ and $\rho_\col$
+\end{algorithmic}
+\end{algorithm}
+
+\subsection{Fingerprinting PIOP}
+
+
+
+
+Let $\col$ be a string column with $N$ rows whose bins $\mathsf{fp}_1,\dots,\mathsf{fp}_m$ the data owner committed under the Merkle root $\rho_\col$ (\cref{alg:fp-commit}), and let $\mathcal{F}_\zeta=\{b : \mathsf{fp}_b(\zeta)=1\}$ be the bins of pattern $\zeta$. The Pre-Filtering Check (\cref{piop:prefilter-check}) proves membership in
+\ifsp
+%% S&P (two-column): instance, witness and conditions stacked so the display fits one column.
 \begin{equation*}
-\NPRelation_{\mathsf{PreFilter}} = \left\{
+\mathcal{R}_{\mathsf{PF}} = \left\{\,
 \begin{aligned}
-  & \NPInstance = (m, \phi),\; \\
-  & \NPInstancey = (\Oracle{\MLE{\mathsf{fp}}}, \Oracle{\MLE{\mathsf{a}}}, \Oracle{\MLE{\mathsf{char\text{-}act}}}, \Oracle{\MLE{\mathsf{a'}}}, \Oracle{\MLE{\mathsf{char\text{-}act'}}}),\; \\
-  & \NPWitness = (\mathsf{fp}, \mathsf{a}, \mathsf{char\text{-}act}, \mathsf{a'}, \mathsf{char\text{-}act'})
+  & \NPInstance = \bigl(\zeta,\ \rho_\col,\ \Oracle{\MLE{\mathsf{a}}}, \Oracle{\MLE{\mathsf{char\text{-}act}}},\\
+  & \qquad \Oracle{\MLE{\mathsf{orig\text{-}ind}}}, \Oracle{\MLE{\mathsf{ind}}}, \Oracle{\MLE{\mathsf{l}}},\\
+  & \qquad \Oracle{\MLE{\mathsf{a'}}}, \Oracle{\MLE{\mathsf{char\text{-}act'}}}\bigr),\\
+  & \NPWitness = \bigl(\mathcal{F}_u,\ (\mathsf{com}_b)_{b\in\mathcal{F}_u},\ \pi\bigr)\\[2pt]
+  & \text{s.t.}\ \emptyset \neq \mathcal{F}_u \subseteq \mathcal{F}_\zeta,\\
+  & \phantom{\text{s.t.}}\ \pi \text{ opens } \rho_\col \text{ to } \mathsf{com}_b = \mathsf{Commit}(\mathsf{fp}_b)\\
+  & \phantom{\text{s.t.}}\ \quad \text{at leaf } b,\ \forall b\in\mathcal{F}_u,\\
+  & \phantom{\text{s.t.}}\ \mathsf{a'}[i] = \mathsf{a}[i]\cdot\textstyle\prod_{b\in\mathcal{F}_u}\mathsf{fp}_b[i],\ \forall i\in[N],\\
+  & \phantom{\text{s.t.}}\ \mathsf{char\text{-}act'}[c] = \mathsf{char\text{-}act}[c]\\
+  & \phantom{\text{s.t.}}\ \quad \cdot\,\mathsf{a'}[\mathsf{orig\text{-}ind}[c]],\ \forall c
 \end{aligned}
-   \;\middle|\;
-    \begin{aligned}
-   \mathsf{a'}[i] = 1 \iff \bigl(\mathsf{a}[i] = 1 \ \text{and}\ \mathsf{fp}[i] \land \phi = \phi\bigr) \\
-    \mathsf{char\text{-}act'}[j] = \mathsf{a'}[i]\ \forall\text{ char } j \text{ of string } i
-    \end{aligned}
+\,\right\}.
+\end{equation*}
+\else
+\begin{equation*}
+\mathcal{R}_{\mathsf{PF}} = \left\{
+\begin{array}{l}
+\bigl(\,(\zeta,\ \rho_\col,\ \Oracle{\MLE{\mathsf{a}}}, \Oracle{\MLE{\mathsf{char\text{-}act}}}, \Oracle{\MLE{\mathsf{orig\text{-}ind}}}, \Oracle{\MLE{\mathsf{ind}}}, \Oracle{\MLE{\mathsf{l}}}, \Oracle{\MLE{\mathsf{a'}}}, \Oracle{\MLE{\mathsf{char\text{-}act'}}}) \,;\ \\
+\phantom{\bigl(}\ (\mathcal{F}_u,\ (\mathsf{com}_b)_{b\in\mathcal{F}_u},\ \pi)\,\bigr)
+\end{array}
+\ \middle|\
+\begin{array}{l}
+\emptyset \neq \mathcal{F}_u \subseteq \mathcal{F}_\zeta,\\
+\pi \text{ opens } \rho_\col \text{ to } \mathsf{com}_b = \mathsf{Commit}(\mathsf{fp}_b) \text{ at leaf } b,\ \forall b\in\mathcal{F}_u,\\
+\mathsf{a'}[i] = \mathsf{a}[i]\cdot\prod_{b\in\mathcal{F}_u}\mathsf{fp}_b[i],\quad \forall i\in[N],\\
+\mathsf{char\text{-}act'}[c] = \mathsf{char\text{-}act}[c]\cdot\mathsf{a'}[\mathsf{orig\text{-}ind}[c]],\quad \forall c
+\end{array}
 \right\}.
 \end{equation*}
+\fi
 
-\parhead{The protocol} The first two steps are the standard ones for any filter: the new activator pair must be consistent (\cref{piop:data-preserving-update-check}), and no inactive string may be revived (a zerocheck on $\mathsf{a'}\mult(1-\mathsf{a})$). The remaining steps enforce the fingerprint test. The prover sends the \emph{masked column} $\mathsf{g} := \mathsf{fp} \land \phi$, obtained by AND-ing every fingerprint with the pattern fingerprint, and the parties certify it with the Bitwise AND check applied to $\mathsf{fp}$, the constant column $\phi\mult\mathbf{1}$, and $\mathsf{g}$; the constant column needs no oracle, as its multilinear extension is the constant $\phi$, which the verifier evaluates by itself. Once $\mathsf{g}$ is certified, the test $\mathsf{fp}[i] \land \phi = \phi$ becomes the equality $\mathsf{g}[i] = \phi$, so $\mathsf{g} - \phi$ is zero exactly on the strings that pass and nonzero on every string that fails. The verdict therefore splits into two complementary checks, as in length filtering: a zerocheck on $\mathsf{a'}\mult(\mathsf{g}-\phi)$ rules out false positives (no kept string fails the test), and a NoZero check on $\mathsf{g}-\phi$ activated by $\mathsf{a}\mult(1-\mathsf{a'})$ rules out false negatives (every dropped string genuinely fails). Unlike length filtering, no order comparison is needed here, so the cheaper NoZero check replaces the sign check.
+\begin{ilemma}[No false negatives]\label{lem:prefilter-sound}
+For every $\bigl(x; w\bigr)\in\mathcal{R}_{\mathsf{PF}}$, $\mathsf{a'}\le\mathsf{a}$ pointwise, $\mathsf{a'}$ is binary, and every active row that matches the pattern survives:
+$\mathsf{a}[i]=1 \wedge \col[i]\sim\zeta \implies \mathsf{a'}[i]=1$.
+\end{ilemma}
+\begin{proof}
+Each $\mathsf{fp}_b$ is a binary column committed by the data owner, so $\mathsf{a'}[i]\in\{0,1\}$ and $\mathsf{a'}[i]\le\mathsf{a}[i]$. If $\col[i]$ matches $\zeta$, then $\col[i]$ contains every character and n-gram of each literal factor, and every precedence pair of the factors read in order. Hence $\mathsf{fp}_b(\col[i])=1$ for every $b\in\mathcal{F}_\zeta\supseteq\mathcal{F}_u$, so the product is $1$ and $\mathsf{a'}[i]=\mathsf{a}[i]=1$.
+\end{proof}
 
-\begin{DefinePIOP}{Pre-Filtering Check}{prefilter}
-  \emph{Inputs:} $\Oracle{\MLE{\mathsf{fp}}}, \Oracle{\MLE{\mathsf{a}}}, \Oracle{\MLE{\mathsf{char\text{-}act}}}, \Oracle{\MLE{\mathsf{a'}}}, \Oracle{\MLE{\mathsf{char\text{-}act'}}}, \Oracle{\MLE{\mathsf{orig\text{-}ind}}}, \Oracle{\MLE{\mathsf{ind}}}, \Oracle{\MLE{\mathsf{l}}}$, bin count $m$, pattern fingerprint $\phi$.
+
+\begin{DefinePIOP}{Pre-Filtering Check}{prefilter-check}[Pre-Filtering Check]
+  \emergencystretch=3em\relax
+  \emph{Inputs:} the pattern $\zeta$ and its bins $\mathcal{F}_\zeta=\{b : \mathsf{fp}_b(\zeta)=1\}$, which both parties derive from the public pattern; the Merkle root $\rho_\col$ over the bin commitments of column $\col$ (\cref{alg:fp-commit}); the input activators $\Oracle{\MLE{\mathsf{a}}}$ and $\Oracle{\MLE{\mathsf{char\text{-}act}}}$; and the fixed columns $\Oracle{\MLE{\mathsf{orig\text{-}ind}}}, \Oracle{\MLE{\mathsf{ind}}}, \Oracle{\MLE{\mathsf{l}}}$.
+  \vspace{2mm}
   \begin{enumerate}[nosep]
-    \item (\textit{Activator Update Validity}) $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:data-preserving-update-check} on $(\mathsf{char\text{-}act'}, \mathsf{a'}, \mathsf{orig\text{-}ind},\allowbreak \mathsf{ind}, \mathsf{l})$.
-    \item (\textit{Containment}) $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:zerocheck} on the column $\mathsf{a'}\mult(1-\mathsf{a})$.
-    \item (\textit{Masking}) $\PIOPProver$ computes the masked column $\mathsf{g} := \mathsf{fp} \land \phi$ and sends $\Oracle{\MLE{\mathsf{g}}}$ to $\PIOPVerifier$. The parties invoke \cref{piop:bitwise-and} on $(\mathsf{fp}, \phi\mult\mathbf{1}, \mathsf{g})$ with bit-width $n = m$.
-    \item (\textit{False Positive check}) $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:zerocheck} on the column $\mathsf{a'}\mult(\mathsf{g}-\phi)$.
-    \item (\textit{False Negative check}) $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:nozero-check} on the column with data $\mathsf{g}-\phi$ and activator $\mathsf{a}\mult(1-\mathsf{a'})$.
+    \item (\emph{Bin selection})\label[step]{pf:select} $\PIOPProver$ chooses the bins to test, $\mathcal{F}_u$, via \cref{alg:greedy-bins} and sends them to $\PIOPVerifier$. $\PIOPVerifier$ checks that $\mathcal{F}_u\neq\emptyset$ and $\mathcal{F}_u\subseteq\mathcal{F}_\zeta$, and rejects otherwise.
+    \item (\emph{Opening the bins})\label[step]{pf:open} $\PIOPProver$ sends the commitments $(\mathsf{com}_b)_{b\in\mathcal{F}_u}$ together with a Merkle multiproof $\pi$ for the leaves $\mathcal{F}_u$. $\PIOPVerifier$ checks that $\pi$ opens $\rho_\col$ to $\mathsf{com}_b$ at leaf $b$ for every $b\in\mathcal{F}_u$, and rejects otherwise. From then on the parties hold the bin oracles $\Oracle{\MLE{\mathsf{fp}_b}}$ for $b\in\mathcal{F}_u$.
+    \item (\emph{Filtered activators})\label[step]{pf:filter} $\PIOPProver$ computes the string-level activator $\mathsf{a'}[i] := \mathsf{a}[i]\cdot\prod_{b\in\mathcal{F}_u}\mathsf{fp}_b[i]$. It also computes its character-level counterpart $\mathsf{char\text{-}act'}$, which keeps exactly the active characters of the strings kept by $\mathsf{a'}$. $\PIOPProver$ sends $\Oracle{\MLE{\mathsf{a'}}}$ and $\Oracle{\MLE{\mathsf{char\text{-}act'}}}$ to $\PIOPVerifier$.
+    \item (\emph{Subset test})\label[step]{pf:subset} The parties invoke a \cref{piop:zerocheck}, of degree $|\mathcal{F}_u|+1$, on $\mathsf{a'}-\mathsf{a}\cdot\prod_{b\in\mathcal{F}_u}\mathsf{fp}_b$.
+    \item (\emph{Activator update validity})\label[step]{pf:dpuc} The parties invoke \cref{piop:data-preserving-update-check} on $(\mathsf{char\text{-}act'}, \mathsf{a'}, \mathsf{orig\text{-}ind}, \mathsf{ind}, \mathsf{l})$, binding $\mathsf{char\text{-}act'}$ to $\mathsf{a'}$.
+    \item (\emph{Output})\label[step]{pf:output} $\PIOPProver$ and $\PIOPVerifier$ output the filtered activators $\mathsf{a'}$ and $\mathsf{char\text{-}act'}$.
   \end{enumerate}
 \end{DefinePIOP}
 
+\subsection{Optimum usage of fingerprints}
+\label{sec:opt-fp}
 
-\subsection{Bitwise AND}
-\label{sec:bitwise-and}
-The \emph{Bitwise AND check} takes three columns $\col_1, \col_2, \col_3$ containing $n$-bit values and proves that every entry of $\col_3$ is the bitwise AND of the corresponding entries in $\col_1$ and $\col_2$. We package this as the relation
-\begin{displaymath}
-\NPRelation_{\mathsf{BitwiseAND}} = \left\{\,
-  \NPInstance = n,\;
-  \NPInstancey = (\Oracle{\MLE{\col_1}}, \Oracle{\MLE{\col_2}}, \Oracle{\MLE{\col_3}}),\;
-  \NPWitness = (\col_1, \col_2, \col_3)
-  \;\middle|\;
-    \forall i,\, \col_3[i] = \col_1[i] \land \col_2[i]
-\,\right\}.
-\end{displaymath}
+As mentioned in \cref{sec:fp-design}, all possible single-char, bigram, trigram, and proceeding features are extracted at the time of commitment and handed to the prover and verifier. However, we observe that it is not necessary to use all of these bins. To demonstrate this, we present two examples (1) consider the pattern $\zeta = \texttt{\%dar\%}$ over a column that contains the string \texttt{zebra}, so the data owner has committed a bin $\mathsf{fp}_{\texttt{z}}$ for the single-character feature \texttt{z}. The pattern, however, contains no \texttt{z} which means using the fingerprint would not remove any true negatives. (2) On the other hand, even if a fingerprint does exist in a pattern, adding it might have no effect. For example, both the trigram \texttt{dar} and the character \texttt{d} are features of $\zeta = \texttt{\%dar\%}$, and consider the column $(\texttt{darling}, \texttt{dare}, \texttt{dog}, \texttt{lemon}, \texttt{sun})$. Each bin removes true negatives on its own: $\mathsf{fp}_{\texttt{dar}}$ alone discards \texttt{dog}, \texttt{lemon} and \texttt{sun}, and $\mathsf{fp}_{\texttt{d}}$ alone discards \texttt{lemon} and \texttt{sun}. Yet once the column has been filtered by $\mathsf{fp}_{\texttt{dar}}$, only \texttt{darling} and \texttt{dare} survive, and applying $\mathsf{fp}_{\texttt{d}}$ afterwards discards nothing further, since every string containing \texttt{dar} also contains \texttt{d}.
 
-\ifsp
-%% Single-column (IEEE) variant: columns laid out horizontally as rows.
-\begin{figure}[tp]
+This becomes more important when we notice that according to \cref{piop:prefilter-check}, each added bin adds prover, verifier, and proof size overheads too. The prover has to send the opening of the leaves of the Merkle Tree to the verifier. Moreover, the prover has to prove that the fingerprint filter was done correctly. That's why the prover needs to find out the minimal set of bins $\mathcal{F}_u$ that minimizes the prover time. anything beyound that won't increase the selectivity, hence won't help with the proving time, yet increases other types of overheads.
+
+
+Finding such a set on the prover side in runtime, comes with two barriers:
+\begin{itemize}[nosep]
+  \item The prover cannot test the prover times online, i.e. it cannot afford to run the prover multiple times and pick the best one. This defeats the whole purpose of minimizing the prover time 
+  \item Finding the best possible bins requires trying out each possible set of bins in $\mathcal{F}_\zeta$ which takes $2^{|\mathcal{F}_\zeta|}$ and is potentially large.
+\end{itemize}
+We fix the first issue in \cref{sec:cost-model} by using a \emph{cost model}, instead of running the actual prover, and we fix the second issue in \cref{sec:greedy} by using a \emph{greedy} assignment for placing the bins and empirically show that the result is very close to the best possible fingerprint.
+
+
+\subsubsection{Prover Cost Model}
+\label{sec:cost-model}
+To prevent the prover to actually run the prover each time it wants to test a new set of bins, we model the cost of string filtering from its \emph{shape} as follow.
+
+\parhead{Notation} The input rows are denoted by $N$ and characters by $M$, the surviving rows by $S$ and their characters by $M_S$, the number of matching rows $T$, the number of tested bins $n_{\mathrm{bin}} = |\mathcal{F}_u|$, the pattern's total literal length $L_\zeta$, and its factor count $n_\zeta$. Write $D(x)$ for the smallest power of two at least $x$, and $D^+(x)$ for the strict variant, which doubles an exact power of two. Tables are padded to a power of two, so the unfiltered input occupies the domain $N_{\mathrm{pad}} = D(N)$. \Cref{fig:plan-shape} places these parameters on the query plan.
+
+\begin{figure}[t]
 \centering
-\resizebox{\columnwidth}{!}{%
+\resizebox{\ifsp\columnwidth\else\linewidth\fi}{!}{%
 \begin{tikzpicture}[
-  cell/.style={draw, align=center, minimum width=0.75cm, minimum height=0.85cm, font=\ttfamily\small, inner sep=1pt},
-  plab/.style={anchor=west, font=\small},
-  op/.style={font=\bfseries}
+  scell/.style={draw, minimum width=1.3cm, minimum height=0.42cm, inner sep=0pt, font=\ttfamily\scriptsize},
+  ccell/.style={draw, minimum width=0.42cm, minimum height=0.26cm, inner sep=0pt, font=\ttfamily\tiny},
+  bnd/.style={very thick},
+  pad/.style={dashed, draw=gray},
+  surv/.style={fill=orange!25},
+  match/.style={fill=green!25},
+  hdr/.style={font=\scriptsize},
+  stage/.style={font=\small\bfseries, align=center},
+  param/.style={font=\small, align=center},
+  flow/.style={-{Stealth[length=2.5mm]}, thick}
 ]
-\def\cellW{0.75}
-% --- column 1 ---
-\node[plab] at (-0.375, 0) {$\idx'_2(X_0,X_1,X_2,X_3) = 2X_0 + X_1$};
-\foreach \val/\bin [count=\i from 0] in
-  {0/00,0/00,0/00,0/00,1/01,1/01,1/01,1/01,2/10,2/10,2/10,2/10,3/11,3/11,3/11,3/11}
-  {\node[cell] at (\cellW*\i, -0.9) {\val\\{\scriptsize(\bin)}};}
-% --- AND ---
-\node[op] at (\cellW*7.5, -1.8) {AND};
-% --- column 2 ---
-\node[plab] at (-0.375, -2.7) {$\idx''_2(X_0,X_1,X_2,X_3) = 2X_2 + X_3$};
-\foreach \val/\bin [count=\i from 0] in
-  {0/00,1/01,2/10,3/11,0/00,1/01,2/10,3/11,0/00,1/01,2/10,3/11,0/00,1/01,2/10,3/11}
-  {\node[cell] at (\cellW*\i, -3.6) {\val\\{\scriptsize(\bin)}};}
-% --- = ---
-\node[op] at (\cellW*7.5, -4.5) {$=$};
-% --- column 3 ---
-\node[plab] at (-0.375, -5.4) {$\MLE{\mathsf{and}}(X_0,X_1,X_2,X_3) = 2X_0X_2 + X_1X_3$};
-\foreach \val/\bin [count=\i from 0] in
-  {0/00,0/00,0/00,0/00,0/00,1/01,0/00,1/01,0/00,0/00,2/10,2/10,0/00,1/01,2/10,3/11}
-  {\node[cell] at (\cellW*\i, -6.3) {\val\\{\scriptsize(\bin)}};}
+% ---------------- input column ----------------
+\node[stage] at (1.3,0.95) {Input column};
+\node[hdr] at (0.7,0.42) {$\mathsf{str}$}; \node[hdr] at (1.95,0.42) {$\mathsf{char}$};
+\node[scell,] at (0.7,-0) {fig};
+\node[scell,surv] at (0.7,-0.42) {dart};
+\node[scell,] at (0.7,-0.84) {sun};
+\node[scell,surv] at (0.7,-1.26) {zebra};
+\node[scell,surv] at (0.7,-1.68) {dare};
+\node[ccell,] at (1.95,-0) {f};
+\draw[bnd] (1.74,0.13) -- (2.16,0.13);
+\node[ccell,] at (1.95,-0.26) {i};
+\node[ccell,] at (1.95,-0.52) {g};
+\node[ccell,surv] at (1.95,-0.78) {d};
+\draw[bnd] (1.74,-0.65) -- (2.16,-0.65);
+\node[ccell,surv] at (1.95,-1.04) {a};
+\node[ccell,surv] at (1.95,-1.3) {r};
+\node[ccell,surv] at (1.95,-1.56) {t};
+\node[ccell,] at (1.95,-1.82) {s};
+\draw[bnd] (1.74,-1.69) -- (2.16,-1.69);
+\node[ccell,] at (1.95,-2.08) {u};
+\node[ccell,] at (1.95,-2.34) {n};
+\node[ccell,surv] at (1.95,-2.6) {z};
+\draw[bnd] (1.74,-2.47) -- (2.16,-2.47);
+\node[ccell,surv] at (1.95,-2.86) {e};
+\node[ccell,surv] at (1.95,-3.12) {b};
+\node[ccell,surv] at (1.95,-3.38) {r};
+\node[ccell,surv] at (1.95,-3.64) {a};
+\node[ccell,surv] at (1.95,-3.9) {d};
+\draw[bnd] (1.74,-3.77) -- (2.16,-3.77);
+\node[ccell,surv] at (1.95,-4.16) {a};
+\node[ccell,surv] at (1.95,-4.42) {r};
+\node[ccell,surv] at (1.95,-4.68) {e};
+\node[param] at (0.7,-2.24) {$N$ rows};
+\node[param] at (1.95,-5.16) {$M$ chars};
+% ---------------- pre-filter ----------------
+\draw[flow] (2.8,-0.63) -- (5.4,-0.63) node[midway,above,stage] {Pre-filter} node[midway,below,param] {tests $n_{\mathrm{bin}}$\\fingerprint bins};
+% ---------------- rematerialized column ----------------
+\node[stage] at (7.15,0.95) {Rematerialized \normalfont\small(if $\mathrm{remat}$)};
+\node[hdr] at (6.4,0.42) {$\mathsf{str}$}; \node[hdr] at (7.9,0.42) {$\mathsf{char}$};
+\node[scell,surv] at (6.4,-0) {dart};
+\node[scell,surv] at (6.4,-0.42) {zebra};
+\node[scell,surv] at (6.4,-0.84) {dare};
+\node[scell,pad] at (6.4,-1.26) {};
+\node[ccell,surv] at (7.9,-0) {d};
+\draw[bnd] (7.69,0.13) -- (8.11,0.13);
+\node[ccell,surv] at (7.9,-0.26) {a};
+\node[ccell,surv] at (7.9,-0.52) {r};
+\node[ccell,surv] at (7.9,-0.78) {t};
+\node[ccell,surv] at (7.9,-1.04) {z};
+\draw[bnd] (7.69,-0.91) -- (8.11,-0.91);
+\node[ccell,surv] at (7.9,-1.3) {e};
+\node[ccell,surv] at (7.9,-1.56) {b};
+\node[ccell,surv] at (7.9,-1.82) {r};
+\node[ccell,surv] at (7.9,-2.08) {a};
+\node[ccell,surv] at (7.9,-2.34) {d};
+\draw[bnd] (7.69,-2.21) -- (8.11,-2.21);
+\node[ccell,surv] at (7.9,-2.6) {a};
+\node[ccell,surv] at (7.9,-2.86) {r};
+\node[ccell,surv] at (7.9,-3.12) {e};
+\node[ccell,pad] at (7.9,-3.38) {};
+\node[ccell,pad] at (7.9,-3.64) {};
+\node[ccell,pad] at (7.9,-3.9) {};
+\node[param] at (6.4,-2.02) {$S$ rows\\padded to $D(S)$};
+\node[param] at (7.9,-4.58) {$M_S$ chars\\padded to $D(M_S)$};
+\node[param] at (7.15,-5.38) {$(N', M') = (S, M_S)$};
+% ---------------- pattern matching ----------------
+\draw[flow] (8.6,-0.63) -- (10.6,-0.63) node[midway,above,stage] {Pattern\\matching} node[midway,below,param] {$\zeta = \texttt{\%dar\%}$\\$L_\zeta$, $n_\zeta$};
+% ---------------- matches ----------------
+\node[stage] at (12.15,0.95) {Matches};
+\node[hdr] at (11.4,0.42) {$\mathsf{str}$}; \node[hdr] at (12.9,0.42) {$\mathsf{char}$};
+\node[scell,match] at (11.4,-0) {dart};
+\node[scell,match] at (11.4,-0.42) {dare};
+\node[ccell,match] at (12.9,-0) {d};
+\draw[bnd] (12.69,0.13) -- (13.11,0.13);
+\node[ccell,match] at (12.9,-0.26) {a};
+\node[ccell,match] at (12.9,-0.52) {r};
+\node[ccell,match] at (12.9,-0.78) {t};
+\node[ccell,match] at (12.9,-1.04) {d};
+\draw[bnd] (12.69,-0.91) -- (13.11,-0.91);
+\node[ccell,match] at (12.9,-1.3) {a};
+\node[ccell,match] at (12.9,-1.56) {r};
+\node[ccell,match] at (12.9,-1.82) {e};
+\node[param] at (11.4,-0.98) {$T$ rows};
+\node[param] at (12.9,-2.3) {$\approx M_T$ chars};
+% ---------------- bypass (no rematerialization) ----------------
+\draw[flow,dashed,gray] (1.3,1.3) -- (1.3,1.85) -- (12.15,1.85) -- (12.15,1.3);
+\node[param,gray,fill=white,inner sep=2pt] at (7.0,1.85) {no $\mathrm{remat}$: pattern matching runs on $(N', M') = (N, M)$};
 \end{tikzpicture}%
 }
-\caption{The arithmetized truth-table for the bitwise AND function on $n=2$ bit inputs, with the three columns laid out as rows.}
-\label{fig:bitwise-and-tt}
+\caption{Shape of a pattern-matching plan with fingerprint pre-filtering, with the size parameters of the cost model. Each stage shows the string-level column $\mathsf{str}$ next to its character column $\mathsf{char}$, with thick rules marking string boundaries. The pre-filter tests $n_{\mathrm{bin}}$ fingerprint bins and keeps $S$ of the $N$ input rows (shaded). If $\mathrm{remat}$ holds, the survivors are compacted into new columns padded to $D(S)$ rows and $D(M_S)$ characters (dashed cells), and pattern matching runs on $(N', M') = (S, M_S)$; otherwise it runs on the full input (dashed path). Pattern matching then keeps the $T$ matching rows, discarding the survivors that were false positives.}
+\label{fig:plan-shape}
 \end{figure}
+
+ All of these are known to the prover at planning time. The shape determines what the planner does:
+\ifsp
+%% S&P (two-column): one definition per row so the display fits one column.
+\begin{align*}
+  \mathrm{remat}  &= [n_{\mathrm{bin}} > 0] \wedge [D^+(S) < D^+(N_{\mathrm{pad}})],\\
+  (N', M', P)     &= \begin{cases} (S, M_S, S) & \text{if } \mathrm{remat},\\
+                                    (N, M, N_{\mathrm{pad}}) & \text{otherwise,} \end{cases}\\
+  \mathrm{second} &= [D^+(T) < D^+(P)],\\
+  M_T             &= T\, M' / N'.
+\end{align*}
 \else
-\begin{figure}[h]
-\centering
-\begin{tikzpicture}[
-  cell/.style={draw, minimum width=1.4cm, minimum height=0.42cm, font=\ttfamily\small, inner sep=1pt},
-  op/.style={draw, circle, minimum size=0.9cm, font=\bfseries, inner sep=1pt, fill=white},
-  collabel/.style={rotate=90, anchor=south, font=\small}
-]
-\def\cellH{0.42}
-\def\colSep{4.0}
-\foreach \v [count=\i from 0] in
-  {0(00),0(00),0(00),0(00),1(01),1(01),1(01),1(01),2(10),2(10),2(10),2(10),3(11),3(11),3(11),3(11)}
-  {\node[cell] (a\i) at (0, -\cellH*\i) {\v};}
-\foreach \v [count=\i from 0] in
-  {0(00),1(01),2(10),3(11),0(00),1(01),2(10),3(11),0(00),1(01),2(10),3(11),0(00),1(01),2(10),3(11)}
-  {\node[cell] (b\i) at (\colSep, -\cellH*\i) {\v};}
-\foreach \v [count=\i from 0] in
-  {0(00),0(00),0(00),0(00),0(00),1(01),0(00),1(01),0(00),0(00),2(10),2(10),0(00),1(01),2(10),3(11)}
-  {\node[cell] (c\i) at (2*\colSep, -\cellH*\i) {\v};}
-\node[op] at (0.42*\colSep, -\cellH*7.5) {AND};
-\node[op] at (1.42*\colSep, -\cellH*7.5) {$=$};
-\node[collabel] at (-1.0, -\cellH*7.5) {$\idx'_2(X_0,X_1,X_2,X_3) = 2X_0 + X_1$};
-\node[collabel] at (\colSep-1.0, -\cellH*7.5) {$\idx''_2(X_0,X_1,X_2,X_3) = 2X_2 + X_3$};
-\node[collabel] at (2*\colSep-1.0, -\cellH*7.5) {$\MLE{\mathsf{and}}(X_0,X_1,X_2,X_3) = 2X_0X_2+X_1X_3$};
-\end{tikzpicture}
-\caption{The arithmetized truth-table for the bitwise AND function on n=2 bit inputs.}
-\label{fig:bitwise-and-tt}
-\end{figure}
+\begin{align*}
+  \mathrm{remat}  &= [n_{\mathrm{bin}} > 0] \wedge [D^+(S) < D^+(N_{\mathrm{pad}})], &
+  (N', M', P)     &= \begin{cases} (S, M_S, S) & \text{if } \mathrm{remat},\\
+                                    (N, M, N_{\mathrm{pad}}) & \text{otherwise,} \end{cases}\\
+  \mathrm{second} &= [D^+(T) < D^+(P)], &
+  M_T             &= T\, M' / N'.
+\end{align*}
+\fi
+The survivors are rematerialized exactly when $\mathrm{remat}$ holds, that is, when a pre-filter is applied and the survivors fit in a strictly smaller power-of-two domain than the input. The pattern-matching protocol then runs on $N'$ rows and $M'$ characters. Every rematerialization of a string column carries a data-preserving update check (\cref{piop:data-preserving-update-check}) that binds the compacted characters to their source rows, so its cost scales with the \emph{character} domain of the survivors.
+
+\parhead{The model} The predicted proving time is linear in the following terms, each priced on the padded domain that the corresponding stage actually runs on:
+\ifsp
+%% S&P (two-column): each description sits right after its term, shortened and
+%% set slightly smaller, so the display fits one column.
+\newcommand{\cmnote}[1]{\enspace\text{\small(#1)}}
+\begin{align*}
+  C = {}& a_0 \cmnote{fixed cost} \\
+  &+ a_{\mathrm{pf}}\, [n_{\mathrm{bin}} > 0] \cmnote{pre-filter, if any bin tested} \\
+  &+ c_{\mathrm{bin}}\, n_{\mathrm{bin}} \cmnote{per tested bin} \\
+  &+ \mathrm{remat} \cdot a_r \cmnote{remat., fixed} \\
+  &+ \mathrm{remat} \cdot a_{rs}\, D(S) \cmnote{remat., per row} \\
+  &+ \mathrm{remat} \cdot a_{rc}\, D(M_S) \cmnote{consistency, per char} \\
+  &+ a_c\, D(M') \cmnote{matching, per char} \\
+  &+ a_{cL}\, (L_\zeta - 1)\, D(M') \cmnote{per char, per extra literal char} \\
+  &+ a_{cn}\, (n_\zeta - 1)\, D(M') \cmnote{per char, per extra factor} \\
+  &+ a_w\, D(N') \cmnote{matching, per row} \\
+  &+ a_{wL}\, (L_\zeta - 1)\, D(N') \cmnote{per row, per extra literal char} \\
+  &+ a_{wn}\, (n_\zeta - 1)\, D(N') \cmnote{per row, per extra factor} \\
+  &+ \mathrm{second} \cdot \bigl(a_2 + a_{2r}\, D(N') \\
+  &\phantom{{}+ \mathrm{second} \cdot \bigl(}{} + a_{2c}\, D(M_T)\bigr) \cmnote{small match set}
+\end{align*}
+\else
+\begin{align*}
+  C = {}& a_0
+    && \text{(fixed cost of every proof)} \\
+  &+ a_{\mathrm{pf}}\, [n_{\mathrm{bin}} > 0]
+    && \text{(pre-filter check, paid once if any bin is tested)} \\
+  &+ c_{\mathrm{bin}}\, n_{\mathrm{bin}}
+    && \text{(opening and zerocheck factor per tested bin)} \\
+  &+ \mathrm{remat} \cdot a_r
+    && \text{(fixed cost of rematerializing the survivors)} \\
+  &+ \mathrm{remat} \cdot a_{rs}\, D(S)
+    && \text{(rematerialization, per surviving row)} \\
+  &+ \mathrm{remat} \cdot a_{rc}\, D(M_S)
+    && \text{(consistency check, per surviving character)} \\
+  &+ a_c\, D(M')
+    && \text{(pattern matching, per input character)} \\
+  &+ a_{cL}\, (L_\zeta - 1)\, D(M')
+    && \text{(per character, per extra literal character)} \\
+  &+ a_{cn}\, (n_\zeta - 1)\, D(M')
+    && \text{(per character, per extra factor)} \\
+  &+ a_w\, D(N')
+    && \text{(pattern matching, per input row)} \\
+  &+ a_{wL}\, (L_\zeta - 1)\, D(N')
+    && \text{(per row, per extra literal character)} \\
+  &+ a_{wn}\, (n_\zeta - 1)\, D(N')
+    && \text{(per row, per extra factor)} \\
+  &+ \mathrm{second} \cdot \bigl(a_2 + a_{2r}\, D(N') + a_{2c}\, D(M_T)\bigr)
+    && \text{(stage triggered by a small match set).}
+\end{align*}
 \fi
 
-To convince the verifier that each row of $\col_3$ is the bitwise AND of the corresponding rows of $\col_1$ and $\col_2$, the prover will convince the verifier that the concatenated rows of $\col_1, \col_2, \col_3$ can be looked up in a truth table encoding the bitwise AND function. More concretely,
-\begin{DefinePIOP}{BitwiseAND}{bitwise-and}
-    \begin{enumerate}[nosep]
-        \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:range-check} on each of the three columns to check that they are all $n$-bit.
-        \item $\PIOPVerifier$ samples three random field elements $r_1, r_2,r_3$ and sends them to $\PIOPProver$.
-        \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:lookup-check} to check that the concatenated column $\col' = r_1\col_1 + r_2\col_2 + r_3\col_3$ can be looked up in the column $\col'' = r_1\idx'_n+r_2\idx''_n+r_3\MLE{o}$ where
-        \begin{align*}
-            \idx'_n(X_0,\ldots,X_{n-1}) &= \sum_{i=0}^{n-1} 2^{n-1-i} X_i, \\
-            \idx''_n(X_0,\ldots,X_{n-1}) &= \sum_{i=0}^{n-1} 2^{n-1-i} X_{n+i}, \\
-            \MLE{\mathsf{and}}(X_0,\ldots,X_{2n-1}) &= \sum_{i=0}^{n-1} 2^{n-1-i} X_iX_{n+i}.
-        \end{align*}
-    \end{enumerate}
-\end{DefinePIOP}
+
+\subsubsection{Greedy Bin Assignment}
+\label{sec:greedy}
+The cost model prices a given set of bins, but the prover still has to decide which of the $2^{|\mathcal{F}_\zeta|}$ subsets of the pattern's bins to price. Since the prover holds the data, it knows for every bin $b$ the set $R_b$ of rows whose fingerprint has $\mathsf{fp}_b = 1$, and a set of bins $Q$ keeps exactly the rows in $\bigcap_{b \in Q} R_b$. The prover therefore orders the bins into a chain greedily (\cref{alg:greedy-bins}): starting from all rows, it repeatedly adds the bin that leaves the fewest survivors among the rows that are still alive, breaking ties toward the lower bin index. Choosing by survivors among the alive rows, rather than by each bin's own selectivity, avoids spending a bin on rows that earlier bins have already discarded: two bins that each discard many rows, but largely the same ones, are worth little more than one of them. After each step the prover records the query's shape, namely $S$, $M_S$ and $n_{\mathrm{bin}}$, which together with $N$, $M$, $T$, $L_\zeta$ and $n_\zeta$ is everything the cost model needs, and prices it. It then tests the prefix of the chain with the lowest predicted cost. This may be the empty prefix, in which case no pre-filter is applied; on a tie it takes the shorter prefix, since every tested bin also enlarges the proof.
+
+The whole chain is priced rather than stopped at the first bin that does not pay off, because the cost is not convex in the number of bins: it drops in steps whenever $S$ or $M_S$ crosses a power of two, so a bin that saves nothing may precede one that crosses a step. Building the chain costs $O(|\mathcal{F}_\zeta|^2 N)$ bit operations on bitsets over the rows, which is negligible next to proving (about one second per query in our experiments). As discussed above, any prefix is sound, so the choice needs no agreement with the verifier beyond the list of bins, and an inaccurate cost model costs proving time, never correctness.
+
+\begin{algorithm}[t]
+\caption{Greedy bin assignment for pattern $\zeta$ over column $\col$.}
+\label{alg:greedy-bins}
+\begin{algorithmic}[1]
+\Require pattern bins $\mathcal{F}_\zeta$; row sets $R_b = \{i : \mathsf{fp}_b(\col[i]) = 1\}$ for $b \in \mathcal{F}_\zeta$; cost model $C$
+\Ensure bins to test $\mathcal{F}_u \subseteq \mathcal{F}_\zeta$
+\State $A \gets \{1, \dots, N\}$ \Comment{rows still alive}
+\State $Q_0 \gets \emptyset$;\quad $c_0 \gets C(S{=}N,\ M_S{=}M,\ n_{\mathrm{bin}}{=}0)$ \Comment{no pre-filter}
+\For{$k = 1, \dots, |\mathcal{F}_\zeta|$}
+  \State $b_k \gets \arg\min_{b \in \mathcal{F}_\zeta \setminus Q_{k-1}} |A \cap R_b|$ \Comment{ties to the lowest bin}
+  \State $Q_k \gets Q_{k-1} \cup \{b_k\}$;\quad $A \gets A \cap R_{b_k}$
+  \State $c_k \gets C\bigl(S{=}|A|,\ M_S{=}\textstyle\sum_{i \in A} |\col[i]|,\ n_{\mathrm{bin}}{=}k\bigr)$
+\EndFor
+\State $k^\star \gets \min\, \arg\min_{k} c_k$ \Comment{cheapest prefix, shortest on a tie}
+\State \Return $\mathcal{F}_u \gets Q_{k^\star}$
+\end{algorithmic}
+\end{algorithm}

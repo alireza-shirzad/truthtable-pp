@@ -7,6 +7,19 @@ We present a collection of protocols that serve as building blocks for the strin
 \label{sec:broadcast}
 
 In some protocols, we need to expand a string-level column into a character-level one (see \cref{sec:string-arith} for definitions) by copying each string's entry onto all of its characters; we call this operation \emph{broadcasting}. We package this as the relation
+\ifsp
+%% S&P (two-column): condition stacked below the tuple so the display fits one column.
+\begin{displaymath}
+\NPRelation_{\mathsf{Bcast}} = \left\{\,
+  \begin{aligned}
+    & \NPInstance = \bot,\\
+    & \NPInstancey = (\Oracle{\MLE{\mathsf{orig\text{-}ind}}}, \Oracle{\MLE{\mathsf{d}}}, \Oracle{\MLE{\mathsf{d}'}}),\\
+    & \NPWitness = (\mathsf{orig\text{-}ind}, \mathsf{d}, \mathsf{d}')\\[2pt]
+    & \text{s.t.}\ \mathsf{d}'[c] = \mathsf{d}[\mathsf{orig\text{-}ind}[c]]\ \text{for every char } c
+  \end{aligned}
+\,\right\}.
+\end{displaymath}
+\else
 \begin{displaymath}
 \NPRelation_{\mathsf{Bcast}} = \left\{\,
   \begin{aligned}
@@ -18,6 +31,7 @@ In some protocols, we need to expand a string-level column into a character-leve
     \mathsf{d}'[c] = \mathsf{d}[\mathsf{orig\text{-}ind}[c]]\ \text{for every character } c
 \,\right\}.
 \end{displaymath}
+\fi
 The following PIOP checks this broadcast relationship.
 \begin{DefinePIOP}{Broadcast Check}{broadcast}
   \emph{Inputs:} $\Oracle{\MLE{\mathsf{orig\text{-}ind}}}, \Oracle{\MLE{\mathsf{ind}}}, \Oracle{\MLE{\mathsf{d}}}, \Oracle{\MLE{\mathsf{d}'}}$.
@@ -39,6 +53,20 @@ Three kinds of updates arise in the system: \emph{data-preserving} (\cref{sec:da
 In a data-preserving update, only the activators are freshly materialized, i.e. columns $\mathsf{a}$ and $\mathsf{char\text{-}act}$, while the remaining data columns are inherited unchanged. These are the operators that merely re-mark which rows are active---selection, projection, \texttt{DISTINCT}, and \texttt{LIMIT}.
 
 Before relying on the new activators, the verifier must confirm that they are \emph{consistent}. Recall that a string column carries a string-level activator $\mathsf{a}$, marking which strings are active, and a character-level activator $\mathsf{char\text{-}act}$, marking which characters are active. The pair is consistent when both columns are boolean and every character inherits the active bit of the string it belongs to. We package this as the relation
+\ifsp
+%% S&P (two-column): conditions stacked below the tuple so the display fits one column.
+\begin{displaymath}
+\NPRelation_{\mathsf{Cons}} = \left\{\,
+  \begin{aligned}
+    & \NPInstance = \bot,\\
+    & \NPInstancey = (\Oracle{\MLE{\mathsf{char\text{-}act}}}, \Oracle{\MLE{\mathsf{a}}}),\\
+    & \NPWitness = (\mathsf{char\text{-}act}, \mathsf{a})\\[2pt]
+    & \text{s.t.}\ \mathsf{char\text{-}act}[j], \mathsf{a}[i] \in \{0,1\}\ \text{for all } i,j,\\
+    & \phantom{\text{s.t.}}\ \mathsf{char\text{-}act}[j] = \mathsf{a}[i]\ \text{for char } j \text{ in string } i
+  \end{aligned}
+\,\right\}.
+\end{displaymath}
+\else
 \begin{displaymath}
 \NPRelation_{\mathsf{Cons}} = \left\{\,
   \begin{aligned}
@@ -53,6 +81,7 @@ Before relying on the new activators, the verifier must confirm that they are \e
   \end{aligned}
 \,\right\}.
 \end{displaymath}
+\fi
 which the following protocol establishes it.
 % The booleanity condiction is symply verified by two \cref{piop:boolean-check}s. For the consistency condition, we observe that grouping the rows $(\mathsf{orig\text{-}ind}, \mathsf{char\text{-}act})$ by $\mathsf{orig\text{-}ind}$ and summing $\mathsf{char\text{-}act}$ within each group must reproduce $\mathsf{l}$ on the active strings (those marked by $\mathsf{a}$). Hence, treating $(\mathsf{orig\text{-}ind}, \mathsf{char\text{-}act})$ as an input table grouped by its key and $(\mathsf{ind}, \mathsf{l})$ with activator $\mathsf{a}$ as the grouped output, we invoke the \texttt{Group By Sum} protocol of \cite{cryptoeprint:2026/1260}, a single \cref{piop:keyedsumcheck} invocation.
 \begin{DefinePIOP}{Data-Preserving Update Check}{data-preserving-update-check}
@@ -112,7 +141,22 @@ Since the prover materializes every new column, the check must establish two thi
 \subsection{Length Filtering}
 \label{sec:length-filtering}
 
-Length filtering discards every string shorter than a threshold $k$, keeping only those of length at least $k$. This is the pruning needed in pattern matching: in every filter  a string can match only if it is at least as long as the pattern, so any shorter string is a guaranteed non-match and can be removed before the filter runs. As we will see in \cref{sec:multi-char-pattern-matching,sec:prefix-suffix}, this is not merely an optimization: length filtering is necessary for the pattern-matching protocols to remain complete and sound. We define the length filtering relation as follows
+Length filtering discards every string shorter than a threshold $k$, keeping only those of length at least $k$. This is the pruning needed in pattern matching: in every filter  a string can match only if it is at least as long as the pattern, so any shorter string is a guaranteed non-match and can be removed before the filter runs. As we will see in \cref{sec:multi-char-pattern-matching}, this is not merely an optimization: length filtering is necessary for the pattern-matching protocols to remain complete and sound. We define the length filtering relation as follows
+\ifsp
+%% S&P (two-column): statement split over two lines and conditions stacked below.
+\begin{equation*}
+\NPRelation_{\mathsf{LenFilter}} = \left\{\,
+\begin{aligned}
+  & \NPInstance = k,\\
+  & \NPInstancey = (\Oracle{\MLE{\mathsf{l}}}, \Oracle{\MLE{\mathsf{a}}}, \Oracle{\MLE{\mathsf{char\text{-}act}}},\\
+  & \phantom{\NPInstancey = (}\Oracle{\MLE{\mathsf{a'}}}, \Oracle{\MLE{\mathsf{char\text{-}act'}}}),\\
+  & \NPWitness = (\mathsf{l}, \mathsf{a}, \mathsf{char\text{-}act}, \mathsf{a'}, \mathsf{char\text{-}act'})\\[2pt]
+  & \text{s.t.}\ \mathsf{a'}[i] = 1 \Leftrightarrow \bigl(\mathsf{a}[i] = 1 \wedge \mathsf{l}[i]\geq k\bigr),\\
+  & \phantom{\text{s.t.}}\ \mathsf{char\text{-}act'}[j] = \mathsf{a'}[i]\ \text{for } j \in \text{string } i
+\end{aligned}
+\,\right\}.
+\end{equation*}
+\else
 \begin{equation*}
 \NPRelation_{\mathsf{LenFilter}} = \left\{
 \begin{aligned}
@@ -124,9 +168,10 @@ Length filtering discards every string shorter than a threshold $k$, keeping onl
     \begin{aligned}
    \mathsf{a'}[i] = 1 \iff \bigl(\mathsf{a}[i] = 1 \ \text{and}\ \mathsf{l}[i]\geq k\bigr) \\
     \mathsf{char\text{-}act'}[j] = \mathsf{a'}[i]\ \forall\text{ char } j \text{ of string } i
-    \end{aligned} 
+    \end{aligned}
 \right\}.
 \end{equation*}
+\fi
 
 \begin{DefinePIOP}{Length Filtering Check}{len-filter}
   \emph{Inputs:} $\Oracle{\MLE{\mathsf{orig\text{-}ind}}}, \Oracle{\MLE{\mathsf{l}}}, \Oracle{\MLE{\mathsf{a}}}, \Oracle{\MLE{\mathsf{char\text{-}act}}}$, threshold $k$.
