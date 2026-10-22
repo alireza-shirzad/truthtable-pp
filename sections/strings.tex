@@ -22,6 +22,8 @@ In this section we develop PIOPs for SQL \emph{wild-card} pattern matching --- t
 \label{fig:wildcard-taxonomy}
 \end{figure}
 
+
+\ali{There is no single/multi char anymore}
 \subsection{Multi-Character}
 \label{sec:multi-char-pattern-matching}
 
@@ -91,6 +93,7 @@ The per-round placement invoked above is carried out by \cref{piop:factor-placem
 
 \parhead{Leftmost Occurrence} To confirm that the $\mathsf{start}$ column output by \cref{piop:factor-placement} indeed marks the leftmost occurrence, the verifier checks, in \cref{fp:placement}, that no occurrence precedes the one recorded in $\mathsf{start}$.
 
+\ali{keep abstracting away large chunks of psudocode, use meaningful helpers like the codebase}
 \begin{DefinePIOP}{Factor Placement}{factor-placement}[Factor Placement]
   \emergencystretch=3em\relax
   \emph{Inputs:} $p=(\mathsf{str},\mathsf{mode})$ with $\ell=|\mathsf{str}|$; the input activators $\Oracle{\MLE{\mathsf{a}}}$ and $\Oracle{\MLE{\mathsf{char\text{-}act}}}$; the rotated character columns $\{\Oracle{\MLE{\mathsf{char}^{(\delta)}}}\}_{\delta=0}^{\ell-1}$ and coefficients $r_0,\dots,r_{\ell-1}$; and $\Oracle{\MLE{\mathsf{bnd}}}, \Oracle{\MLE{\mathsf{orig\text{-}ind}}}, \Oracle{\MLE{\mathsf{int\text{-}ind}}}, \Oracle{\MLE{\mathsf{ind}}}$.

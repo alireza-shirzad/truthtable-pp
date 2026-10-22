@@ -100,7 +100,8 @@ In a domain-preserving update, all of the main and auxiliary columns, including 
 
 Since the prover materializes every new column, the check must establish two things: that the new columns form a well-formed arithmetization, and that no new string is introduced. The second requirement is the expensive one---verified directly, it would require re-hashing the freshly materialized characters---but we obtain it \emph{for free} from the trusted old columns: matching each new string to its source row pins its hash, length, and characters to those of an old string, so the new hash is correct by inheritance and never recomputed. What does \emph{not} come for free is the \emph{structural} shape of the new columns---that $\mathsf{l^{new}}$ counts the characters of each new string and that $\mathsf{int\text{-}ind^{new}}$ enumerates their within-word positions without gaps or repeats. These constraints are self-referential to the new columns, untethered to the old ones, and left unchecked they let the prover reorder, duplicate, or drop characters while still passing the source lookups. We therefore certify the structure directly with a handful of cheap checks---no hashing---and only then transfer the content by provenance.
 
-
+\ali{Too many polynomials}
+\ali{add intuition before the box and link it in the piop}
 
 \begin{DefinePIOP}{Full String Validity Check}{full-str-valid}
   \emph{Inputs:} the old columns
