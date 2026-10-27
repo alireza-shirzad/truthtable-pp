@@ -39,6 +39,29 @@
 \usepackage{mathtools}
 \usepackage{bbm}
 \usepackage{subcaption}
+\usepackage{listings}
+% SQL syntax-highlighting style for query listings (after TruthTable).
+\definecolor{sqlkeyword}{HTML}{0033B3}
+\definecolor{sqlstring}{HTML}{067D17}
+\definecolor{sqlcomment}{HTML}{8C8C8C}
+\lstdefinestyle{sql}{
+  language=SQL,
+  sensitive=false,
+  basicstyle=\ttfamily\footnotesize,
+  keywordstyle=\color{sqlkeyword}\bfseries,
+  stringstyle=\color{sqlstring},
+  commentstyle=\color{sqlcomment}\itshape,
+  morecomment=[l]{--},
+  morekeywords={count,sum,avg,min,max,inner,join,cast,with},
+  breaklines=true,
+  breakatwhitespace=false,
+  columns=fullflexible,
+  keepspaces=true,
+  showstringspaces=false,
+  literate={'}{{\char39}}1,
+}
+% Scratch box used to center an lstlisting (listings ignore \centering on their own).
+\newsavebox{\sqlbox}
 \usepackage{tabu}
 \usepackage{multirow}
 \usepackage{xparse}

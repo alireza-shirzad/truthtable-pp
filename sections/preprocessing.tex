@@ -1,0 +1,11 @@
+% !TEX root = ../paper.tex
+\doclearpage
+\section{Acceleration via Preprocessing}
+\label{sec:preprocessing}
+
+The protocols of \cref{sec:piop-for-pattern-matching,sec:lex-order} are complete as they stand, but both pay for their generality: pattern matching sweeps the character-level columns of every candidate string, and sorting inspects the strings character by character. In both cases much of this work can be shifted from the prover, who would repeat it for every query, to the data owner, who performs it once at ingestion and commits the result alongside the data. This section presents the two preprocessing steps we use. For pattern matching, \emph{fingerprints} (Sections~\ref{sec:prefilter-fp} to~\ref{sec:opt-fp}) summarize which characters each string contains, so that a cheap pre-filter discards the rows that cannot match and the full protocol runs only on the survivors. For ordering, \emph{ranks} (\cref{sec:rank}) record the position of every committed string in the lexicographic order of its column, so that sorting strings reduces to sorting integers.
+
+The two steps differ in weight, and the difference is instructive. Ranks are a single extra column and need no new protocol, because the order of a column is a property of the column alone. Matching depends on the pattern, so its summary must serve every pattern at once, which is why fingerprints come with a design space, a PIOP of their own, and a cost model to decide when to use them. What the two share is the trust model: the precomputed columns are committed by the data owner, who is trusted for the data itself, and where this trust is unwanted they can instead be certified once at ingestion against the committed character-level columns, as \cref{piop:rank-cert} does for ranks, so that no query ever pays for their correctness.
+
+\input{sections/fingerprinting.tex}
+\input{sections/ranks.tex}

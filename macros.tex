@@ -1,5 +1,4 @@
 % !TEX root = paper.tex
-\newcommand{\papername}{TruthTable++}
 \newcommand{\truthtable}{\mathsf{TruthTable}}
 
 % FORMATTING
@@ -160,3 +159,32 @@
 
 % Polynomial Commitment Schemes
 \newcommand{\Commitment}{\mathsf{cm}}
+% Lexicographic ordering (sections/sorting.tex, sections/str-piop-toolbox.tex)
+\newcommand{\strcol}{\mathsf{s}}          % a string column
+\newcommand{\sqlkw}[1]{\textcolor{sqlkeyword}{\bfseries #1}}   % SQL keyword, matching the sql listing style
+\newcommand{\sqlline}[1]{\text{\footnotesize\ttfamily #1}}      % one line of SQL inside math
+\newcommand{\lexle}{\preceq}              % lexicographic <=
+\newcommand{\lexlt}{\prec}                % lexicographic <
+\newcommand{\pad}[1]{\overline{#1}}       % string padded with the sentinel \bot to length L
+
+% System model and cc-SNARK syntax (sections/overview.tex), after TruthTable's notation
+\newcommand{\Server}{\mathcal{S}}
+\newcommand{\Client}{\mathcal{C}}
+\newcommand{\DataOwner}{\mathcal{D}}
+\newcommand{\Database}{\mathsf{DB}}
+\newcommand{\DatabaseCM}{\Commitment_{\Database}}
+\newcommand{\Query}{\mathsf{Q}}
+\newcommand{\QueryResult}{\mathsf{res}}
+\newcommand{\Proof}{\pi}
+\newcommand{\QueryPlan}{\mathsf{QP}}
+\newcommand{\QP}{\mathsf{QP}}
+\newcommand{\opt}{\mathsf{opt}}
+\newcommand{\SQL}{\mathsf{SQL}}
+\newcommand{\ResultSet}{R}
+\newcommand{\Setup}{\mathsf{Setup}}
+\newcommand{\Commit}{\mathsf{Commit}}
+\newcommand{\Prove}{\mathsf{Prove}}
+\newcommand{\Verify}{\mathsf{Verify}}
+\newcommand{\pk}{\mathsf{pk}}
+\newcommand{\vk}{\mathsf{vk}}
+\newcommand{\ck}{\mathsf{ck}}

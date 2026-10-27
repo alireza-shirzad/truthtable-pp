@@ -1,0 +1,263 @@
+% !TEX root = paper.tex
+\section{Deferred Proofs}
+\label{sec:deferred-proofs}
+This appendix states the relations proven by the protocols of \cref{sec:string-toolbox,sec:lex-order,sec:preprocessing}, which the main text describes only in words, and proves the soundness and completeness of the corresponding PIOPs. Throughout, a string column is given by its arithmetization of \cref{sec:string-arith}, and we write $s_i$ for the string held in row $i$.
+
+\subsection{Broadcast Check}
+\label{sec:proof-bcast}
+\cref{piop:broadcast} (\cref{sec:broadcast}) proves that a character-level column $\mathsf{d}^\prime$ is obtained from a string-level column $\mathsf{d}$ by copying the entry of every string onto all of its characters:
+\ifsp
+%% S&P (two-column): condition stacked below the tuple so the display fits one column.
+\begin{displaymath}
+\NPRelation_{\mathsf{Bcast}} = \left\{\,
+  \begin{aligned}
+    & \NPInstance = \bot,\\
+    & \NPInstancey = (\Oracle{\MLE{\mathsf{orig\text{-}ind}}}, \Oracle{\MLE{\mathsf{d}}}, \Oracle{\MLE{\mathsf{d}'}}),\\
+    & \NPWitness = (\mathsf{orig\text{-}ind}, \mathsf{d}, \mathsf{d}')\\[2pt]
+    & \text{s.t.}\ \mathsf{d}'[c] = \mathsf{d}[\mathsf{orig\text{-}ind}[c]]\ \text{for every char } c
+  \end{aligned}
+\,\right\}.
+\end{displaymath}
+\else
+\begin{displaymath}
+\NPRelation_{\mathsf{Bcast}} = \left\{\,
+  \begin{aligned}
+    \NPInstance &= \bot,\\
+    \NPInstancey &= (\Oracle{\MLE{\mathsf{orig\text{-}ind}}}, \Oracle{\MLE{\mathsf{d}}}, \Oracle{\MLE{\mathsf{d}'}}),\\
+    \NPWitness &= (\mathsf{orig\text{-}ind}, \mathsf{d}, \mathsf{d}')
+  \end{aligned}
+  \;\middle|\;
+    \mathsf{d}'[c] = \mathsf{d}[\mathsf{orig\text{-}ind}[c]]\ \text{for every character } c
+\,\right\}.
+\end{displaymath}
+\fi
+\parhead{Soundness and completeness}
+\ali{TODO: soundness and completeness proof.}
+
+\subsection{Data-Preserving Update Check}
+\label{sec:proof-cons}
+\cref{piop:data-preserving-update-check} (\cref{sec:data-preserving}) proves that a string-level activator $\mathsf{a}$ and a character-level activator $\mathsf{char\text{-}act}$ are consistent, i.e.\ both are boolean and every character inherits the active bit of its string:
+\ifsp
+%% S&P (two-column): conditions stacked below the tuple so the display fits one column.
+\begin{displaymath}
+\NPRelation_{\mathsf{Cons}} = \left\{\,
+  \begin{aligned}
+    & \NPInstance = \bot,\\
+    & \NPInstancey = (\Oracle{\MLE{\mathsf{char\text{-}act}}}, \Oracle{\MLE{\mathsf{a}}}),\\
+    & \NPWitness = (\mathsf{char\text{-}act}, \mathsf{a})\\[2pt]
+    & \text{s.t.}\ \mathsf{char\text{-}act}[j], \mathsf{a}[i] \in \{0,1\}\ \text{for all } i,j,\\
+    & \phantom{\text{s.t.}}\ \mathsf{char\text{-}act}[j] = \mathsf{a}[i]\ \text{for char } j \text{ in string } i
+  \end{aligned}
+\,\right\}.
+\end{displaymath}
+\else
+\begin{displaymath}
+\NPRelation_{\mathsf{Cons}} = \left\{\,
+  \begin{aligned}
+  \NPInstance &= \bot,\\
+  \NPInstancey &= (\Oracle{\MLE{\mathsf{char\text{-}act}}}, \Oracle{\MLE{\mathsf{a}}}),\\
+  \NPWitness &= (\mathsf{char\text{-}act}, \mathsf{a})
+  \end{aligned}
+  \;\middle|\;
+  \begin{aligned}
+    & \mathsf{char\text{-}act}[j], \mathsf{a}[i] \in \{0,1\}\ \text{for all } i,j,\ \text{and} \\
+    & \mathsf{char\text{-}act}[j] = \mathsf{a}[i]\ \text{for every character } j \text{ of string } i
+  \end{aligned}
+\,\right\}.
+\end{displaymath}
+\fi
+\parhead{Soundness and completeness}
+\ali{TODO: soundness and completeness proof.}
+
+\subsection{Length Filtering Check}
+\label{sec:proof-lenfilter}
+\cref{piop:len-filter} (\cref{sec:length-filtering}) proves that the new activators keep exactly the active strings of length at least $k$, together with their characters:
+\ifsp
+%% S&P (two-column): statement split over two lines and conditions stacked below.
+\begin{equation*}
+\NPRelation_{\mathsf{LenFilter}} = \left\{\,
+\begin{aligned}
+  & \NPInstance = k,\\
+  & \NPInstancey = (\Oracle{\MLE{\mathsf{l}}}, \Oracle{\MLE{\mathsf{a}}}, \Oracle{\MLE{\mathsf{char\text{-}act}}},\\
+  & \phantom{\NPInstancey = (}\Oracle{\MLE{\mathsf{a'}}}, \Oracle{\MLE{\mathsf{char\text{-}act'}}}),\\
+  & \NPWitness = (\mathsf{l}, \mathsf{a}, \mathsf{char\text{-}act}, \mathsf{a'}, \mathsf{char\text{-}act'})\\[2pt]
+  & \text{s.t.}\ \mathsf{a'}[i] = 1 \Leftrightarrow \bigl(\mathsf{a}[i] = 1 \wedge \mathsf{l}[i]\geq k\bigr),\\
+  & \phantom{\text{s.t.}}\ \mathsf{char\text{-}act'}[j] = \mathsf{a'}[i]\ \text{for } j \in \text{string } i
+\end{aligned}
+\,\right\}.
+\end{equation*}
+\else
+\begin{equation*}
+\NPRelation_{\mathsf{LenFilter}} = \left\{
+\begin{aligned}
+  & \NPInstance = k,\; \\
+  & \NPInstancey = (\Oracle{\MLE{\mathsf{l}}}, \Oracle{\MLE{\mathsf{a}}}, \Oracle{\MLE{\mathsf{char\text{-}act}}}, \Oracle{\MLE{\mathsf{a'}}}, \Oracle{\MLE{\mathsf{char\text{-}act'}}}),\; \\
+  & \NPWitness = (\mathsf{l}, \mathsf{a}, \mathsf{char\text{-}act}, \mathsf{a'}, \mathsf{char\text{-}act'})
+\end{aligned}
+   \;\middle|\; 
+    \begin{aligned}
+   \mathsf{a'}[i] = 1 \iff \bigl(\mathsf{a}[i] = 1 \ \text{and}\ \mathsf{l}[i]\geq k\bigr) \\
+    \mathsf{char\text{-}act'}[j] = \mathsf{a'}[i]\ \forall\text{ char } j \text{ of string } i
+    \end{aligned}
+\right\}.
+\end{equation*}
+\fi
+\parhead{Soundness and completeness}
+\ali{TODO: soundness and completeness proof.}
+
+\subsection{Character Projection Check}
+\label{sec:proof-proj}
+\cref{piop:char-proj} (\cref{sec:char-projection}) proves that the string-level column $\mathsf{c}_k$ holds the $k$-th character of every active string, and the sentinel $\bot = -1$ for strings that have no $k$-th character:
+\ifsp
+%% S&P (two-column): conditions stacked below the tuple so the display fits one column.
+\begin{displaymath}
+\NPRelation_{\mathsf{Proj}} = \left\{\,
+  \begin{aligned}
+    & \NPInstance = k,\\
+    & \NPInstancey = (\Oracle{\MLE{\mathsf{char}}}, \Oracle{\MLE{\mathsf{orig\text{-}ind}}}, \Oracle{\MLE{\mathsf{int\text{-}ind}}},\\
+    & \phantom{\NPInstancey = (}\Oracle{\MLE{\mathsf{char\text{-}act}}}, \Oracle{\MLE{\mathsf{l}}}, \Oracle{\MLE{\mathsf{a}}}, \Oracle{\MLE{\mathsf{c}_k}}),\\
+    & \NPWitness = (\mathsf{char}, \mathsf{orig\text{-}ind}, \mathsf{int\text{-}ind}, \mathsf{char\text{-}act}, \mathsf{l}, \mathsf{a}, \mathsf{c}_k)\\[2pt]
+    & \text{s.t.}\ \forall i\ \text{with}\ \mathsf{a}[i] = 1:\\
+    & \phantom{\text{s.t.}}\ \mathsf{c}_k[i] = \mathsf{char}[j]\ \text{for the } j \text{ with } \mathsf{orig\text{-}ind}[j] = i,\\
+    & \phantom{\text{s.t.}\ \mathsf{c}_k[i] = \mathsf{char}[j]\ }\mathsf{int\text{-}ind}[j] = k\ \text{if } \mathsf{l}[i] > k,\\
+    & \phantom{\text{s.t.}}\ \mathsf{c}_k[i] = \bot\ \text{if } \mathsf{l}[i] \le k
+  \end{aligned}
+\,\right\}.
+\end{displaymath}
+\else
+\begin{displaymath}
+\NPRelation_{\mathsf{Proj}} = \left\{\,
+  \begin{aligned}
+    \NPInstance &= k,\\
+    \NPInstancey &= (\Oracle{\MLE{\mathsf{char}}}, \Oracle{\MLE{\mathsf{orig\text{-}ind}}}, \Oracle{\MLE{\mathsf{int\text{-}ind}}}, \Oracle{\MLE{\mathsf{char\text{-}act}}}, \Oracle{\MLE{\mathsf{l}}}, \Oracle{\MLE{\mathsf{a}}}, \Oracle{\MLE{\mathsf{c}_k}}),\\
+    \NPWitness &= (\mathsf{char}, \mathsf{orig\text{-}ind}, \mathsf{int\text{-}ind}, \mathsf{char\text{-}act}, \mathsf{l}, \mathsf{a}, \mathsf{c}_k)
+  \end{aligned}
+  \;\middle|\;
+  \begin{array}{l}
+    \forall i\ \text{with}\ \mathsf{a}[i] = 1: \\[3pt]
+    \quad \mathsf{c}_k[i] = \mathsf{char}[j]\ \text{for the } j \text{ with } \mathsf{orig\text{-}ind}[j] = i,\ \mathsf{int\text{-}ind}[j] = k,\ \text{if } \mathsf{l}[i] > k, \\[3pt]
+    \quad \mathsf{c}_k[i] = \bot\ \text{if } \mathsf{l}[i] \le k
+  \end{array}
+\,\right\}.
+\end{displaymath}
+\fi
+In other words, $\mathsf{c}_k[i] = \pad{s_i}[k]$ is the $k$-th entry of the padded string of \cref{sec:sql-string-order}.
+\parhead{Soundness and completeness}
+\ali{TODO: soundness and completeness proof.}
+
+\subsection{Lexicographic Sortedness Check}
+\label{sec:proof-lexsorted}
+\cref{piop:lex-sorted-check} (\cref{sec:lex-sorted-check}) proves that a string column with $n$ active rows in the contiguous layout is sorted in the lexicographic order of \cref{sec:sql-string-order}:
+\ifsp
+%% S&P (two-column): tuple and condition stacked so the display fits one column.
+\begin{displaymath}
+\NPRelation_{\mathsf{LexSorted}} = \left\{\,
+  \begin{aligned}
+    & \NPInstance = \bot,\\
+    & \NPInstancey = \Oracle{\MLE{\strcol}},\\
+    & \NPWitness = \strcol\\[2pt]
+    & \text{s.t.}\ \mathsf{a} = \contig_{\mu,n},\\
+    & \phantom{\text{s.t.}}\ s_i \lexle s_{i+1}\ \text{for all } 0 \le i < n-1
+  \end{aligned}
+\,\right\}.
+\end{displaymath}
+\else
+\begin{displaymath}
+\NPRelation_{\mathsf{LexSorted}} = \left\{\,
+  \NPInstance = \bot,\;
+  \NPInstancey = \Oracle{\MLE{\strcol}},\;
+  \NPWitness = \strcol
+  \;\middle|\;
+  \begin{array}{l}
+    \mathsf{a} = \contig_{\mu,n}, \\[3pt]
+    s_i \lexle s_{i+1}\ \text{for all } 0 \le i < n-1
+  \end{array}
+\,\right\}.
+\end{displaymath}
+\fi
+Only adjacent rows are constrained, which suffices because $\lexle$ is transitive.
+\parhead{Soundness and completeness}
+\Cref{ls:same} pins $\mathsf{same}$ exactly: a marked pair has equal hashes, hence equal strings by the collision resistance of the hash, and an unmarked pair of $\mathsf{t}_{\mathsf{in}}$ has distinct hashes. \Cref{ls:sort} then proves, for every pair of $\mathsf{eq}_0$, that the rows $(\mathsf{c}_0, \dots, \mathsf{c}_{R-1})[i]$ and $(\mathsf{c}_0, \dots, \mathsf{c}_{R-1})[i+1]$ are in strictly increasing lexicographic order, i.e.\ that there is a first position $k < R$ at which they differ and $\mathsf{c}_k[i] < \mathsf{c}_k[i+1]$ there. By \cref{ls:proj} these rows are the first $R$ entries of $\pad{s_i}$ and $\pad{s_{i+1}}$, so $s_i \lexlt s_{i+1}$ by \cref{lem:padded-lex}. Every pair of $\mathsf{t}_{\mathsf{in}}$ is thus either equal or strictly increasing, which is $\NPRelation_{\mathsf{LexSorted}}$. For completeness, the padded sequences of two distinct adjacent strings in a sorted column differ at some position, the first such position is at most the longer length, and the honest prover's $R$ is one more than the largest first-difference position over all adjacent distinct pairs, so after $R$ keys no pair of $\mathsf{eq}_0$ remains tied and the strict check passes.
+
+\subsection{Rank Certification Check}
+\label{sec:proof-rankvalid}
+\cref{piop:rank-cert} (\cref{sec:rank}) proves that a rank column is monotone in the lexicographic order and separates exactly the distinct strings. Writing $\pi$ for the permutation that sorts $\mathsf{rk}$ non-decreasingly, the relation constrains the column sorted by rank:
+\ifsp
+\begin{displaymath}
+\NPRelation_{\mathsf{RankValid}} = \left\{\,
+  \begin{aligned}
+    & \NPInstance = \bot,\\
+    & \NPInstancey = (\Oracle{\MLE{\strcol}}, \Oracle{\MLE{\mathsf{rk}}}),\\
+    & \NPWitness = (\strcol, \mathsf{rk})\\[2pt]
+    & \text{s.t.}\ \forall\, 0 \le i < n-1:\\
+    & \phantom{\text{s.t.}}\ s_{\pi(i)} \lexle s_{\pi(i+1)},\\
+    & \phantom{\text{s.t.}}\ \mathsf{rk}[\pi(i)] = \mathsf{rk}[\pi(i+1)] \iff s_{\pi(i)} = s_{\pi(i+1)}
+  \end{aligned}
+\,\right\}.
+\end{displaymath}
+\else
+\begin{displaymath}
+\NPRelation_{\mathsf{RankValid}} = \left\{\,
+  \NPInstance = \bot,\;
+  \NPInstancey = (\Oracle{\MLE{\strcol}}, \Oracle{\MLE{\mathsf{rk}}}),\;
+  \NPWitness = (\strcol, \mathsf{rk})
+  \;\middle|\;
+  \begin{array}{l}
+    \forall\, 0 \le i < n-1:\quad s_{\pi(i)} \lexle s_{\pi(i+1)}\ \text{ and} \\[3pt]
+    \phantom{\forall\, 0 \le i < n-1:\quad} \mathsf{rk}[\pi(i)] = \mathsf{rk}[\pi(i+1)] \iff s_{\pi(i)} = s_{\pi(i+1)}
+  \end{array}
+\,\right\}.
+\end{displaymath}
+\fi
+Adjacent consistency along $\pi$ implies the global property by transitivity: ranks are non-decreasing along the lexicographic order and increase exactly where the string changes.
+\parhead{Soundness and completeness}
+\ali{TODO: soundness and completeness proof.}
+
+\subsection{Pre-Filtering Check}
+\label{sec:proof-pf}
+Let $\col$ be a string column with $N$ rows whose bins $\mathsf{fp}_1,\dots,\mathsf{fp}_m$ the data owner committed under the Merkle root $\rho_\col$ (\cref{alg:fp-commit}), and let $\mathcal{F}_\zeta=\{b : \mathsf{fp}_b(\zeta)=1\}$ be the bins of pattern $\zeta$. \cref{piop:prefilter-check} (\cref{sec:fp-piop}) proves membership in
+\ifsp
+%% S&P (two-column): instance, witness and conditions stacked so the display fits one column.
+\begin{equation*}
+\mathcal{R}_{\mathsf{PF}} = \left\{\,
+\begin{aligned}
+  & \NPInstance = \bigl(\zeta,\ \rho_\col,\ \Oracle{\MLE{\mathsf{a}}}, \Oracle{\MLE{\mathsf{char\text{-}act}}},\\
+  & \qquad \Oracle{\MLE{\mathsf{orig\text{-}ind}}}, \Oracle{\MLE{\mathsf{ind}}}, \Oracle{\MLE{\mathsf{l}}},\\
+  & \qquad \Oracle{\MLE{\mathsf{a'}}}, \Oracle{\MLE{\mathsf{char\text{-}act'}}}\bigr),\\
+  & \NPWitness = \bigl(\mathcal{F}_u,\ (\mathsf{com}_b)_{b\in\mathcal{F}_u},\ \pi\bigr)\\[2pt]
+  & \text{s.t.}\ \emptyset \neq \mathcal{F}_u \subseteq \mathcal{F}_\zeta,\\
+  & \phantom{\text{s.t.}}\ \pi \text{ opens } \rho_\col \text{ to } \mathsf{com}_b = \mathsf{Commit}(\mathsf{fp}_b)\\
+  & \phantom{\text{s.t.}}\ \quad \text{at leaf } b,\ \forall b\in\mathcal{F}_u,\\
+  & \phantom{\text{s.t.}}\ \mathsf{a'}[i] = \mathsf{a}[i]\cdot\textstyle\prod_{b\in\mathcal{F}_u}\mathsf{fp}_b[i],\ \forall i\in[N],\\
+  & \phantom{\text{s.t.}}\ \mathsf{char\text{-}act'}[c] = \mathsf{char\text{-}act}[c]\\
+  & \phantom{\text{s.t.}}\ \quad \cdot\,\mathsf{a'}[\mathsf{orig\text{-}ind}[c]],\ \forall c
+\end{aligned}
+\,\right\}.
+\end{equation*}
+\else
+\begin{equation*}
+\mathcal{R}_{\mathsf{PF}} = \left\{
+\begin{array}{l}
+\bigl(\,(\zeta,\ \rho_\col,\ \Oracle{\MLE{\mathsf{a}}}, \Oracle{\MLE{\mathsf{char\text{-}act}}}, \Oracle{\MLE{\mathsf{orig\text{-}ind}}}, \Oracle{\MLE{\mathsf{ind}}}, \Oracle{\MLE{\mathsf{l}}}, \Oracle{\MLE{\mathsf{a'}}}, \Oracle{\MLE{\mathsf{char\text{-}act'}}}) \,;\ \\
+\phantom{\bigl(}\ (\mathcal{F}_u,\ (\mathsf{com}_b)_{b\in\mathcal{F}_u},\ \pi)\,\bigr)
+\end{array}
+\ \middle|\
+\begin{array}{l}
+\emptyset \neq \mathcal{F}_u \subseteq \mathcal{F}_\zeta,\\
+\pi \text{ opens } \rho_\col \text{ to } \mathsf{com}_b = \mathsf{Commit}(\mathsf{fp}_b) \text{ at leaf } b,\ \forall b\in\mathcal{F}_u,\\
+\mathsf{a'}[i] = \mathsf{a}[i]\cdot\prod_{b\in\mathcal{F}_u}\mathsf{fp}_b[i],\quad \forall i\in[N],\\
+\mathsf{char\text{-}act'}[c] = \mathsf{char\text{-}act}[c]\cdot\mathsf{a'}[\mathsf{orig\text{-}ind}[c]],\quad \forall c
+\end{array}
+\right\}.
+\end{equation*}
+\fi
+
+\begin{ilemma}[No false negatives]\label{lem:prefilter-sound}
+For every $\bigl(x; w\bigr)\in\mathcal{R}_{\mathsf{PF}}$, $\mathsf{a'}\le\mathsf{a}$ pointwise, $\mathsf{a'}$ is binary, and every active row that matches the pattern survives:
+$\mathsf{a}[i]=1 \wedge \col[i]\sim\zeta \implies \mathsf{a'}[i]=1$.
+\end{ilemma}
+\begin{proof}
+Each $\mathsf{fp}_b$ is a binary column committed by the data owner, so $\mathsf{a'}[i]\in\{0,1\}$ and $\mathsf{a'}[i]\le\mathsf{a}[i]$. If $\col[i]$ matches $\zeta$, then $\col[i]$ contains every character and n-gram of each literal factor, and every precedence pair of the factors read in order. Hence $\mathsf{fp}_b(\col[i])=1$ for every $b\in\mathcal{F}_\zeta\supseteq\mathcal{F}_u$, so the product is $1$ and $\mathsf{a'}[i]=\mathsf{a}[i]=1$.
+\end{proof}
+\parhead{Soundness and completeness}
+\ali{TODO: soundness and completeness proof.}

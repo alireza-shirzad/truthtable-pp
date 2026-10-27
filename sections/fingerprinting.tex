@@ -1,14 +1,12 @@
-\doclearpage
-\section{Pre-Filtering Optimization}
+% !TEX root = ../paper.tex
+\subsection{Pre-Filtering via Fingerprinting}
+\label{sec:prefilter-fp}
 
 In \cref{sec:piop-for-pattern-matching} we presented a PIOP for pattern matching that is proven secure and ready to be deployed. Although \cref{piop:multi-char-pattern-matching} proves what is conceptually a simple filter, it operates on the full character-level machinery of the string arithmetization and is therefore expensive. This motivates us to shrink the string columns fed into it as much as possible.
 
 To this end, we borrow the \emph{fingerprinting} technique from the database literature, where it was introduced~\cite{string_fingerprint} as a fast pre-filter for query execution: it cheaply discards \emph{true negatives}, the rows that certainly do not match the pattern, while possibly retaining \emph{false positives}, rows that survive the filter but do not actually match. Once most true negatives are gone, the surviving column is small enough that an exact but expensive pattern-matching protocol can affordably remove the remaining false positives.
 
 Although fingerprinting was originally proposed to speed up the \emph{execution} of pattern matching, we find that it speeds up its \emph{verification} just as effectively. Before presenting the verification mechanism, we first describe how fingerprint-based pre-filtering works.
-
-\subsection{Pre-Filtering via Fingerprinting}
-\label{sec:prefilter-fp}
 
 The idea of fingerprinting is to replace the full representation of a string with a handful of \emph{bins}, each bin holding a single bit that is $1$ if and only if the string satisfies a fixed feature. The fingerprint of a string is the vector of its bin values.
 
@@ -116,54 +114,12 @@ For each bin $i$, the data owner forms the binary \emph{bin column} $\mathsf{bin
 \end{algorithm}
 
 \subsection{Fingerprinting PIOP}
+\label{sec:fp-piop}
 
 
 
 
-Let $\col$ be a string column with $N$ rows whose bins $\mathsf{fp}_1,\dots,\mathsf{fp}_m$ the data owner committed under the Merkle root $\rho_\col$ (\cref{alg:fp-commit}), and let $\mathcal{F}_\zeta=\{b : \mathsf{fp}_b(\zeta)=1\}$ be the bins of pattern $\zeta$. The Pre-Filtering Check (\cref{piop:prefilter-check}) proves membership in
-\ifsp
-%% S&P (two-column): instance, witness and conditions stacked so the display fits one column.
-\begin{equation*}
-\mathcal{R}_{\mathsf{PF}} = \left\{\,
-\begin{aligned}
-  & \NPInstance = \bigl(\zeta,\ \rho_\col,\ \Oracle{\MLE{\mathsf{a}}}, \Oracle{\MLE{\mathsf{char\text{-}act}}},\\
-  & \qquad \Oracle{\MLE{\mathsf{orig\text{-}ind}}}, \Oracle{\MLE{\mathsf{ind}}}, \Oracle{\MLE{\mathsf{l}}},\\
-  & \qquad \Oracle{\MLE{\mathsf{a'}}}, \Oracle{\MLE{\mathsf{char\text{-}act'}}}\bigr),\\
-  & \NPWitness = \bigl(\mathcal{F}_u,\ (\mathsf{com}_b)_{b\in\mathcal{F}_u},\ \pi\bigr)\\[2pt]
-  & \text{s.t.}\ \emptyset \neq \mathcal{F}_u \subseteq \mathcal{F}_\zeta,\\
-  & \phantom{\text{s.t.}}\ \pi \text{ opens } \rho_\col \text{ to } \mathsf{com}_b = \mathsf{Commit}(\mathsf{fp}_b)\\
-  & \phantom{\text{s.t.}}\ \quad \text{at leaf } b,\ \forall b\in\mathcal{F}_u,\\
-  & \phantom{\text{s.t.}}\ \mathsf{a'}[i] = \mathsf{a}[i]\cdot\textstyle\prod_{b\in\mathcal{F}_u}\mathsf{fp}_b[i],\ \forall i\in[N],\\
-  & \phantom{\text{s.t.}}\ \mathsf{char\text{-}act'}[c] = \mathsf{char\text{-}act}[c]\\
-  & \phantom{\text{s.t.}}\ \quad \cdot\,\mathsf{a'}[\mathsf{orig\text{-}ind}[c]],\ \forall c
-\end{aligned}
-\,\right\}.
-\end{equation*}
-\else
-\begin{equation*}
-\mathcal{R}_{\mathsf{PF}} = \left\{
-\begin{array}{l}
-\bigl(\,(\zeta,\ \rho_\col,\ \Oracle{\MLE{\mathsf{a}}}, \Oracle{\MLE{\mathsf{char\text{-}act}}}, \Oracle{\MLE{\mathsf{orig\text{-}ind}}}, \Oracle{\MLE{\mathsf{ind}}}, \Oracle{\MLE{\mathsf{l}}}, \Oracle{\MLE{\mathsf{a'}}}, \Oracle{\MLE{\mathsf{char\text{-}act'}}}) \,;\ \\
-\phantom{\bigl(}\ (\mathcal{F}_u,\ (\mathsf{com}_b)_{b\in\mathcal{F}_u},\ \pi)\,\bigr)
-\end{array}
-\ \middle|\
-\begin{array}{l}
-\emptyset \neq \mathcal{F}_u \subseteq \mathcal{F}_\zeta,\\
-\pi \text{ opens } \rho_\col \text{ to } \mathsf{com}_b = \mathsf{Commit}(\mathsf{fp}_b) \text{ at leaf } b,\ \forall b\in\mathcal{F}_u,\\
-\mathsf{a'}[i] = \mathsf{a}[i]\cdot\prod_{b\in\mathcal{F}_u}\mathsf{fp}_b[i],\quad \forall i\in[N],\\
-\mathsf{char\text{-}act'}[c] = \mathsf{char\text{-}act}[c]\cdot\mathsf{a'}[\mathsf{orig\text{-}ind}[c]],\quad \forall c
-\end{array}
-\right\}.
-\end{equation*}
-\fi
-
-\begin{ilemma}[No false negatives]\label{lem:prefilter-sound}
-For every $\bigl(x; w\bigr)\in\mathcal{R}_{\mathsf{PF}}$, $\mathsf{a'}\le\mathsf{a}$ pointwise, $\mathsf{a'}$ is binary, and every active row that matches the pattern survives:
-$\mathsf{a}[i]=1 \wedge \col[i]\sim\zeta \implies \mathsf{a'}[i]=1$.
-\end{ilemma}
-\begin{proof}
-Each $\mathsf{fp}_b$ is a binary column committed by the data owner, so $\mathsf{a'}[i]\in\{0,1\}$ and $\mathsf{a'}[i]\le\mathsf{a}[i]$. If $\col[i]$ matches $\zeta$, then $\col[i]$ contains every character and n-gram of each literal factor, and every precedence pair of the factors read in order. Hence $\mathsf{fp}_b(\col[i])=1$ for every $b\in\mathcal{F}_\zeta\supseteq\mathcal{F}_u$, so the product is $1$ and $\mathsf{a'}[i]=\mathsf{a}[i]=1$.
-\end{proof}
+Let $\col$ be a string column with $N$ rows whose bins $\mathsf{fp}_1,\dots,\mathsf{fp}_m$ the data owner committed under the Merkle root $\rho_\col$ (\cref{alg:fp-commit}), and let $\mathcal{F}_\zeta=\{b : \mathsf{fp}_b(\zeta)=1\}$ be the bins of pattern $\zeta$. The Pre-Filtering Check (\cref{piop:prefilter-check}) proves membership in the relation $\mathcal{R}_{\mathsf{PF}}$, stated in \cref{sec:proof-pf}: the prover chooses a non-empty subset $\mathcal{F}_u \subseteq \mathcal{F}_\zeta$ of the pattern\textquotesingle s bins and opens their commitments under $\rho_\col$; the new string-level activator is the old one multiplied by the opened bin columns, $\mathsf{a}^\prime[i] = \mathsf{a}[i]\cdot\prod_{b\in\mathcal{F}_u}\mathsf{fp}_b[i]$; and the new character-level activator keeps exactly the characters of the kept strings. Since every matching string lies in every bin of the pattern, the filter never discards a matching row (\cref{lem:prefilter-sound}).
 
 
 \begin{DefinePIOP}{Pre-Filtering Check}{prefilter-check}[Pre-Filtering Check]
@@ -175,7 +131,7 @@ Each $\mathsf{fp}_b$ is a binary column committed by the data owner, so $\mathsf
     \item (\emph{Opening the bins})\label[step]{pf:open} $\PIOPProver$ sends the commitments $(\mathsf{com}_b)_{b\in\mathcal{F}_u}$ together with a Merkle multiproof $\pi$ for the leaves $\mathcal{F}_u$. $\PIOPVerifier$ checks that $\pi$ opens $\rho_\col$ to $\mathsf{com}_b$ at leaf $b$ for every $b\in\mathcal{F}_u$, and rejects otherwise. From then on the parties hold the bin oracles $\Oracle{\MLE{\mathsf{fp}_b}}$ for $b\in\mathcal{F}_u$.
     \item (\emph{Filtered activators})\label[step]{pf:filter} $\PIOPProver$ computes the string-level activator $\mathsf{a'}[i] := \mathsf{a}[i]\cdot\prod_{b\in\mathcal{F}_u}\mathsf{fp}_b[i]$. It also computes its character-level counterpart $\mathsf{char\text{-}act'}$, which keeps exactly the active characters of the strings kept by $\mathsf{a'}$. $\PIOPProver$ sends $\Oracle{\MLE{\mathsf{a'}}}$ and $\Oracle{\MLE{\mathsf{char\text{-}act'}}}$ to $\PIOPVerifier$.
     \item (\emph{Subset test})\label[step]{pf:subset} The parties invoke a \cref{piop:zerocheck}, of degree $|\mathcal{F}_u|+1$, on $\mathsf{a'}-\mathsf{a}\cdot\prod_{b\in\mathcal{F}_u}\mathsf{fp}_b$.
-    \item (\emph{Activator update validity})\label[step]{pf:dpuc} The parties invoke \cref{piop:data-preserving-update-check} on $(\mathsf{char\text{-}act'}, \mathsf{a'}, \mathsf{orig\text{-}ind}, \mathsf{ind}, \mathsf{l})$, binding $\mathsf{char\text{-}act'}$ to $\mathsf{a'}$.
+    \item (\emph{Activator update validity})\label[step]{pf:dpuc} The parties invoke \cref{piop:data-preserving-update-check} on the updated column $\strcol'$, binding $\mathsf{char\text{-}act'}$ to $\mathsf{a'}$.
     \item (\emph{Output})\label[step]{pf:output} $\PIOPProver$ and $\PIOPVerifier$ output the filtered activators $\mathsf{a'}$ and $\mathsf{char\text{-}act'}$.
   \end{enumerate}
 \end{DefinePIOP}

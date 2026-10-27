@@ -1,0 +1,94 @@
+% !TEX root = ../paper.tex
+\doclearpage
+\section{PIOPs for Lexicographic Ordering}
+\label{sec:lex-order}
+
+Pattern matching is not the only white-box string operation that SQL workloads demand. Queries routinely \emph{order} their output by a string column (\texttt{ORDER BY s\_name}), compare strings against literals (\texttt{p\_type < 'MEDIUM'}), and select extremal strings (\texttt{MIN(n\_name)}). All of these rest on a single primitive, the \emph{lexicographic order} of strings, and none of them can be verified by a system that sees only a hash per string: a hash carries no order. In this section we develop PIOPs for this primitive. We first fix the ordering conventions of SQL as implemented by DataFusion~\cite{datafusion}, the engine underlying $\truthtable$ (\cref{sec:sql-string-order}); then state the sortedness relation and prove it by reducing the order of strings to the multi-key integer order that $\truthtable$ already supports, with one key per character position (\cref{sec:lex-sorted-check}). \Cref{sec:rank} later shows that for strings copied from committed columns the order can be \emph{precomputed} at ingestion in the rank column of \cref{sec:string-arith}, which turns every later string sort into an integer sort and relegates the character-level protocol to a one-time certification.
+
+\subsection{String Ordering in SQL}
+\label{sec:sql-string-order}
+
+The SQL standard leaves the order of strings to a \emph{collation}, and engines differ widely in their defaults (case-insensitive, locale-aware, or padding-insensitive orders are all common). We follow DataFusion~\cite{datafusion}, whose conventions are the simplest possible and, as we show, map directly onto our arithmetization.
+
+\parhead{Binary collation}
+DataFusion compares two strings by the bytes of their \textsc{utf-8} encodings, from left to right, exactly as \texttt{memcmp} does; no \texttt{COLLATE} clause or locale is supported. Because \textsc{utf-8} preserves the order of Unicode code points under byte-wise comparison, this is the same as comparing the sequences of code points. Consequently the order is \emph{case-sensitive} and places every upper-case letter before every lower-case one (\texttt{'Zebra'} $<$ \texttt{'apple'}, since \texttt{0x5A} $<$ \texttt{0x61}), and trailing spaces are significant (\texttt{'a'} $<$ \texttt{'a '}), in contrast to the blank-padded semantics of \texttt{CHAR} columns in some engines. Our character column $\mathsf{char}$ holds exactly these bytes (\cref{sec:string-arith}), so comparing its entries as integers, byte by byte, reproduces DataFusion's order verbatim.
+
+\parhead{Unequal lengths}
+Two strings are compared position by position until the first position at which they differ; the string with the smaller character there is smaller. If no such position exists before the shorter string runs out, the shorter string is the smaller one: a proper prefix precedes every string that extends it (\texttt{'ab'} $<$ \texttt{'abc'} $<$ \texttt{'ac'}), and the empty string precedes every other string.
+
+\parhead{Ties}
+Two strings are equal precisely when they have the same length and agree at every position. Within an \texttt{ORDER BY}, rows that tie on one sort key are ordered by the next key; rows that tie on \emph{all} keys may be returned in any order, since SQL does not require a stable sort. Our relations accept any such order.
+
+\parhead{\texttt{NULL}s}
+\texttt{NULL} strings do not compare with any value; their placement is a separate convention. DataFusion's default treats \texttt{NULL} as the largest value, so \texttt{NULL}s come last in ascending and first in descending order. We record this convention for completeness only: $\truthtable$ does not support \texttt{NULL} values in any column, string or otherwise, and neither does our extension of it.
+
+\parhead{Direction}
+\texttt{DESC} simply reverses the order on non-\texttt{NULL} values; with the default \texttt{NULL} convention it also moves the \texttt{NULL}s to the front.
+
+\parhead{Formalization}
+Let $\Sigma = \{0, \dots, 2^{\alpha}-1\}$ with $\alpha = 8$ be the character alphabet, i.e.\ the bytes as they appear in the $\mathsf{char}$ column (\cref{sec:string-arith}), and write a string as $s = s[0]\,s[1] \cdots s[|s|-1]$ with $s[j] \in \Sigma$. The \emph{lexicographic order} $\lexle$ on strings is defined by $s \lexlt t$ iff either
+\begin{itemize}[nosep]
+  \item there is a position $k < \min(|s|, |t|)$ with $s[j] = t[j]$ for all $j < k$ and $s[k] < t[k]$, or
+  \item $|s| < |t|$ and $s[j] = t[j]$ for all $j < |s|$ (i.e.\ $s$ is a proper prefix of $t$),
+\end{itemize}
+and $s \lexle t$ iff $s \lexlt t$ or $s = t$. The two cases are unified by \emph{padding}. Fix a bound $L$ on the string lengths and a sentinel $\bot := -1 \notin \Sigma$, and let $\pad{s} \in (\Sigma \cup \{\bot\})^{L}$ be $s$ followed by $L - |s|$ copies of $\bot$. Since $\bot$ is smaller than every code point, a proper prefix $s$ of $t$ satisfies $\pad{s}[|s|] = \bot < t[|s|] = \pad{t}[|s|]$, so the prefix rule becomes an instance of the first rule, and we obtain:
+\begin{lemma}[Padded comparison]\label{lem:padded-lex}
+  For strings $s, t$ of length at most $L$, $s \lexle t$ holds iff $\pad{s} \le \pad{t}$ in the ordinary lexicographic order on integer sequences of length $L$, i.e.\ iff either $\pad{s} = \pad{t}$, or at the first index $k$ with $\pad{s}[k] \ne \pad{t}[k]$ we have $\pad{s}[k] < \pad{t}[k]$. Moreover $\pad{s} = \pad{t}$ iff $s = t$.
+\end{lemma}
+\Cref{lem:padded-lex} is what lets us sort by the first character, then the second, and so on, without ever treating the string lengths as a special case: the character-projection columns of \cref{sec:char-projection} deliver exactly the padded sequences $\pad{s}$, one position at a time.
+
+\subsection{Lexicographic Sortedness Check}
+\label{sec:lex-sorted-check}
+
+Throughout, a string column $\strcol$ is given by its full arithmetization $\hat{\strcol} = (\mathsf{h}, \mathsf{l}, \mathsf{a}, \mathsf{char}, \mathsf{orig\text{-}ind}, \mathsf{int\text{-}ind}, \mathsf{char\text{-}act}, \mathsf{bnd})$ of \cref{sec:string-arith} in the contiguous layout, with $n$ active rows, and we write $s_i$ for the string held in row $i$, i.e.\ the sequence of $\mathsf{char}[j]$ over the characters $j$ with $\mathsf{orig\text{-}ind}[j] = i$, in order of $\mathsf{int\text{-}ind}[j]$. The relation we prove, $\NPRelation_{\mathsf{LexSorted}}$ (stated in \cref{sec:proof-lexsorted}), says that the column is sorted: the activator is the contiguous $\contig_{\mu,n}$, and $s_i \lexle s_{i+1}$ for every pair of adjacent active rows. Only adjacent rows are constrained, which suffices because $\lexle$ is transitive.
+
+$\truthtable$ already proves that a table is sorted by \emph{several integer keys}: its lexicographic sort check, restated as \cref{piop:lex-sort}, orders the rows by the first key, propagates the pairs tied on it to the second key and orders them there, propagates the pairs still tied to the third key, and so on, carrying a boolean tie indicator from key to key. The observation of this section is that the lexicographic order on strings \emph{is} that multi-key order, with one key per character position. By \cref{lem:padded-lex}, $s_i \lexle s_{i+1}$ iff the padded sequences $\pad{s_i}$ and $\pad{s_{i+1}}$ are ordered as rows of an integer table whose $k$-th column holds the $k$-th padded character of every string. That column is exactly the projection $\mathsf{c}_k$ of \cref{sec:char-projection}, and the prover can commit to it and prove it well formed because the character-level columns already \emph{point} to the $k$-th character of every string through $(\mathsf{orig\text{-}ind}, \mathsf{int\text{-}ind})$. A string sortedness check is therefore a character projection per position followed by a single invocation of \cref{piop:lex-sort} on the table of projections. Two subtleties remain.
+
+\parhead{Strings of different lengths}
+A string that has run out of characters at position $k$ must sort before every string that has not. The sentinel $\bot = -1$ that the projection fills in beyond the end of a string (\cref{sec:char-projection}) does precisely this, since it is smaller than every character code; \cref{lem:padded-lex} is the statement that no further special case is needed. Each key thus takes values in $[-1, 2^{\alpha}-1]$, so the sign checks inside \cref{piop:lex-sort} run with width $\alpha + 1$.
+
+\parhead{How many positions to commit}
+Committing to all $L$ positions, for $L$ the longest string, would waste work: most adjacent pairs are separated by their first character or two. The prover should commit only to as many positions as are needed to \emph{separate every adjacent pair}, and prove that this many suffice. Two ingredients make this precise. First, adjacent pairs of \emph{equal} strings can never be separated, however many positions are inspected, so they are removed from consideration up front. Equal strings have equal hashes, so the prover marks the adjacent pairs with equal hashes in an \emph{equal-neighbour indicator} $\mathsf{same}$, certified by a zerocheck (marked pairs have equal hashes) and a no-zero check (unmarked pairs have distinct hashes); the initial tie indicator handed to \cref{piop:lex-sort} is then $\mathsf{eq}_0 := \contig_{\mu,n-1} \mult (1 - \mathsf{same})$, the adjacent pairs of \emph{distinct} strings. Second, with $\mathsf{eq}_0$ in place the prover sets
+\begin{displaymath}
+  R := 1 + \max_{i :\, \mathsf{eq}_0[i] = 1} \mathrm{lcp}(s_i, s_{i+1}),
+\end{displaymath}
+one more than the longest common prefix of any adjacent pair of distinct strings (and $R := 0$ if there is no such pair), commits to the projections $\mathsf{c}_0, \dots, \mathsf{c}_{R-1}$ only, and runs \cref{piop:lex-sort} in \emph{strict} mode, which asserts that no pair of $\mathsf{eq}_0$ remains tied after the $R$ keys. Strictness is what certifies that $R$ positions suffice: a smaller $R$ leaves some distinct pair tied and the check fails, while a larger $R$ is accepted but wasteful. The string lengths never enter: two distinct strings are separated at the first position where their padded sequences differ, which exists and lies below the longer of the two lengths, so no bound on the lengths needs to be known or proven.
+
+\begin{DefinePIOP}{Lexicographic Sortedness Check}{lex-sorted-check}[Lexicographic Sortedness Check]
+  \emergencystretch=3em\relax
+  \emph{Inputs:} the string column $\Oracle{\MLE{\strcol}}$ with all of its main and auxiliary oracles (\cref{sec:string-arith}); $\Oracle{\MLE{\mathsf{ind}}}$; and an initial tie indicator $\Oracle{\MLE{\mathsf{t}_{\mathsf{in}}}}$ marking the adjacent pairs to be ordered (by default $\contig_{\mu,n-1}$, all of them).
+  \vspace{1mm}
+
+  \noindent\emph{Output:} the equal-neighbour indicator $\Oracle{\MLE{\mathsf{same}}}$, marking the pairs of $\mathsf{t}_{\mathsf{in}}$ whose strings are equal.
+  \vspace{2mm}
+  \begin{enumerate}[nosep]
+    \item (\emph{Layout})\label[step]{ls:layout} $\PIOPProver$ sends the active length $n$, and $\PIOPVerifier$ asserts $\mathsf{a} = \contig_{\mu,n}$.
+    \item (\emph{Equal neighbours})\label[step]{ls:same} $\PIOPProver$ sends $\Oracle{\MLE{\mathsf{h}^{\mathsf{next}}}}$ and $\Oracle{\MLE{\mathsf{same}}}$ with $\mathsf{same}[i] := \mathsf{t}_{\mathsf{in}}[i] \mult \mathbf{1}[\mathsf{h}[i] = \mathsf{h}[i+1]]$, and $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:rotcheck} on $(\mathsf{h}, \mathsf{h}^{\mathsf{next}}, -1)$, \cref{piop:boolean-check} on $\mathsf{same}$, \cref{piop:zerocheck} on $\mathsf{same} \mult (1 - \mathsf{t}_{\mathsf{in}})$ and on $\mathsf{same} \mult (\mathsf{h}^{\mathsf{next}} - \mathsf{h})$, and \cref{piop:nozero-check} on the column with activator $\mathsf{t}_{\mathsf{in}} \mult (1 - \mathsf{same})$ and data $\mathsf{h}^{\mathsf{next}} - \mathsf{h}$. Both parties set $\mathsf{eq}_0 := \mathsf{t}_{\mathsf{in}} \mult (1 - \mathsf{same})$.
+    \item (\emph{Number of positions})\label[step]{ls:count} $\PIOPProver$ sends $R := 1 + \max_{i:\,\mathsf{eq}_0[i]=1} \mathrm{lcp}(s_i, s_{i+1})$, or $R := 0$ if $\mathsf{eq}_0 \equiv 0$.
+    \item (\emph{Projections})\label[step]{ls:proj} For $k = 0, \dots, R-1$, $\PIOPProver$ sends $\Oracle{\MLE{\mathsf{c}_k}}$, and $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:char-proj} on $(k, \mathsf{c}_k)$ and the string column, with the lookups of all positions batched as in \cref{sec:char-projection}; this establishes $\mathsf{c}_k[i] = \pad{s_i}[k]$ on active rows.
+    \item (\emph{Multi-key sort})\label[step]{ls:sort} $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:lex-sort} in strict mode on the table $(\mathsf{a}, [\mathsf{c}_0, \dots, \mathsf{c}_{R-1}])$ with initial tie indicator $\mathsf{eq}_0$ and width $\alpha + 1$.
+  \end{enumerate}
+\end{DefinePIOP}
+
+\parhead{Soundness and completeness}
+Soundness rests on two facts: \cref{ls:same} pins the equal-neighbour indicator exactly, by the collision resistance of the hash, and the strict multi-key sort of \cref{ls:sort} on the projections is, by \cref{lem:padded-lex}, a strict lexicographic comparison of the strings themselves. Completeness holds because the honest prover\textquotesingle s $R$ separates every adjacent pair of distinct strings. The full argument is in \cref{sec:proof-lexsorted}.
+
+\parhead{Cost}
+The protocol commits to $R$ projections and the $R + 1$ shifted copies inside \cref{piop:lex-sort}, all of length $N$, and sweeps the character-level columns of length $M$ once for the batched projection lookup; the prover performs $O(R \mult N + M)$ field operations. $R$ is data dependent, one more than the longest common prefix between adjacent distinct strings in the sorted column, and is typically a small constant: sorting the \texttt{n\_name} column of TPC-H, for instance, separates the $25$ nations within the first few characters.\ali{Measure $R$ on the TPC-H string keys.}
+
+\parhead{Descending order, multiple keys and \texttt{NULL}s}
+Reversing the order amounts to sorting by the negated keys: \cref{piop:lex-sort} is invoked on the virtual columns $-\mathsf{c}_k$, which the verifier forms by negating the projections; the tie indicators and every other step are unchanged. SQL orders rows by the first key and breaks ties by the second, and so on. The tie indicators make this composition direct, since both \cref{piop:lex-sort} and \cref{piop:lex-sorted-check} take an initial tie indicator and return the pairs still tied afterwards: the check of the first key returns the pairs tied on it, and the check of the second key starts from exactly those pairs. For a string key the returned indicator is $\mathsf{same}$, as every pair of distinct strings has been separated; for an integer key it is the final tie indicator $\mathsf{t}_m$ of \cref{piop:lex-sort}. Keys of different types therefore chain freely. Pairs that remain tied after the last key may appear in any order, as in SQL. Should \texttt{NULL}s ever be supported, DataFusion's convention of \cref{sec:sql-string-order} is the same mechanism once more: a null indicator, $0$ on non-null and $1$ on null rows, is sorted first as a leading integer key, and the string key is checked on the pairs it leaves tied.
+
+\parhead{The \texttt{ORDER BY} operator}
+The \texttt{ORDER BY} operator on a string column is a domain-preserving update in the sense of \cref{sec:domain-preserving}: every output string is a copy of an input string. Proving it therefore decomposes into three parts, two of which we already have: the output is a well-formed arithmetization holding the same multiset of strings as the input, and it is in $\NPRelation_{\mathsf{LexSorted}}$. First, \cref{piop:full-str-valid} certifies that the freshly materialized output column is a well-formed arithmetization and ties each output row $i$ to a source row $\mathsf{src}[i]$ of the input holding the same hash, length and characters. Second, the output must contain every input string exactly once, i.e.\ $\mathsf{src}$ must be a \emph{bijection} between the active output rows and the active input rows; a \cref{piop:mset} between $\mathsf{src}$ (activated by $\mathsf{a}^{\mathsf{new}}$) and the index column (activated by $\mathsf{a}^{\mathsf{old}}$) establishes this, and in particular forces the two columns to have the same number of active rows. Third, the output must be sorted, which is \cref{piop:lex-sorted-check}.
+
+\begin{DefinePIOP}{String Sort Check}{str-sort}[String Sort Check]
+  \emergencystretch=3em\relax
+  \emph{Inputs:} the input column $\Oracle{\MLE{\strcol^{\mathsf{old}}}}$ and the output column $\Oracle{\MLE{\strcol^{\mathsf{new}}}}$ (all main and auxiliary oracles of each), together with $\Oracle{\MLE{\mathsf{ind}}}$.
+  \vspace{2mm}
+  \begin{enumerate}[nosep]
+    \item (\emph{Validity and provenance})\label[step]{ss:valid} $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:full-str-valid} on $(\strcol^{\mathsf{old}}, \strcol^{\mathsf{new}})$ with no a-priori source column, so that $\PIOPProver$ sends $\Oracle{\MLE{\mathsf{src}}}$ and the check certifies $(\mathsf{h}^{\mathsf{new}}, \mathsf{l}^{\mathsf{new}})[i] = (\mathsf{h}^{\mathsf{old}}, \mathsf{l}^{\mathsf{old}})[\mathsf{src}[i]]$ and the character-level consistency of every active output row $i$.
+    \item (\emph{Permutation})\label[step]{ss:perm} $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:mset} on the columns $(\mathsf{a}^{\mathsf{new}}, \mathsf{src})$ and $(\mathsf{a}^{\mathsf{old}}, \mathsf{ind})$.
+    \item (\emph{Order})\label[step]{ss:order} $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:lex-sorted-check} on $\strcol^{\mathsf{new}}$.
+  \end{enumerate}
+\end{DefinePIOP}

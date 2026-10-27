@@ -1,7 +1,7 @@
 % !TEX root = paper.tex
 \section{Deferred PIOPs}
 \label{sec:deferred-piops}
-This appendix collects the low-level PIOPs and relations used throughout \papername{}. These are standard or lightly adapted from prior work, and are deferred here so that the main text can focus on the string-filtering protocols.
+This appendix collects the low-level PIOPs and relations used throughout this paper. These are standard or lightly adapted from prior work, and are deferred here so that the main text can focus on the string-filtering protocols.
 
 \subsection{NoZero Check}
 The \emph{NoZero Check} takes a column $\col = (\mathsf{d},\mathsf{a})$ and proves that every active entry of $\col$ is nonzero. We package this as the relation
@@ -434,5 +434,58 @@ since $\contig_{\mu, t_0}(x) = 1$ precisely when $\idx_\mu(x) < t_0$, supplying 
     \item $\PIOPProver$ sends $\PIOPVerifier$ the active length $s$, and $\PIOPVerifier$ asserts $\col.\act = \col'.\act = \contig_{\mu, s}$.
     \item $\PIOPProver$ and $\PIOPVerifier$ locally construct the tagged tables $\Table$ and $\Table'$ as above, using the shifted index polynomial $\idxrot(x) = \idx_\mu(x) - t_0 + s\mult\contig_{\mu, t_0}(x)$ with $t_0 := t \bmod s$.
     \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:mset} to prove that $\Table$ and $\Table'$ are equal as multisets of rows.
+  \end{enumerate}
+\end{DefinePIOP}
+
+
+\subsection{Lexicographic Sort Check}
+\label{sec:lex-sort}
+The \emph{Lexicographic Sort Check} is the multi-key sortedness protocol of $\truthtable$~\cite{cryptoeprint:2026/1260}, which we restate in our notation. It takes a table $\Table = (\mathsf{a}, [\mathsf{d}_1, \dots, \mathsf{d}_m])$ in contiguous layout with $s$ active rows, together with a boolean \emph{initial tie indicator} $\mathsf{t}_0$ marking a subset of the adjacent row pairs $(j, j+1)$, and proves that every marked pair is in non-decreasing lexicographic order of the keys, $(\mathsf{d}_1[j], \dots, \mathsf{d}_m[j]) \le_{\mathsf{lex}} (\mathsf{d}_1[j+1], \dots, \mathsf{d}_m[j+1])$. In \emph{strict} mode it proves in addition that no marked pair is equal on all $m$ keys. We package this as the relation
+\ifsp
+\begin{displaymath}
+\NPRelation_{\mathsf{LexSort}} = \left\{\,
+  \begin{aligned}
+    & \NPInstance = (m, \mathsf{strict}),\\
+    & \NPInstancey = (\Oracle{\MLE{\Table}}, \Oracle{\MLE{\mathsf{t}_0}}),\\
+    & \NPWitness = (\Table, \mathsf{t}_0)\\[2pt]
+    & \text{s.t.}\ \mathsf{a} = \contig_{\mu,s},\ \text{and}\ \forall j\ \text{with}\ \mathsf{t}_0[j] = 1:\\
+    & \phantom{\text{s.t.}}\ (\mathsf{d}_1[j], \dots, \mathsf{d}_m[j]) \le_{\mathsf{lex}} (\mathsf{d}_1[j+1], \dots, \mathsf{d}_m[j+1]),\\
+    & \phantom{\text{s.t.}}\ \text{with}\ \ne\ \text{if}\ \mathsf{strict}
+  \end{aligned}
+\,\right\}.
+\end{displaymath}
+\else
+\begin{displaymath}
+\NPRelation_{\mathsf{LexSort}} = \left\{\,
+  \NPInstance = (m, \mathsf{strict}),\;
+  \NPInstancey = (\Oracle{\MLE{\Table}}, \Oracle{\MLE{\mathsf{t}_0}}),\;
+  \NPWitness = (\Table, \mathsf{t}_0)
+  \;\middle|\;
+  \begin{array}{l}
+    \mathsf{a} = \contig_{\mu,s},\ \text{and for all } j \text{ with } \mathsf{t}_0[j] = 1: \\[3pt]
+    (\mathsf{d}_1[j], \dots, \mathsf{d}_m[j]) \le_{\mathsf{lex}} (\mathsf{d}_1[j+1], \dots, \mathsf{d}_m[j+1]),\ \text{with} \ne \text{ if } \mathsf{strict}
+  \end{array}
+\,\right\}.
+\end{displaymath}
+\fi
+The protocol mirrors the way one sorts by several keys: order by the first key, then order the runs of rows tied on the first key by the second key, and so on. For each key $i$ the prover sends a \emph{tie indicator} $\mathsf{t}_i$ marking the adjacent pairs that are tied on keys $1, \dots, i$, together with the shifted copy $\mathsf{d}'_i := \rho_{-1}(\mathsf{d}_i)$ that aligns every row with its successor. Three checks per key certify the bookkeeping and the order: ties can only persist ($\mathsf{t}_i \le \mathsf{t}_{i-1}$); a persisting tie is a genuine tie ($\mathsf{d}_i[j] = \mathsf{d}_i[j+1]$ wherever $\mathsf{t}_i[j] = 1$); and a tie broken at key $i$ is broken in the right direction ($\mathsf{d}_i[j] < \mathsf{d}_i[j+1]$ wherever $\mathsf{t}_{i-1}[j] = 1$ and $\mathsf{t}_i[j] = 0$). Together these force $\mathsf{t}_i = \mathsf{t}_{i-1} \mult \mathbf{1}[\mathsf{d}_i[j] = \mathsf{d}_i[j+1]]$ and $\mathsf{d}_i[j] \le \mathsf{d}_i[j+1]$ on every pair of $\mathsf{t}_{i-1}$, which is the lexicographic condition by induction on $i$. Our restatement differs from $\truthtable$'s in two cosmetic ways that later sections rely on: the initial tie indicator $\mathsf{t}_0$ is an input rather than fixed to $\contig_{\mu,s-1}$ (all adjacent pairs, the case of a plain \texttt{ORDER BY}), and the final tie indicator $\mathsf{t}_m$ is returned, so that several invocations can be chained over keys of different kinds.
+\begin{DefinePIOP}{Lexicographic Sort Check}{lex-sort}
+  \emergencystretch=3em\relax
+  \emph{Inputs:} $\Oracle{\MLE{\mathsf{a}}}, \Oracle{\MLE{\mathsf{d}_1}}, \dots, \Oracle{\MLE{\mathsf{d}_m}}$; the initial tie indicator $\Oracle{\MLE{\mathsf{t}_0}}$ (by default $\contig_{\mu,s-1}$); a width $\alpha$ bounding $|\mathsf{d}_i[j] - \mathsf{d}_i[j+1]|$; and the flag $\mathsf{strict}$.
+  \vspace{1mm}
+
+  \noindent\emph{Output:} the final tie indicator $\Oracle{\MLE{\mathsf{t}_m}}$.
+  \vspace{2mm}
+  \begin{enumerate}[nosep]
+    \item $\PIOPProver$ sends the active length $s$, and $\PIOPVerifier$ asserts $\mathsf{a} = \contig_{\mu,s}$.
+    \item For $i = 1, \dots, m$, $\PIOPProver$ sends $\Oracle{\MLE{\mathsf{d}'_i}}$ and $\Oracle{\MLE{\mathsf{t}_i}}$ with $\mathsf{d}'_i[j] := \mathsf{d}_i[j+1]$ and $\mathsf{t}_i[j] := \mathsf{t}_{i-1}[j] \mult \mathbf{1}[\mathsf{d}_i[j] = \mathsf{d}_i[j+1]]$, and $\PIOPProver$ and $\PIOPVerifier$ invoke
+    \begin{enumerate}[nosep]
+      \item \cref{piop:rotcheck} on $(\mathsf{d}_i, \mathsf{d}'_i, -1)$;
+      \item \cref{piop:boolean-check} on $\mathsf{t}_i$ and \cref{piop:zerocheck} on $\mathsf{t}_i \mult (1 - \mathsf{t}_{i-1})$;
+      \item (\emph{persisting ties}) \cref{piop:zerocheck} on $\mathsf{t}_i \mult (\mathsf{d}'_i - \mathsf{d}_i)$;
+      \item (\emph{broken ties}) the $\mathsf{Pos}$ \cref{piop:sign-check} with width $\alpha$ on the column with activator $\mathsf{t}_{i-1} \mult (1 - \mathsf{t}_i)$ and data $\mathsf{d}'_i - \mathsf{d}_i$.
+    \end{enumerate}
+    \item If $\mathsf{strict}$, $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:sumcheck} for $\sum_{x \in \BoolHCube{\mu}} \mathsf{t}_m(x) = 0$; since $\mathsf{t}_m$ is boolean, this forces $\mathsf{t}_m \equiv 0$.
+    \item $\PIOPProver$ and $\PIOPVerifier$ output $\Oracle{\MLE{\mathsf{t}_m}}$.
   \end{enumerate}
 \end{DefinePIOP}
