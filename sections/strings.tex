@@ -41,7 +41,7 @@ We now describe the protocol at a high level.
 
 
 
-\parhead{Sweep \& Verdict} We then sweep through all $t$ factors, discarding at each round the strings that do not contain the current factor. Finally, the strings that remain alive are exactly those in which every factor was placed---that is, the strings that satisfy the entire pattern. The sweep records this survival information in the string-level activator $\mathsf{alive_h}$, so $\mathsf{alive_h}$ marks precisely the matching strings. In the honest case it therefore equals $\mathsf{a^{new}}$, which \cref{mc:verdict} verifies with a single zerocheck.
+\parhead{Sweep \& Verdict} We then sweep through all $t$ factors, discarding at each round the strings that do not contain the current factor. Finally, the strings that remain alive are exactly those in which every factor was placed---that is, the strings that satisfy the entire pattern. The sweep records this survival information in the str-level activator $\mathsf{alive_h}$, so $\mathsf{alive_h}$ marks precisely the matching strings. In the honest case it therefore equals $\mathsf{a^{new}}$, which \cref{mc:verdict} verifies with a single zerocheck.
 
 \begin{DefinePIOP}{Multi-Character Pattern Matching}{multi-char-pattern-matching}[Multi-Character Pattern Matching]
   \emergencystretch=3em\relax
@@ -51,12 +51,12 @@ We now describe the protocol at a high level.
     \item (\emph{Activator validity})\label[step]{mc:validity} $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:data-preserving-update-check} on the updated column $\strcol^{\mathsf{new}}$, whose activators are $\mathsf{a^{new}}$ and $\mathsf{char\text{-}act^{new}}$.
     \item (\emph{Length filtering})\label[step]{mc:filter} $\PIOPProver$ computes $\mathsf{a^{old'}}$ and $\mathsf{char\text{-}act^{old'}}$, the result of dropping strings shorter than $k$, and the parties invoke \cref{piop:len-filter} on $(\mathsf{a^{old}}, \mathsf{char\text{-}act^{old}}, \mathsf{a^{old'}}, \mathsf{char\text{-}act^{old'}})$ with threshold $k$.
     \item (\emph{Containment})\label[step]{mc:containment} $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:zerocheck} on $\mathsf{a^{new}}\cdot(1-\mathsf{a^{old'}})$.
-    \item (\emph{Sweep Factors})\label[step]{mc:sweep} $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:sweep-factors} on $(\mathcal{P}, \mathsf{a^{old'}}, \mathsf{char\text{-}act^{old'}}, \Oracle{\MLE{\mathsf{char}}}, \Oracle{\MLE{\mathsf{bnd}}}, \Oracle{\MLE{\mathsf{orig\text{-}ind}}}, \Oracle{\MLE{\mathsf{int\text{-}ind}}}, \allowbreak\Oracle{\MLE{\mathsf{ind}}})$, which sweeps the factors $p_1,\dots,p_t$ in order and returns the final string-level activator $\mathsf{alive_h}$.
+    \item (\emph{Sweep Factors})\label[step]{mc:sweep} $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:sweep-factors} on $(\mathcal{P}, \mathsf{a^{old'}}, \mathsf{char\text{-}act^{old'}}, \Oracle{\MLE{\mathsf{char}}}, \Oracle{\MLE{\mathsf{bnd}}}, \Oracle{\MLE{\mathsf{orig\text{-}ind}}}, \Oracle{\MLE{\mathsf{int\text{-}ind}}}, \allowbreak\Oracle{\MLE{\mathsf{ind}}})$, which sweeps the factors $p_1,\dots,p_t$ in order and returns the final str-level activator $\mathsf{alive_h}$.
     \item (\emph{Verdict})\label[step]{mc:verdict} $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:zerocheck} on $\mathsf{a^{new}}-\mathsf{alive_h}$.
   \end{enumerate}
 \end{DefinePIOP}
 
-Next we discuss the main building block of \cref{piop:multi-char-pattern-matching}, namely \cref{piop:sweep-factors}, which carries out the entire sweep and returns the final string-level activator $\mathsf{alive_h}$, marking exactly the strings that contain all $t$ factors in order and without overlap.
+Next we discuss the main building block of \cref{piop:multi-char-pattern-matching}, namely \cref{piop:sweep-factors}, which carries out the entire sweep and returns the final str-level activator $\mathsf{alive_h}$, marking exactly the strings that contain all $t$ factors in order and without overlap.
 
 
 \parhead{Easy case: Single Factor} We first explain how to check if a column of strings satisfy a single factor $p=(\mathsf{str},\mathsf{mode})$, then extend it to a multi-factor scenario. Let $\ell=|\mathsf{str}|$, then the prover needs to convince the verifier that (i) there exist \emph{a window of length $\ell$} that has the exact pattern $\mathsf{str}$, and (ii) there does not exist such a window for the discarded strings. Also the start position of this window matters. For $\mathsf{mode}=\mathsf{prefix}$, we want this window to start at the 0th location of the survived strings, for $\mathsf{mode}=\mathsf{suffix}$, we want this window to start at the last location of the survived strings, and for $\mathsf{mode}=\mathsf{infix}$, the window can start from anywhere inside the string.
@@ -67,9 +67,9 @@ As noted, the valid starting location of the match depends on the factor's mode,
 
 \parhead{From a Single-Factor to Multi-Factor} To check whether the factors $\mathcal{P}=\{p_1,\dots,p_t\}$ occur in order and without overlap, we first prepare the rotated character polynomials for future fingerptintings in \cref{sf:init}. Next, we explain how the actual sweeping happens in a high level.
 
-\parhead{Sweeping Overview} We sweep the factors $p_1,\dots,p_t$ from left to right in $t$ rounds: one factor per round. Round $j$ locates the leftmost occurrence of the factor $p_j$ within the each string using \cref{piop:factor-placement} and forms two string-level columns: (i) $\mathsf{match}_j$, a boolean indicator of whether the string contains $p_j$ at all; and (ii) $\mathsf{start}_j$, the internal index at which that leftmost occurrence begins. This is done in \cref{mc:sweep}.
+\parhead{Sweeping Overview} We sweep the factors $p_1,\dots,p_t$ from left to right in $t$ rounds: one factor per round. Round $j$ locates the leftmost occurrence of the factor $p_j$ within the each string using \cref{piop:factor-placement} and forms two str-level columns: (i) $\mathsf{match}_j$, a boolean indicator of whether the string contains $p_j$ at all; and (ii) $\mathsf{start}_j$, the internal index at which that leftmost occurrence begins. This is done in \cref{mc:sweep}.
 
-The key idea is that once $p_j$ has been placed, every character up to and including that occurrence is switched off, so the next factor is searched only within the remaining suffix. A single character-level activator $\mathsf{alive_c}$ tracks this shrinking suffix, and it is what enforces the ordering and non-overlap requirements simultaneously: a later factor can only be placed strictly after an earlier one. Committing to the \emph{leftmost} occurrence is safe because it leaves the largest possible suffix for the factors that follow.
+The key idea is that once $p_j$ has been placed, every character up to and including that occurrence is switched off, so the next factor is searched only within the remaining suffix. A single char-level activator $\mathsf{alive_c}$ tracks this shrinking suffix, and it is what enforces the ordering and non-overlap requirements simultaneously: a later factor can only be placed strictly after an earlier one. Committing to the \emph{leftmost} occurrence is safe because it leaves the largest possible suffix for the factors that follow.
 
 For example, consider the pattern ``\%ab\%bd\%t'' and the string ``kabyabrbdut'' with characters $[k,a,b,\allowbreak y,a,b,r,b,d,u,t]$. Initially every character is active, so $\mathsf{alive_c}^{(0)}=[1,1,1,1,1,1,1,1,1,1,1]$. The first round places ``ab'' at its leftmost occurrence and switches off everything up to and including it, leaving $\mathsf{alive_c}^{(1)}=[0,0,0,1,1,1,1,1,1,1,1]$; only the characters after ``ab'' remain under consideration. The second round places ``bd'' within that suffix, giving $\mathsf{alive_c}^{(2)}=[0,0,0,0,0,0,0,0,0,1,1]$, so the final factor ``t'' is searched only in the last two positions---where it is indeed found, and the string matches.
 
@@ -85,7 +85,7 @@ For example, consider the pattern ``\%ab\%bd\%t'' and the string ``kabyabrbdut''
       \item (\textit{Past-placement indicator})\label[step]{sf:past} $\PIOPProver$ broadcasts $\mathsf{start}_j$ to character level as $\mathsf{start}_j'$ via \cref{piop:broadcast}, and the parties invoke the Non-Negative \cref{piop:sign-check} on $\mathsf{int\text{-}ind}[c]-\mathsf{start}_{j}'[c]-|p_{j}|$, receiving the indicator $\mathsf{past}_{j}$ with $\mathsf{past}_{j}[c] = \mathbf{1}[\mathsf{int\text{-}ind}[c]\ge\mathsf{start}_{j}'[c]+|p_{j}|]$.
       \item (\textit{Updating the activators}) $\PIOPProver$ and $\PIOPVerifier$ set $\mathsf{alive_h^{(j)}}[i] := \mathsf{alive_h^{(j-1)}}[i]\cdot\mathsf{match}_j[i]$, and $\PIOPProver$ broadcasts it to character level as $\mathsf{alive_h^{(j)}}'$ via \cref{piop:broadcast}. $\PIOPProver$ then forms $\mathsf{alive_c^{(j)}}[c] := \mathsf{alive_c^{(j-1)}}[c]\cdot\mathsf{alive_h^{(j)}}'[c]\cdot\mathsf{past}_{j}[c]$, and the parties invoke a \cref{piop:zerocheck} on $\mathsf{alive_c^{(j)}}-\mathsf{alive_c^{(j-1)}}\cdot\mathsf{alive_h^{(j)}}'\cdot\mathsf{past}_{j}$.
     \end{enumerate}
-    \item (\emph{Output})\label[step]{sf:output} After the $t$ rounds, $\PIOPProver$ and $\PIOPVerifier$ output the final string-level activator $\mathsf{alive_h^{(t)}}$.
+    \item (\emph{Output})\label[step]{sf:output} After the $t$ rounds, $\PIOPProver$ and $\PIOPVerifier$ output the final str-level activator $\mathsf{alive_h^{(t)}}$.
   \end{enumerate}
 \end{DefinePIOP}
 
@@ -99,7 +99,7 @@ The per-round placement invoked above is carried out by \cref{piop:factor-placem
   \emph{Inputs:} $p=(\mathsf{str},\mathsf{mode})$ with $\ell=|\mathsf{str}|$; the input activators $\Oracle{\MLE{\mathsf{a}}}$ and $\Oracle{\MLE{\mathsf{char\text{-}act}}}$; the rotated character columns $\{\Oracle{\MLE{\mathsf{char}^{(\delta)}}}\}_{\delta=0}^{\ell-1}$ and coefficients $r_0,\dots,r_{\ell-1}$; and $\Oracle{\MLE{\mathsf{bnd}}}, \Oracle{\MLE{\mathsf{orig\text{-}ind}}}, \Oracle{\MLE{\mathsf{int\text{-}ind}}}, \Oracle{\MLE{\mathsf{ind}}}$.
   \vspace{1mm}
 
-  \noindent\emph{Output:} the string-level match indicator $\mathsf{match}$ and placement $\mathsf{start}$.
+  \noindent\emph{Output:} the str-level match indicator $\mathsf{match}$ and placement $\mathsf{start}$.
   \vspace{2mm}
   \begin{enumerate}[nosep]
     \item (\textit{Window fingerprinting}) using the rotated columns and coefficients supplied as input, the parties form $\mathsf{wf} := \sum_{\delta=0}^{\ell-1} r_\delta\,\mathsf{char}^{(\delta)}$, $\mathsf{pf} := \sum_{\delta=0}^{\ell-1} r_\delta\,\mathsf{str}[\delta]$, and $\mathsf{diff} := \mathsf{wf}-\mathsf{pf}$; this is a virtual linear combination, so no new commitments or rotation checks are needed.
@@ -119,16 +119,16 @@ The per-round placement invoked above is carried out by \cref{piop:factor-placem
     forcing $\mathsf{occurs}$ to mark exactly the candidate windows equal to $\mathsf{str}$.
     \item (\textit{Leftmost placement})\label[step]{fp:placement} Writing $O_i:=\{\,\mathsf{int\text{-}ind}[c] : \mathsf{orig\text{-}ind}[c]=i,\ \mathsf{occurs}[c]=1\,\}$ for the occurrence positions in string $i$, $\PIOPProver$ builds and sends
     \begin{itemize}[nosep]
-      \item the string-level indicator $\mathsf{match}[i]:=\mathbf{1}[\,O_i\neq\emptyset\,]$ (the string carries an occurrence);
+      \item the str-level indicator $\mathsf{match}[i]:=\mathbf{1}[\,O_i\neq\emptyset\,]$ (the string carries an occurrence);
       \item the placement $\mathsf{start}[i]:=\min O_i$ when $\mathsf{match}[i]=1$ (the leftmost occurrence), and $\mathsf{start}[i]:=0$ otherwise;
-      \item the character-level marker $\mathsf{mark}[c]:=\mathbf{1}[\,\mathsf{occurs}[c]=1\ \text{and}\ \mathsf{int\text{-}ind}[c]=\mathsf{start}[\mathsf{orig\text{-}ind}[c]]\,]$ (the character at that leftmost occurrence).
+      \item the char-level marker $\mathsf{mark}[c]:=\mathbf{1}[\,\mathsf{occurs}[c]=1\ \text{and}\ \mathsf{int\text{-}ind}[c]=\mathsf{start}[\mathsf{orig\text{-}ind}[c]]\,]$ (the character at that leftmost occurrence).
     \end{itemize}
     The parties then check
     \begin{enumerate}[nosep]
       \item a \cref{piop:boolean-check} on $\mathsf{match}$ and on $\mathsf{mark}$;
       \item (\emph{no false negatives}) $\PIOPProver$ broadcasts $\mathsf{match}$ to character level ($\mathsf{match}'$) via \cref{piop:broadcast}, and the parties invoke a \cref{piop:zerocheck} on $\mathsf{occurs}\cdot(1-\mathsf{match}')$, so every occurrence lies in a matched string;
       \item (\emph{no false positives}) a \cref{piop:zerocheck} on $\mathsf{mark}\cdot(1-\mathsf{occurs})$ (each mark is an occurrence), a \cref{piop:nodup-check} on $\mathsf{orig\text{-}ind}$ with activator $\mathsf{mark}$ (at most one mark per string), and---with a count $n_{\mathsf{m}}$ from $\PIOPProver$---two \cref{piop:sumcheck}s for $\sum_c\mathsf{mark}[c]=n_{\mathsf{m}}$ and $\sum_i\mathsf{match}[i]=n_{\mathsf{m}}$, so exactly one occurrence is marked in each matched string;
-      \item (\emph{placement}) $\PIOPVerifier$ samples $\gamma\samples\F$ and the parties invoke \cref{piop:lookup-check} on $(\mathsf{match},\ \mathsf{ind}+\gamma\,\mathsf{start}) \lookup (\mathsf{mark},\ \mathsf{orig\text{-}ind}+\gamma\,\mathsf{int\text{-}ind})$, i.e.\ with $\mathsf{match}$ activating the string-level column $\mathsf{ind}+\gamma\,\mathsf{start}$ and $\mathsf{mark}$ activating the character-level column $\mathsf{orig\text{-}ind}+\gamma\,\mathsf{int\text{-}ind}$. This ties each matched string's $\mathsf{start}$ to the $\mathsf{int\text{-}ind}$ of its mark (both activated sides have $n_{\mathsf{m}}$ elements, so the lookup forces equality);
+      \item (\emph{placement}) $\PIOPVerifier$ samples $\gamma\samples\F$ and the parties invoke \cref{piop:lookup-check} on $(\mathsf{match},\ \mathsf{ind}+\gamma\,\mathsf{start}) \lookup (\mathsf{mark},\ \mathsf{orig\text{-}ind}+\gamma\,\mathsf{int\text{-}ind})$, i.e.\ with $\mathsf{match}$ activating the str-level column $\mathsf{ind}+\gamma\,\mathsf{start}$ and $\mathsf{mark}$ activating the char-level column $\mathsf{orig\text{-}ind}+\gamma\,\mathsf{int\text{-}ind}$. This ties each matched string's $\mathsf{start}$ to the $\mathsf{int\text{-}ind}$ of its mark (both activated sides have $n_{\mathsf{m}}$ elements, so the lookup forces equality);
       \item (\emph{leftmost}) $\PIOPProver$ broadcasts $\mathsf{start}$ to character level ($\mathsf{start}'$); a \cref{piop:sign-check} forms $\mathbf{1}[\mathsf{int\text{-}ind}<\mathsf{start}']$, and the parties invoke a \cref{piop:zerocheck} on $\mathsf{occurs}\cdot\mathbf{1}[\mathsf{int\text{-}ind}<\mathsf{start}']$ with activator $\mathsf{match}'$, so no occurrence precedes the marked one.
     \end{enumerate}
   \end{enumerate}
@@ -236,11 +236,11 @@ The per-round placement invoked above is carried out by \cref{piop:factor-placem
   \node[rowlab] at (-0.45,\ywC){$\mathsf{wf}$};
   \node[rowlab] at (-0.45,\yocC){$\mathsf{occurs}$};
   \node[rowlab] at (-0.45,\yaC){$\mathsf{alive_c^{(3)}}$};
-  %% ============ string-level columns, one 5-word block to the right of each round band ============
+  %% ============ str-level columns, one 5-word block to the right of each round band ============
   \def\lblx{20.9}
   \def\colA{21.55}\def\colB{22.13}\def\colC{22.71}
   \newcommand{\SB}[4]{\node[scell,fill=#3] at (#1,#2){#4};}
-  % vertical divider separating the character-level panel from the string-level blocks
+  % vertical divider separating the char-level panel from the str-level blocks
   \draw[gray!70,thick] (19.15,1.2) -- (19.15,-15.2);
   % ===== input block (beside the base character rows); shows length filtering a^old -> a^old' =====
   \foreach \yy/\nm in {0/ghiabkbd,-0.6/abbd,-1.2/abdabf,-1.8/abbdef,-2.4/abxbdgefk}{

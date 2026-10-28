@@ -64,6 +64,8 @@ We start with the approach of $\truthtable$~\cite{cryptoeprint:2026/1260} which 
     \end{itemize}
 \cref{fig:string-arith-example} illustrates this arithmetization on a sample four-row string-typed column.
 
+\parhead{Notation} Our protocols treat the two levels of a string column $\strcol$ as two relational tables. $\strcol.\mathsf{main}$ is the \emph{string table}, with one row per string, columns $\mathsf{ind}, \mathsf{h}, \mathsf{l}, \mathsf{rk}$ and activator $\mathsf{a}$, where $\mathsf{ind} = (0, 1, \dots, N-1)$ is the index column; $\strcol.\mathsf{aux}$ is the \emph{character table}, with one row per character, columns $\mathsf{orig\text{-}ind}, \mathsf{int\text{-}ind}, \mathsf{char}, \mathsf{bnd}$ and activator $\mathsf{char\text{-}act}$. For a table $\mathsf{T}$ we write $\mathsf{T}[\mathsf{x}, \mathsf{y}]$ for its projection onto the columns $\mathsf{x}, \mathsf{y}$, which keeps the activator of $\mathsf{T}$.
+
 \ifsp\begin{figure*}[tp]\else\begin{figure}[h!]\fi
 \centering
 % Text is set at the body font size: the picture is not rescaled; instead
@@ -78,7 +80,7 @@ We start with the approach of $\truthtable$~\cite{cryptoeprint:2026/1260} which 
     idx/.style={font=\scriptsize, gray}
   ]
 
-  %==================== Panel 1: string-level columns ====================
+  %==================== Panel 1: str-level columns ====================
   \node[hd, anchor=west] at (-0.9,5.2) {$\mathsf{s}$};
   \node[hd] at (2.1,5.2) {$\mathsf{a}$};
   \node[hd] at (2.7,5.2) {$\mathsf{h}$};
@@ -100,11 +102,11 @@ We start with the approach of $\truthtable$~\cite{cryptoeprint:2026/1260} which 
   \draw[black, thick, densely dotted, rounded corners=2pt] (1.75,5.7) rectangle (3.05,2.2);
   \node[boxlab, anchor=north east, align=center] at (3.3,2.05) {main\\columns};
 
-  % dotted box around the string-level auxiliary columns (length, rank)
+  % dotted box around the str-level auxiliary columns (length, rank)
   \draw[black, thick, densely dotted, rounded corners=2pt] (4.05,5.7) rectangle (5.35,2.2);
   \node[boxlab, anchor=north west, align=center] at (3.35,2.05) {string-level\\aux.\ columns};
 
-  %==================== Panel 2: character-level columns (placed to the right) ====================
+  %==================== Panel 2: char-level columns (placed to the right) ====================
   \begin{scope}[xshift=8.1*\u cm, yshift=5.2*\u cm]
   % group (string) labels above the char row
   \foreach \cx/\nm in {2/apple, 7.5/orange, 13.5/cherry, 19.5/banana}{
@@ -149,7 +151,7 @@ We start with the approach of $\truthtable$~\cite{cryptoeprint:2026/1260} which 
     \node[cell] at (25*0.6,\yy) {0};
   }
 
-  % dotted box around the character-level auxiliary columns
+  % dotted box around the char-level auxiliary columns
   \draw[blue, thick, densely dotted, rounded corners=2pt] (-2.45,0.50) rectangle (15.4,-2.95);
   \node[boxlab] at (6.25,-3.1) {character-level auxiliary columns};
   \end{scope}
@@ -165,7 +167,7 @@ $\col=(\texttt{apple},\texttt{orange},\texttt{cherry},\texttt{banana})$ with
 
 
 \begin{remark}[Dropping auxiliary columns]
-The final result check needs only the hash column for the opening process, so the auxiliary columns need not be carried all the way through the plan. Deciding \emph{how long} to keep them matters for efficiency: every extra column makes the downstream operations more expensive, especially the character-level columns, which can be far larger than the original string column. The best place to drop them is the earliest point past which the plan performs no further white-box string operation.
+The final result check needs only the hash column for the opening process, so the auxiliary columns need not be carried all the way through the plan. Deciding \emph{how long} to keep them matters for efficiency: every extra column makes the downstream operations more expensive, especially the char-level columns, which can be far larger than the original string column. The best place to drop them is the earliest point past which the plan performs no further white-box string operation.
 
 This motivates the planner to push string-filtering operations as far down the plan as possible, so the auxiliary columns can be released early. Such push-down is possible in some plans but not in others: a \textsc{like} predicate on a base column commutes with an inner join and can be pushed down to the base scan, so the auxiliary columns are released before the join, whereas a \textsc{not like} predicate above a \textsc{left join} is not equivalent to a filter on the nullable side, so it stays above the join and the auxiliary columns must be carried through it.
 \end{remark}

@@ -7,14 +7,14 @@ We present a collection of protocols that serve as building blocks for the strin
 \subsection{Broadcast Check}
 \label{sec:broadcast}
 
-In some protocols, we need to expand a string-level column into a character-level one by copying each string's entry onto all of its characters; we call this operation \emph{broadcasting}; \cref{fig:broadcast-example} shows a small example.
+In some protocols, we need to expand a str-level column into a char-level one by copying each string's entry onto all of its characters; we call this operation \emph{broadcasting}; \cref{fig:broadcast-example} shows a small example.
 \begin{figure}[H]
 \centering
 \begin{tikzpicture}[x=1cm, y=1cm,
     cell/.style={draw, minimum size=5.6mm, inner sep=0pt, font=\small},
     rowlab/.style={font=\small, anchor=east},
     hd/.style={font=\small\ttfamily}]
-  % ---- string-level columns ----
+  % ---- str-level columns ----
   \node[rowlab] at (0,0.56)  {$\mathsf{s}$};
   \node[rowlab] at (0,0)     {$\mathsf{ind}$};
   \node[rowlab] at (0,-0.56) {$\mathsf{d}$};
@@ -23,7 +23,7 @@ In some protocols, we need to expand a string-level column into a character-leve
     \node[cell, minimum width=6.6mm] at (0.47+\i*0.66, 0)     {\i};
     \node[cell, minimum width=6.6mm] at (0.47+\i*0.66, -0.56) {\d};
   }
-  % ---- character-level columns ----
+  % ---- char-level columns ----
   \begin{scope}[xshift=3.6cm]
   \node[rowlab] at (0,0.56)  {$\mathsf{s}$};
   \node[rowlab] at (0,0)     {$\mathsf{char}$};
@@ -39,23 +39,28 @@ In some protocols, we need to expand a string-level column into a character-leve
   }
   \end{scope}
 \end{tikzpicture}
-\caption{Broadcasting the string-level column $\mathsf{d} = (5, 9, 2)$ of the strings \texttt{hi}, \texttt{cat} and \texttt{ox} onto their characters yields the character-level column $\mathsf{d}^\prime$.}
+\caption{Broadcasting the str-level column $\mathsf{d} = (5, 9, 2)$ of the strings \texttt{hi}, \texttt{cat} and \texttt{ox} onto their characters yields the char-level column $\mathsf{d}^\prime$.}
 \label{fig:broadcast-example}
 \end{figure}
- More formally, a character-level column $\mathsf{d}^\prime$ is the broadcast of a string-level column $\mathsf{d}$: every character carries the entry of the string it belongs to, $\mathsf{d}^\prime[c] = \mathsf{d}[\mathsf{orig\text{-}ind}[c]]$. The following PIOP checks this relation.
+
+\parhead{Proof sketch} The column $\mathsf{d}'$ is the broadcast of $\mathsf{d}$ when every character $c$ carries the entry of the string it belongs to, i.e.\ $\mathsf{d}'[c] = \mathsf{d}[\mathsf{orig\text{-}ind}[c]]$. Equivalently, the pair $(\mathsf{orig\text{-}ind}[c], \mathsf{d}'[c])$ of every character must be the pair $(\mathsf{ind}[i], \mathsf{d}[i])$ of its string $i = \mathsf{orig\text{-}ind}[c]$, where $\mathsf{ind}$ is the index column of $\strcol.\mathsf{main}$. It therefore suffices to check the lookup
+\begin{equation}
+  \label{eq:bcast-lkup}
+  (\mathsf{orig\text{-}ind}, \mathsf{d}') \lookup (\mathsf{ind}, \mathsf{d}),
+\end{equation}
+
 \begin{DefinePIOP}{Broadcast Check}{broadcast}
-  \emph{Inputs:} a string column $\Oracle{\MLE{\strcol}}$ with all of its main and auxiliary oracles; a string-level column $\Oracle{\MLE{\mathsf{d}}}$ and its claimed broadcast, the character-level column $\Oracle{\MLE{\mathsf{d}'}}$.
+  \emph{Inputs:} the string column $\Oracle{\MLE{\strcol}}$ with all of its main and auxiliary oracles; a str-level column $\Oracle{\MLE{\mathsf{d}}}$; and its claimed broadcast, the char-level column $\Oracle{\MLE{\mathsf{d}'}}$.
   \begin{enumerate}[nosep]
-    \item (\emph{Parse}) $\PIOPProver$ and $\PIOPVerifier$ parse $\Oracle{\MLE{\strcol}}$ to obtain the origin-index oracle $\Oracle{\MLE{\mathsf{orig\text{-}ind}}}$.
-    \item $\PIOPVerifier$ samples a random $r \samples \F$ and sends it to $\PIOPProver$.
-    \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:lookup-check} on $(\mathbf{1},\, \mathsf{orig\text{-}ind} + r\,\mathsf{d}') \lookup (\mathbf{1},\, \mathsf{ind} + r\,\mathsf{d})$.
+    \item (\emph{Parse}) $\PIOPProver$ and $\PIOPVerifier$ parse $\Oracle{\MLE{\strcol}}$ to obtain $\Oracle{\MLE{\mathsf{orig\text{-}ind}}}$.
+    \item To check that $\mathsf{d}'$ is the broadcast of $\mathsf{d}$, $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:lookup-check} on \cref{eq:bcast-lkup}.
   \end{enumerate}
 \end{DefinePIOP}
-The formal definition and security proofs are deferred to \cref{sec:proof-bcast}. 
+The formal definition and the security proofs are deferred to \cref{sec:proof-bcast}.
 
 \subsection{Consistency-Checking protocols}
 \label{sec:consistency-checking}
-The auxiliary columns must remain trusted and in sync with one another and with the main column at all times. Since the prover is untrusted, it cannot update them freely and every update must come with a proof of well-formedness. We therefore design protocols that prove this well-formedness.
+As discussed in \cref{sec:arithmetization}, the main and auxiliary columns of a base table are produced by the data owner and are therefore trusted. In the course of a query, however, the prover must update these columns, for instance when an operator filters, joins or sorts a string column. Since the prover is untrusted, every such update must come with a proof that the resulting main and auxiliary columns are again well-formed. This section presents the protocols that establish this well-formedness.
 
 Three kinds of updates arise in the system: \emph{data-preserving} (\cref{sec:data-preserving}), \emph{domain-preserving} (\cref{sec:domain-preserving}) and \emph{domain-altering}. The relational core of SQL falls almost entirely into the first two, with the third one confined to a handful of value-constructing expressions where all of the columns are freshly materialized and new strings are introduced: aggregates such as \texttt{STRING\_AGG}, and string constructors such as \texttt{CONCAT}, \texttt{SUBSTRING}, case mapping, casts, and literals.
 
@@ -71,7 +76,7 @@ Before relying on the new activators, the verifier must confirm that the two act
     bad/.style={fill=red!20},
     rowlab/.style={font=\small, anchor=east},
     hd/.style={font=\small\ttfamily}]
-  % ---- string-level columns ----
+  % ---- str-level columns ----
   \node[rowlab] at (0,0.5)  {$\mathsf{s}$};
   \node[rowlab] at (0,0)    {$\mathsf{ind}$};
   \node[rowlab] at (0,-1.0) {$\mathsf{a}^{(1)}$};
@@ -82,7 +87,7 @@ Before relying on the new activators, the verifier must confirm that the two act
     \node[cell, minimum width=6mm] at (0.45+\i*0.6, -1.0) {\x};
     \node[cell, minimum width=6mm] at (0.45+\i*0.6, -1.5) {\y};
   }
-  % ---- character-level columns ----
+  % ---- char-level columns ----
   \begin{scope}[xshift=3.9cm]
   \node[rowlab] at (0,0.5)  {$\mathsf{s}$};
   \node[rowlab] at (0,0)    {$\mathsf{char}$};
@@ -100,31 +105,33 @@ Before relying on the new activators, the verifier must confirm that the two act
   }
   \end{scope}
 \end{tikzpicture}
-\caption{Two data-preserving updates that deactivate the string \texttt{cat}. Update~(1) is consistent: every character carries the activator bit of its string. Update~(2) is not: the character \texttt{a} of the inactive string \texttt{cat} remains active (shaded).}
+\caption{Two data-preserving updates that deactivate the string \texttt{cat}. Update~(1) is consistent; However, update~(2) is not: the shaded character \texttt{a} of \texttt{cat} remains active.}
 \label{fig:consistency-example}
 \end{figure}
 
-To prove that the update was done correctly, it suffices to show that both columns are boolean, using \cref{piop:boolean-check}, and every character inherits the active bit of the string it belongs to. To prove the inheritance condition, we need to prove that if a string identified by index $i$ has length $m$, then there are $m$ active characters belonging to index $i$. Viewing the character-level columns as a table $\mathsf{Chars}$ with columns $\mathsf{orig\text{-}ind}$ and $\mathsf{char\text{-}act}$, and the string-level columns as a table $\mathsf{Strs}$ with columns $\mathsf{ind}$ and $\mathsf{l}$ and activator $\mathsf{a}$, this exactly translates to the following check using a \texttt{SUM GROUP BY} query:
+\parhead{Proof sketch} To prove that the update was done correctly, it suffices to show that both columns are boolean, using \cref{piop:boolean-check}, and every character inherits the active bit of the string it belongs to. To prove the inheritance condition, we need to prove that if a string identified by index $i$ has length $m$, then there are $m$ active characters belonging to index $i$.
+
+In terms of the tables $\strcol.\mathsf{main}$ and $\strcol.\mathsf{aux}$ of \cref{sec:string-arith}, this exactly translates to the following check using a \texttt{SUM GROUP BY} query:
 \begin{equation}\label{eq:cons-groupby}
 \begin{array}{@{}l@{}}
 \sqlline{\sqlkw{SELECT} orig\_ind,}\\
 \sqlline{\ \ \ \ \ \ \ \sqlkw{SUM}(char\_act)}\\
-\sqlline{\ \ \sqlkw{FROM} Chars}\\
+\sqlline{\ \ \sqlkw{FROM} s.aux}\\
 \sqlline{\ \sqlkw{GROUP BY} orig\_ind;}
 \end{array}
-=
+\quad=\quad
 \begin{array}{@{}l@{}}
 \sqlline{\sqlkw{SELECT} ind, l}\\
-\sqlline{\ \ \sqlkw{FROM} Strs;}
+\sqlline{\ \ \sqlkw{FROM} s.main;}
 \end{array}
 \end{equation}
 $\truthtable$~\cite{cryptoeprint:2026/1260} proves a \texttt{SUM GROUP BY} with a single \cref{piop:keyedsumcheck}, and we reuse that protocol verbatim.
 \begin{DefinePIOP}{Data-Preserving Update Check}{data-preserving-update-check}
-  \emph{Inputs:} The updated string column $\Oracle{\MLE{\strcol}}$ with all of its main and auxiliary oracles.
+  \emph{Inputs:} the updated string column $\Oracle{\MLE{\strcol}}$ with all of its main and auxiliary oracles.
   \begin{enumerate}[nosep]
-    \item (\emph{Parse}) $\PIOPProver$ and $\PIOPVerifier$ parse $\Oracle{\MLE{\strcol}}$ to obtain the activator oracles $\Oracle{\MLE{\mathsf{a}}}$ and $\Oracle{\MLE{\mathsf{char\text{-}act}}}$, the origin-index oracle $\Oracle{\MLE{\mathsf{orig\text{-}ind}}}$, and the length oracle $\Oracle{\MLE{\mathsf{l}}}$.
-    \item (\emph{booleanity}) To check if the updated activator is boolean, $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:boolean-check} on $\mathsf{char\text{-}act}$ and on $\mathsf{a}$.
-    \item (\emph{activator consistency}) To check \cref{eq:cons-groupby}, $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:keyedsumcheck} on $\mathsf{Chars}$ and $\mathsf{Strs}$, which forces $\sum_{j:\,\mathsf{orig\text{-}ind}[j]=i}\mathsf{char\text{-}act}[j] = \mathsf{a}[i]\cdot\mathsf{l}[i]$ for every key $i$.
+    \item (\emph{Parse}) $\PIOPProver$ and $\PIOPVerifier$ parse $\Oracle{\MLE{\strcol}}$ to obtain $\Oracle{\MLE{\mathsf{a}}}$, $\Oracle{\MLE{\mathsf{char\text{-}act}}}$, $\Oracle{\MLE{\mathsf{orig\text{-}ind}}}$ and $\Oracle{\MLE{\mathsf{l}}}$.
+    \item To check that both activators are boolean, $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:boolean-check} on $\mathsf{a}$ and on $\mathsf{char\text{-}act}$.
+    \item To check that the two activators are consistent, $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:keyedsumcheck} on \cref{eq:cons-groupby}, which forces $\sum_{j:\,\mathsf{orig\text{-}ind}[j]=i}\mathsf{char\text{-}act}[j] = \mathsf{a}[i]\cdot\mathsf{l}[i]$ for every key $i$.
   \end{enumerate}
 \end{DefinePIOP}
 The formal definition and the security proofs are deferred to \cref{sec:proof-cons}.
@@ -132,64 +139,127 @@ The formal definition and the security proofs are deferred to \cref{sec:proof-co
 \subsubsection{Domain-Preserving Update}
 \label{sec:domain-preserving}
 
-In a domain-preserving update, all of the main and auxiliary columns, including data and activators, are freshly materialized by the untrusted prover, yet every output string cell is a copy of some input cell, so no new string is introduced. This covers all join types, \texttt{UNION}, \texttt{INTERSECT}, \texttt{EXCEPT}, sorting, and value-selecting aggregates such as \texttt{MIN}, \texttt{MAX}, and \texttt{ANY\_VALUE}.
+In a domain-preserving update, all of the main and auxiliary columns, including data and activators, are \emph{freshly materialized} by the untrusted prover, yet every output string cell is a copy of some input cell, so no new string is introduced. This covers all join types, \texttt{UNION}, \texttt{INTERSECT}, \texttt{EXCEPT}, sorting, and value-selecting aggregates such as \texttt{MIN}, \texttt{MAX}, and \texttt{ANY\_VALUE}.
 
 
-Since the prover freshly materializes every new column, the check must establish two things: that the new columns form a well-formed arithmetization, and that no new string is introduced. For the second property we exploit the fact that, although the column is fresh, its strings are not: each of them already appears in a string column committed by the data owner. The prover therefore points each new string to a source string in that column, and we check that the two agree on every attribute of the arithmetization, namely the hash, the length, the rank, and the sequence of characters.
+\parhead{Proof sketch} Since the prover freshly materializes every new column, the check must establish two things: that the new columns form a well-formed arithmetization, and that no new string is introduced. For the second property we exploit the fact that, although the column is fresh, its strings are not: each of them already appears in a string column committed by the data owner, where it is identified by its hash. It therefore suffices to check that every str-level attribute is the attribute that the old column attaches to the string with the same hash, i.e.
+\begin{equation}
+  \label{eq:main-lkup}
+  \strcol^{\mathsf{new}}.\mathsf{main}[\mathsf{h}, \mathsf{l}, \mathsf{rk}] \lookup \strcol^{\mathsf{old}}.\mathsf{main}[\mathsf{h}, \mathsf{l}, \mathsf{rk}],
+\end{equation}
+which binds the length and rank of every new row to those of the old string with the same hash. At the char-level a character carries only the index of its string, not its hash. The prover therefore sends, for each of the two columns, a \emph{char-level hash column} $\mathsf{h}'$ that copies the hash of every string onto its characters, and proves it to be the broadcast of $\mathsf{h}$. It therefore suffices to check that every char-level attribute is the attribute that the old column attaches to the characters with the same hash, i.e.
+\begin{multline}
+  \label{eq:aux-lkup}
+  (\mathsf{h}'^{\mathsf{new}}, \strcol^{\mathsf{new}}.\mathsf{aux}[\mathsf{char}, \mathsf{int\text{-}ind}]) \\
+  \lookup (\mathsf{h}'^{\mathsf{old}}, \strcol^{\mathsf{old}}.\mathsf{aux}[\mathsf{char}, \mathsf{int\text{-}ind}]),
+\end{multline}
+The two lookups certify that every attribute present is genuine; they do not certify that none is missing or repeated. The data-preserving check closes the first gap, by forcing every active string to have exactly as many active characters as its length, and a no-duplicate check on the pairs $(\mathsf{orig\text{-}ind}, \mathsf{int\text{-}ind})$ closes the second, by forcing those characters to occupy distinct positions.
 
-The pointers form the \emph{source column} $\mathsf{src}$: a string-level column of the new table in which $\mathsf{src}[i]$ is the index of the row of the old column that row $i$ was copied from. Some operators produce this column as a by-product of their own proof, in which case it is already trusted and is passed to the check; otherwise the prover supplies it, and the lookups below are what make it trustworthy. The check also uses the \emph{index column} $\mathsf{ind} = (0, 1, \dots, N-1)$, the evaluation table of the index polynomial $\idx_\mu$ of \cref{sec:prelims}, which numbers the rows of the old column so that $\mathsf{src}$ can be matched against it.
-
-\ali{Too many polynomials}
-\ali{add intuition before the box and link it in the piop}
-
-\begin{DefinePIOP}{Full String Validity Check}{full-str-valid}
-  \emph{Inputs:} the input column $\strcol^{\mathsf{old}}$ and the output column $\strcol^{\mathsf{new}}$, each with all of its main and auxiliary oracles (\cref{sec:string-arith}); $\Oracle{\MLE{\mathsf{ind}}}$; and optionally a trusted source column $\Oracle{\MLE{\mathsf{src}}}$.
+\begin{DefinePIOP}{Domain-Preserving Update Check}{domain-preserving-update-check}
+  \emph{Inputs:} the input column $\Oracle{\MLE{\strcol^{\mathsf{old}}}}$ and the output column $\Oracle{\MLE{\strcol^{\mathsf{new}}}}$, each with all of its main and auxiliary oracles; and the char-level hash columns $\Oracle{\MLE{\mathsf{h}'^{\mathsf{old}}}}$ and $\Oracle{\MLE{\mathsf{h}'^{\mathsf{new}}}}$, sent by $\PIOPProver$.
   \begin{enumerate}[nosep]
-    \item \emph{(Activators and lengths)} $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:data-preserving-update-check} on $\strcol^{\mathsf{new}}$, establishing $\NPRelation_{\mathsf{Cons}}$ for the new activator pair.
-    \item \emph{(Offset enumeration)} $\PIOPVerifier$ samples $r \samples \F$ and sends it to $\PIOPProver$; the parties then invoke \cref{piop:nodup-check} on a column with data $\mathsf{orig\text{-}ind^{new}} + r\,\mathsf{int\text{-}ind^{new}}$ and activator $\mathsf{char\text{-}act^{new}}$.
-    \item \emph{(Source column)} If no trusted source column is given a priori, $\PIOPProver$ sends $\Oracle{\MLE{\mathsf{src}}}$ to $\PIOPVerifier$.
-    \item \emph{(String-level provenance)} $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:lookup-check} on the statement $(\mathsf{src}, \mathsf{h}^{\mathsf{new}}, \mathsf{l}^{\mathsf{new}}, \mathsf{rk}^{\mathsf{new}}, \mathsf{a}_h^{\mathsf{new}}) \lookup (\mathsf{ind}, \mathsf{h}^{\mathsf{old}}, \mathsf{l}^{\mathsf{old}}, \mathsf{rk}^{\mathsf{old}}, \mathsf{a}_h^{\mathsf{old}})$, so every new row inherits the hash, length and rank of its source row.
-    \item \emph{(Character-level provenance)}\label[step]{full-str:char-lookup} $\PIOPProver$ sends the broadcast $\Oracle{\MLE{\mathsf{src}^\prime}}$ of $\mathsf{src}$ onto the characters, which the parties check with \cref{piop:broadcast}, and then invoke \cref{piop:lookup-check} on the statement $(\mathsf{src}^\prime, \mathsf{char}^{\mathsf{new}}, \mathsf{int\text{-}ind}^{\mathsf{new}}) \lookup (\mathsf{orig\text{-}ind}^{\mathsf{old}}, \mathsf{char}^{\mathsf{old}}, \mathsf{int\text{-}ind}^{\mathsf{old}})$.
+    \item $\PIOPProver$ and $\PIOPVerifier$ parse $\Oracle{\MLE{\strcol^{\mathsf{new}}}}$ to obtain $\Oracle{\MLE{\mathsf{h}^{\mathsf{new}}}}$, $\Oracle{\MLE{\mathsf{orig\text{-}ind}^{\mathsf{new}}}}$, $\Oracle{\MLE{\mathsf{int\text{-}ind}^{\mathsf{new}}}}$ and $\Oracle{\MLE{\mathsf{char\text{-}act}^{\mathsf{new}}}}$, and $\Oracle{\MLE{\strcol^{\mathsf{old}}}}$ to obtain $\Oracle{\MLE{\mathsf{h}^{\mathsf{old}}}}$.
+    \item To check that each $\mathsf{h}'$ is the broadcast of the corresponding $\mathsf{h}$, $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:broadcast} on $(\strcol^{\mathsf{old}}, \mathsf{h}^{\mathsf{old}}, \mathsf{h}'^{\mathsf{old}})$ and on $(\strcol^{\mathsf{new}}, \mathsf{h}^{\mathsf{new}}, \mathsf{h}'^{\mathsf{new}})$.
+    \item To check that no new string is introduced, $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:lookup-check} on \cref{eq:main-lkup} and on \cref{eq:aux-lkup}.
+    \item To check that the str-level and char-level activators are consistent, $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:data-preserving-update-check} on $\strcol^{\mathsf{new}}$.
+    \item To check that no character of a string is duplicated, $\PIOPVerifier$ samples $r \samples \F$ and sends it to $\PIOPProver$; the parties then invoke \cref{piop:nodup-check} on the column with data $\mathsf{orig\text{-}ind}^{\mathsf{new}} + r\,\mathsf{int\text{-}ind}^{\mathsf{new}}$ and activator $\mathsf{char\text{-}act}^{\mathsf{new}}$.
   \end{enumerate}
 \end{DefinePIOP}
 
-
-
-
+The formal definition and the security proofs are deferred to \cref{sec:proof-domain-preserving}.
 \subsection{Length Filtering}
 \label{sec:length-filtering}
 
-Length filtering discards every string shorter than a threshold $k$, keeping only those of length at least $k$. This is the pruning needed in pattern matching: in every filter  a string can match only if it is at least as long as the pattern, so any shorter string is a guaranteed non-match and can be removed before the filter runs. As we will see in \cref{sec:multi-char-pattern-matching}, this is not merely an optimization: length filtering is necessary for the pattern-matching protocols to remain complete and sound. The length filtering relation $\NPRelation_{\mathsf{LenFilter}}$, stated in \cref{sec:proof-lenfilter}, takes the threshold $k$ as instance and requires that the new string-level activator $\mathsf{a}^\prime$ keep exactly the active strings of length at least $k$, and that the new character-level activator $\mathsf{char\text{-}act}^\prime$ keep exactly the characters of the kept strings. The following PIOP checks this relation.
+Length filtering certifies that every string shorter than a threshold $k$ was correctly discarded. We apply it as a first step in every pattern matching operation in  \cref{sec:multi-char-pattern-matching}, since a string can match a pattern only if it is at least as long as the pattern; any shorter string is a guaranteed non-match and can be removed before the filter runs. Interestingly, this is not merely an optimization: length filtering is a necessary condition for the pattern-matching protocols of \cref{sec:multi-char-pattern-matching} to be complete and sound.
+
+\parhead{Proof sketch} We first verify that the new main and auxiliary string columns are internally consistent by invoking \cref{piop:data-preserving-update-check}, since length filtering is a data-preserving update. Having established this, we treat the problem as a general filtering operation and use the machinery of $\truthtable$~\cite{cryptoeprint:2026/1260}. We invoke a zerocheck on $\mathsf{a'}\cdot(1-\mathsf{a})$ to ensure that rows were only deactivated and none was newly activated. Finally, we check that no active string has length below $k$ and no deactivated string has length at least $k$, by invoking \cref{piop:sign-check} on the following:
+\begin{equation}
+  \label{eq:fp-fn-len-filtering}
+  (\mathsf{a}\cdot(1-\mathsf{a'}),\; \mathsf{l}-k) < 0 \qquad (\mathsf{a'},\; \mathsf{l}-k) \geq 0.
+\end{equation}
 
 \begin{DefinePIOP}{Length Filtering Check}{len-filter}
-  \emph{Inputs:} $\Oracle{\MLE{\mathsf{orig\text{-}ind}}}, \Oracle{\MLE{\mathsf{l}}}, \Oracle{\MLE{\mathsf{a}}}, \Oracle{\MLE{\mathsf{char\text{-}act}}}$, threshold $k$.
+  \emph{Inputs:} the input column $\Oracle{\MLE{\strcol}}$ and the output column $\Oracle{\MLE{\strcol'}}$, each with all of its main and auxiliary oracles; and threshold $k$.
   \begin{enumerate}[nosep]
-    \item (\textit{Activator Update Validity}) $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:data-preserving-update-check} on the updated column $\strcol'$, whose activators are $\mathsf{a'}$ and $\mathsf{char\text{-}act'}$.
-    \item (\textit{Containment}) $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:zerocheck} on the column $\mathsf{a'}\cdot(1-\mathsf{a})$.
-    \item(\textit{False negative check}) $\PIOPProver$ and $\PIOPVerifier$ invoke the Negative \cref{piop:sign-check} on the column $(\mathsf{a}\cdot(1-\mathsf{a'}), \mathsf{l}-k)$.
-    \item (\textit{False Positive check}) $\PIOPProver$ and $\PIOPVerifier$ invoke the Non-Negative \cref{piop:sign-check} on the column $(\mathsf{a'}, \mathsf{l}-k)$.
+    \item (\emph{Parse}) $\PIOPProver$ and $\PIOPVerifier$ parse $\Oracle{\MLE{\strcol}}$ to obtain $\Oracle{\MLE{\mathsf{a}}}$ and $\Oracle{\MLE{\mathsf{l}}}$, and $\Oracle{\MLE{\strcol'}}$ to obtain $\Oracle{\MLE{\mathsf{a}'}}$ and $\Oracle{\MLE{\mathsf{char\text{-}act}'}}$.
+    \item To check that the new activators are internally consistent, $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:data-preserving-update-check} on $\strcol'$.
+    \item To check that no new string was activated, $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:zerocheck} on $\mathsf{a'}\cdot(1-\mathsf{a})$.
+    \item To check that there are no false positives and no false negatives, $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:sign-check} on \cref{eq:fp-fn-len-filtering}.
   \end{enumerate}
 \end{DefinePIOP}
+The formal definition and the security proofs are deferred to \cref{sec:proof-lenfilter}.
 
 
 \subsection{Character Projection}
 \label{sec:char-projection}
 
-Several protocols need to look at the strings of a column ``one position at a time'': the lexicographic-ordering protocols of \cref{sec:lex-order} compare all strings on their first character, then on their second, and so on. We therefore need, for a position $k$, a \emph{string-level} column holding the $k$-th character of every string. Strings shorter than $k+1$ have no such character; following \cref{sec:sql-string-order}, we fill in the sentinel $\bot := -1$ there, which is smaller than every character code and thereby makes shorter strings sort first. We call this column the \emph{projection} of the string column onto position $k$. The projection relation $\NPRelation_{\mathsf{Proj}}$, stated in \cref{sec:proof-proj}, takes the position $k$ as instance and requires, for every active string $i$, that $\mathsf{c}_k[i]$ be the character of string $i$ at internal index $k$ if $\mathsf{l}[i] > k$, and the sentinel $\bot$ otherwise; in other words, $\mathsf{c}_k[i] = \pad{s_i}[k]$ is the $k$-th entry of the padded string of \cref{sec:sql-string-order}.
+Sometimes we need to process the strings of a column one character at a time, as in the lexicographic ordering of \cref{sec:lex-order}, which compares all strings on their first character, then on their second, and so on. For this we use the \emph{projection} onto a position $k$, the str-level column $\mathsf{c}_k$ that holds the $k$-th character of every string, with the sentinel $\bot := -1$ for strings shorter than $k+1$. 
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[x=1cm, y=1cm,
+    cell/.style={draw, minimum size=5.6mm, inner sep=0pt, font=\small},
+    ccell/.style={cell, font=\small\ttfamily},
+    rowlab/.style={font=\small, anchor=east},
+    hd/.style={font=\small\ttfamily}]
+  %--- char-level columns ---
+  \node[hd] at (0.70, 0.56) {hi};
+  \node[hd] at (2.10, 0.56) {cat};
+  \node[hd] at (3.22, 0.56) {a};
+  \node[rowlab] at (0, 0)    {$\mathsf{char}$};
+  \node[rowlab] at (0,-0.56) {$\mathsf{orig\text{-}ind}$};
+  \node[rowlab] at (0,-1.12) {$\mathsf{int\text{-}ind}$};
+  \foreach \j/\c/\o/\ii in {0/h/0/0, 1/i/0/1, 2/c/1/0, 3/a/1/1, 4/t/1/2, 5/a/2/0}{
+    \node[ccell] at (0.42+\j*0.56, 0)     {\c};
+    \node[cell]  at (0.42+\j*0.56,-0.56) {\o};
+    \node[cell]  at (0.42+\j*0.56,-1.12) {\ii};
+  }
+  %--- arrow ---
+  \draw[->,thick] (3.60,-0.56) -- (4.10,-0.56);
+  %--- projections c_0, c_1, c_2 ---
+  \begin{scope}[xshift=4.65cm]
+  \foreach \i/\s in {0/hi, 1/cat, 2/a}{
+    \node[hd] at (0.42+\i*0.66, 0.56) {\s};
+  }
+  \node[rowlab] at (0, 0)    {$\mathsf{c}_0$};
+  \node[rowlab] at (0,-0.56) {$\mathsf{c}_1$};
+  \node[rowlab] at (0,-1.12) {$\mathsf{c}_2$};
+  % entries per string i and position r; \bot marks the sentinel
+  \foreach \i/\r/\v in {0/0/h, 0/1/i, 1/0/c, 1/1/a, 1/2/t, 2/0/a}{
+    \node[ccell, minimum width=6.6mm] at (0.42+\i*0.66,-\r*0.56) {\v};
+  }
+  \foreach \i/\r in {0/2, 2/1, 2/2}{
+    \node[cell, minimum width=6.6mm] at (0.42+\i*0.66,-\r*0.56) {$\bot$};
+  }
+  \end{scope}
+\end{tikzpicture}
+\caption{Projecting the string column $(\mathtt{hi}, \mathtt{cat}, \mathtt{a})$ onto every position $k \in \{0, 1, 2\}$. The projection $\mathsf{c}_k$ collects, for each string, the character with $\mathsf{int\text{-}ind} = k$; a string with no such character receives the sentinel $\bot = -1$.}
+\label{fig:projection-example}
+\end{figure}
 
-The check has three parts. The prover first splits the active strings into those long enough to have a $k$-th character and those that are not, by sending a boolean \emph{length indicator} $\mathsf{g}_k$ with $\mathsf{g}_k[i] = \mathbf{1}[\mathsf{l}[i] > k]$; two sign checks on $\mathsf{l} - k$, a $\mathsf{Pos}$ one where $\mathsf{g}_k = 1$ and a $\mathsf{NonPos}$ one where $\mathsf{g}_k = 0$, pin it down. For the long strings, the triple $(i, k, \mathsf{c}_k[i])$ must appear among the character-level triples $(\mathsf{orig\text{-}ind}[j], \mathsf{int\text{-}ind}[j], \mathsf{char}[j])$ of the active characters, which a \cref{piop:lookup-check} on random linear combinations of the triples enforces; since the active pairs $(\mathsf{orig\text{-}ind}[j], \mathsf{int\text{-}ind}[j])$ are distinct in a well-formed arithmetization (\cref{sec:domain-preserving}), membership pins $\mathsf{c}_k[i]$ to the unique character at that position. For the short strings, a \cref{piop:zerocheck} forces the sentinel.
+\parhead{Proof sketch} The check splits the active strings into those long enough to have a $k$-th character and those that are not. To this end, the prover sends a boolean \emph{length indicator} $\mathsf{g}_k$ with $\mathsf{g}_k[i] = \mathsf{a}[i] \mult \mathbf{1}[\mathsf{l}[i] > k]$, and a zerocheck on $\mathsf{g}_k \mult (1 - \mathsf{a})$ ensures that it marks only active strings. We then pin $\mathsf{g}_k$ down by invoking \cref{piop:sign-check} on the following:
+\begin{equation}
+  \label{eq:proj-len}
+  (\mathsf{g}_k,\; \mathsf{l} - k) > 0 \qquad (\mathsf{a} \mult (1 - \mathsf{g}_k),\; \mathsf{l} - k) \leq 0.
+\end{equation}
+For a long string $i$, the triple $(i, k, \mathsf{c}_k[i])$ must be the index, internal index and character of one of its active characters, which is the lookup
+\begin{equation}
+  \label{eq:proj-lkup}
+  (\mathsf{ind}, k, \mathsf{c}_k) \lookup \strcol.\mathsf{aux}[\mathsf{orig\text{-}ind}, \mathsf{int\text{-}ind}, \mathsf{char}],
+\end{equation}
+where the left-hand side is activated by $\mathsf{g}_k$. Since the active pairs $(\mathsf{orig\text{-}ind}, \mathsf{int\text{-}ind})$ are distinct in a well-formed arithmetization (\cref{sec:domain-preserving}), membership pins $\mathsf{c}_k[i]$ to the unique character at that position. Finally, for the short strings we force the sentinel by a zerocheck on
+\begin{equation}
+  \label{eq:proj-sentinel}
+  \mathsf{a} \mult (1 - \mathsf{g}_k) \mult (\mathsf{c}_k + 1).
+\end{equation}
 
 \begin{DefinePIOP}{Character Projection Check}{char-proj}[Character Projection Check]
-  \emergencystretch=3em\relax
-  \emph{Inputs:} position $k$; the oracles $\Oracle{\MLE{\mathsf{char}}}, \Oracle{\MLE{\mathsf{orig\text{-}ind}}}, \Oracle{\MLE{\mathsf{int\text{-}ind}}},\allowbreak \Oracle{\MLE{\mathsf{char\text{-}act}}}, \Oracle{\MLE{\mathsf{l}}}, \Oracle{\MLE{\mathsf{a}}}, \Oracle{\MLE{\mathsf{ind}}}$; and the projection $\Oracle{\MLE{\mathsf{c}_k}}$.
-  \vspace{2mm}
+  \emph{Inputs:} the string column $\Oracle{\MLE{\strcol}}$ with all of its main and auxiliary oracles; the position $k$; the projection $\Oracle{\MLE{\mathsf{c}_k}}$; and the length indicator $\Oracle{\MLE{\mathsf{g}_k}}$, sent by $\PIOPProver$.
   \begin{enumerate}[nosep]
-    \item (\emph{Length indicator})\label[step]{cp:len} $\PIOPProver$ sends $\Oracle{\MLE{\mathsf{g}_k}}$ with $\mathsf{g}_k[i] := \mathsf{a}[i] \mult \mathbf{1}[\mathsf{l}[i] > k]$. $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:boolean-check} on $\mathsf{g}_k$, \cref{piop:zerocheck} on $\mathsf{g}_k \mult (1 - \mathsf{a})$, the $\mathsf{Pos}$ \cref{piop:sign-check} on the column $(\mathsf{g}_k,\ \mathsf{l} - k)$, and the $\mathsf{NonPos}$ \cref{piop:sign-check} on the column $(\mathsf{a} \mult (1 - \mathsf{g}_k),\ \mathsf{l} - k)$.
-    \item (\emph{Present characters})\label[step]{cp:present} $\PIOPVerifier$ samples $r \samples \F$ and sends it to $\PIOPProver$. $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:lookup-check} on
-    $(\mathsf{g}_k,\ \mathsf{ind} + r\,k + r^2\,\mathsf{c}_k) \lookup (\mathsf{char\text{-}act},\ \mathsf{orig\text{-}ind} + r\,\mathsf{int\text{-}ind} + r^2\,\mathsf{char})$.
-    \item (\emph{Absent characters})\label[step]{cp:absent} $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:zerocheck} on $\mathsf{a} \mult (1 - \mathsf{g}_k) \mult (\mathsf{c}_k + 1)$.
+    \item (\emph{Parse}) $\PIOPProver$ and $\PIOPVerifier$ parse $\Oracle{\MLE{\strcol}}$ to obtain $\Oracle{\MLE{\mathsf{a}}}$ and $\Oracle{\MLE{\mathsf{l}}}$.
+    \item To check that $\mathsf{g}_k$ is boolean and marks only active strings, $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:boolean-check} on $\mathsf{g}_k$ and \cref{piop:zerocheck} on $\mathsf{g}_k \mult (1 - \mathsf{a})$.
+    \item To check that $\mathsf{g}_k$ marks exactly the strings longer than $k$, $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:sign-check} on \cref{eq:proj-len}.
+    \item To check the characters of the long strings, $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:lookup-check} on \cref{eq:proj-lkup}.
+    \item To check the sentinel of the short strings, $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:zerocheck} on \cref{eq:proj-sentinel}.
   \end{enumerate}
 \end{DefinePIOP}
-
-\parhead{Batching across positions}
-When projections onto several positions $k_1, \dots, k_R$ are needed, as in \cref{piop:lex-sorted-check}, the $R$ lookups of \cref{cp:present} share the same right-hand side and can be merged into a single \cref{piop:lookup-check} whose left-hand side is the concatenation of the $R$ projected columns, so the character-level columns are swept once rather than $R$ times.
+The formal definition and the security proofs are deferred to \cref{sec:proof-proj}.

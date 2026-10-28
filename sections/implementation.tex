@@ -10,7 +10,7 @@ We implement our protocols by extending the open-source implementation of $\trut
 
 Our extension expands this code base to support string-typed columns, adding about 8K lines of Rust to \texttt{truth-table} and about 3K lines to \texttt{ark-piop}. Concretely, we add the following on top of $\truthtable$:
 \begin{itemize}[nosep]
-  \item \emph{String arithmetization.} A string-typed column is materialized as the hash column of $\truthtable$ augmented with the string-level and character-level auxiliary columns of \cref{sec:string-arith}, together with the fingerprint bin columns of \cref{sec:fp-design}. All auxiliary columns are computed once at ingestion and committed alongside the main column.
+  \item \emph{String arithmetization.} A string-typed column is materialized as the hash column of $\truthtable$ augmented with the str-level and char-level auxiliary columns of \cref{sec:string-arith}, together with the fingerprint bin columns of \cref{sec:fp-design}. All auxiliary columns are computed once at ingestion and committed alongside the main column.
   \item \emph{String protocols.} The string toolbox of \cref{sec:consistency-checking,sec:length-filtering}, which every string-aware operator invokes to keep the auxiliary columns in sync with the main column; the wild-card pattern-matching PIOPs of \cref{sec:piop-for-pattern-matching}, exposed to the planner as a \texttt{LIKE} predicate; and the fingerprint pre-filtering check of \cref{piop:prefilter-check}, which the planner inserts in front of every \texttt{LIKE} predicate. The bin partition of the alphabet is a per-column configuration parameter chosen at ingestion, e.g. from the instance-optimized partitions of~\cite{string_fingerprint}.
 \end{itemize}
 

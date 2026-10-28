@@ -5,7 +5,7 @@ This appendix states the relations proven by the protocols of \cref{sec:string-t
 
 \subsection{Broadcast Check}
 \label{sec:proof-bcast}
-\cref{piop:broadcast} (\cref{sec:broadcast}) proves that a character-level column $\mathsf{d}^\prime$ is obtained from a string-level column $\mathsf{d}$ by copying the entry of every string onto all of its characters:
+\cref{piop:broadcast} (\cref{sec:broadcast}) proves that a char-level column $\mathsf{d}^\prime$ is obtained from a str-level column $\mathsf{d}$ by copying the entry of every string onto all of its characters:
 \ifsp
 %% S&P (two-column): condition stacked below the tuple so the display fits one column.
 \begin{displaymath}
@@ -36,7 +36,7 @@ This appendix states the relations proven by the protocols of \cref{sec:string-t
 
 \subsection{Data-Preserving Update Check}
 \label{sec:proof-cons}
-\cref{piop:data-preserving-update-check} (\cref{sec:data-preserving}) proves that a string-level activator $\mathsf{a}$ and a character-level activator $\mathsf{char\text{-}act}$ are consistent, i.e.\ both are boolean and every character inherits the active bit of its string:
+\cref{piop:data-preserving-update-check} (\cref{sec:data-preserving}) proves that a str-level activator $\mathsf{a}$ and a char-level activator $\mathsf{char\text{-}act}$ are consistent, i.e.\ both are boolean and every character inherits the active bit of its string:
 \ifsp
 %% S&P (two-column): conditions stacked below the tuple so the display fits one column.
 \begin{displaymath}
@@ -66,6 +66,27 @@ This appendix states the relations proven by the protocols of \cref{sec:string-t
 \,\right\}.
 \end{displaymath}
 \fi
+\parhead{Soundness and completeness}
+\ali{TODO: soundness and completeness proof.}
+
+\subsection{Domain-Preserving Update Check}
+\label{sec:proof-domain-preserving}
+\cref{piop:domain-preserving-update-check} (\cref{sec:domain-preserving}) proves that the output column $\strcol^{\mathsf{new}}$ is a well-formed arithmetization in which every string is drawn from the input column $\strcol^{\mathsf{old}}$, with the same hash, length, rank, and sequence of characters:
+\begin{displaymath}
+\NPRelation_{\mathsf{DomPres}} = \left\{\,
+  \begin{aligned}
+    & \NPInstance = \bot,\\
+    & \NPInstancey = (\Oracle{\MLE{\strcol^{\mathsf{old}}}}, \Oracle{\MLE{\strcol^{\mathsf{new}}}}),\\
+    & \NPWitness = (\strcol^{\mathsf{old}}, \strcol^{\mathsf{new}})
+  \end{aligned}
+  \;\middle|\;
+  \begin{aligned}
+    & \text{every active row of } \strcol^{\mathsf{new}} \text{ carries the } \mathsf{l}, \mathsf{rk}, \\
+    & \text{and characters of the row in } \strcol^{\mathsf{old}} \\
+    & \text{with the same hash } \mathsf{h}
+  \end{aligned}
+\,\right\}.
+\end{displaymath}
 \parhead{Soundness and completeness}
 \ali{TODO: soundness and completeness proof.}
 
@@ -107,7 +128,7 @@ This appendix states the relations proven by the protocols of \cref{sec:string-t
 
 \subsection{Character Projection Check}
 \label{sec:proof-proj}
-\cref{piop:char-proj} (\cref{sec:char-projection}) proves that the string-level column $\mathsf{c}_k$ holds the $k$-th character of every active string, and the sentinel $\bot = -1$ for strings that have no $k$-th character:
+\cref{piop:char-proj} (\cref{sec:char-projection}) proves that the str-level column $\mathsf{c}_k$ holds the $k$-th character of every active string, and the sentinel $\bot = -1$ for strings that have no $k$-th character:
 \ifsp
 %% S&P (two-column): conditions stacked below the tuple so the display fits one column.
 \begin{displaymath}
