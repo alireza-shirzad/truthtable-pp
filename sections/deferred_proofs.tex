@@ -5,16 +5,19 @@ This appendix states the relations proven by the protocols of \cref{sec:string-t
 
 \subsection{Broadcast Check}
 \label{sec:proof-bcast}
-\cref{piop:broadcast} (\cref{sec:broadcast}) proves that a char-level column $\mathsf{d}^\prime$ is obtained from a str-level column $\mathsf{d}$ by copying the entry of every string onto all of its characters:
+\cref{piop:broadcast} (\cref{sec:broadcast}) proves that a char-level column $\mathsf{d}^\prime$ is obtained from a str-level column $\mathsf{d}$ by copying the entry of every string onto all of its characters, on the characters selected by the activator $\mathsf{act}_c$ and with respect to the strings selected by the activator $\mathsf{act}_s$ (by default $\mathsf{char\text{-}act}$ and $\mathsf{a}$):
 \ifsp
 %% S&P (two-column): condition stacked below the tuple so the display fits one column.
 \begin{displaymath}
 \NPRelation_{\mathsf{Bcast}} = \left\{\,
   \begin{aligned}
     & \NPInstance = \bot,\\
-    & \NPInstancey = (\Oracle{\MLE{\mathsf{orig\text{-}ind}}}, \Oracle{\MLE{\mathsf{d}}}, \Oracle{\MLE{\mathsf{d}'}}),\\
-    & \NPWitness = (\mathsf{orig\text{-}ind}, \mathsf{d}, \mathsf{d}')\\[2pt]
-    & \text{s.t.}\ \mathsf{d}'[c] = \mathsf{d}[\mathsf{orig\text{-}ind}[c]]\ \text{for every char } c
+    & \NPInstancey = (\Oracle{\MLE{\mathsf{orig\text{-}ind}}}, \Oracle{\MLE{\mathsf{act}_c}}, \Oracle{\MLE{\mathsf{d}}},\\
+    & \phantom{\NPInstancey = (}\Oracle{\MLE{\mathsf{act}_s}}, \Oracle{\MLE{\mathsf{d}'}}),\\
+    & \NPWitness = (\mathsf{orig\text{-}ind}, \mathsf{act}_c, \mathsf{d}, \mathsf{act}_s, \mathsf{d}')\\[2pt]
+    & \text{s.t.}\ \forall c\ \text{with}\ \mathsf{act}_c[c] = 1:\\
+    & \phantom{\text{s.t.}}\ \quad \mathsf{act}_s[\mathsf{orig\text{-}ind}[c]] = 1\ \text{and}\\
+    & \phantom{\text{s.t.}}\ \quad \mathsf{d}'[c] = \mathsf{d}[\mathsf{orig\text{-}ind}[c]]
   \end{aligned}
 \,\right\}.
 \end{displaymath}
@@ -23,14 +26,18 @@ This appendix states the relations proven by the protocols of \cref{sec:string-t
 \NPRelation_{\mathsf{Bcast}} = \left\{\,
   \begin{aligned}
     \NPInstance &= \bot,\\
-    \NPInstancey &= (\Oracle{\MLE{\mathsf{orig\text{-}ind}}}, \Oracle{\MLE{\mathsf{d}}}, \Oracle{\MLE{\mathsf{d}'}}),\\
-    \NPWitness &= (\mathsf{orig\text{-}ind}, \mathsf{d}, \mathsf{d}')
+    \NPInstancey &= (\Oracle{\MLE{\mathsf{orig\text{-}ind}}}, \Oracle{\MLE{\mathsf{act}_c}}, \Oracle{\MLE{\mathsf{d}}}, \Oracle{\MLE{\mathsf{act}_s}}, \Oracle{\MLE{\mathsf{d}'}}),\\
+    \NPWitness &= (\mathsf{orig\text{-}ind}, \mathsf{act}_c, \mathsf{d}, \mathsf{act}_s, \mathsf{d}')
   \end{aligned}
   \;\middle|\;
-    \mathsf{d}'[c] = \mathsf{d}[\mathsf{orig\text{-}ind}[c]]\ \text{for every character } c
+  \begin{array}{l}
+    \forall c\ \text{with}\ \mathsf{act}_c[c] = 1: \\[3pt]
+    \quad \mathsf{act}_s[\mathsf{orig\text{-}ind}[c]] = 1\ \text{and}\ \mathsf{d}'[c] = \mathsf{d}[\mathsf{orig\text{-}ind}[c]]
+  \end{array}
 \,\right\}.
 \end{displaymath}
 \fi
+Inactive characters, in particular the padding positions beyond the last character, are unconstrained.
 \parhead{Soundness and completeness}
 \ali{TODO: soundness and completeness proof.}
 
@@ -69,9 +76,66 @@ This appendix states the relations proven by the protocols of \cref{sec:string-t
 \parhead{Soundness and completeness}
 \ali{TODO: soundness and completeness proof.}
 
+\subsection{Layout Check}
+\label{sec:proof-layout}
+\cref{piop:layout-check} (\cref{sec:layout-check}) proves that the active characters of every active string occupy consecutive positions of the char-level columns, in order of their internal index, with $\mathsf{bnd}$ marking the first of them, and that inactive strings have no active characters:
+\ifsp
+\begin{displaymath}
+\NPRelation_{\mathsf{Layout}} = \left\{\,
+  \begin{aligned}
+    & \NPInstance = \bot,\\
+    & \NPInstancey = (\Oracle{\MLE{\mathsf{a}}}, \Oracle{\MLE{\mathsf{orig\text{-}ind}}}, \Oracle{\MLE{\mathsf{int\text{-}ind}}},\\
+    & \phantom{\NPInstancey = (}\Oracle{\MLE{\mathsf{char\text{-}act}}}, \Oracle{\MLE{\mathsf{bnd}}}),\\
+    & \NPWitness = (\mathsf{a}, \mathsf{orig\text{-}ind}, \mathsf{int\text{-}ind}, \mathsf{char\text{-}act}, \mathsf{bnd})\\[2pt]
+    & \text{s.t.}\ \forall c\ \text{with}\ \mathsf{char\text{-}act}[c] = 1:\\
+    & \phantom{\text{s.t.}}\ \quad \mathsf{bnd}[c] = \mathbf{1}[\mathsf{int\text{-}ind}[c] = 0],\\
+    & \phantom{\text{s.t.}}\ \forall i:\ \text{the active } c \text{ with } \mathsf{orig\text{-}ind}[c] = i\\
+    & \phantom{\text{s.t.}}\ \quad \text{are } p_i, \dots, p_i + m_i - 1,\\
+    & \phantom{\text{s.t.}}\ \quad \text{with}\ \mathsf{int\text{-}ind}[p_i + j] = j\ \text{for}\ j < m_i,\\
+    & \phantom{\text{s.t.}}\ \text{and}\ m_i = 0\ \text{if}\ \mathsf{a}[i] = 0
+  \end{aligned}
+\,\right\}.
+\end{displaymath}
+\else
+\begin{displaymath}
+\NPRelation_{\mathsf{Layout}} = \left\{\,
+  \begin{aligned}
+    \NPInstance &= \bot,\\
+    \NPInstancey &= (\Oracle{\MLE{\mathsf{a}}}, \Oracle{\MLE{\mathsf{orig\text{-}ind}}}, \Oracle{\MLE{\mathsf{int\text{-}ind}}}, \Oracle{\MLE{\mathsf{char\text{-}act}}}, \Oracle{\MLE{\mathsf{bnd}}}),\\
+    \NPWitness &= (\mathsf{a}, \mathsf{orig\text{-}ind}, \mathsf{int\text{-}ind}, \mathsf{char\text{-}act}, \mathsf{bnd})
+  \end{aligned}
+  \;\middle|\;
+  \begin{array}{l}
+    \forall c\ \text{with}\ \mathsf{char\text{-}act}[c] = 1:\ \mathsf{bnd}[c] = \mathbf{1}[\mathsf{int\text{-}ind}[c] = 0], \\[3pt]
+    \forall i:\ \{c : \mathsf{char\text{-}act}[c] = 1,\ \mathsf{orig\text{-}ind}[c] = i\} = \{p_i, \dots, p_i + m_i - 1\} \\[3pt]
+    \quad \text{for some } p_i, m_i \text{ with } \mathsf{int\text{-}ind}[p_i + j] = j \text{ for } j < m_i,\ \text{and } m_i = 0 \text{ if } \mathsf{a}[i] = 0
+  \end{array}
+\,\right\}.
+\end{displaymath}
+\fi
+Combined with $\NPRelation_{\mathsf{Cons}}$, which fixes $m_i = \mathsf{a}[i]\mult\mathsf{l}[i]$, the relation says that the active characters of string $i$ are exactly the positions $p_i, \dots, p_i + \mathsf{l}[i] - 1$, with internal indices $0, \dots, \mathsf{l}[i]-1$ in that order; in particular the active pairs $(\mathsf{orig\text{-}ind}, \mathsf{int\text{-}ind})$ are distinct.
+\parhead{Soundness and completeness}
+Completeness is immediate from the layout of \cref{sec:string-arith}. For soundness, suppose all three steps accept. By the zero-indicator step, $\mathsf{bnd}[c] = \mathbf{1}[\mathsf{int\text{-}ind}[c] = 0]$ on every active $c$. By the predecessor lookup, for every active $c$ with $\mathsf{int\text{-}ind}[c] \ne 0$ there is an active $c'$ with $\idx_\mu(c') = \idx_\mu(c) - 1$, i.e.\ $c' = c - 1$, $\mathsf{orig\text{-}ind}[c-1] = \mathsf{orig\text{-}ind}[c]$ and $\mathsf{int\text{-}ind}[c-1] = \mathsf{int\text{-}ind}[c] - 1$ (with probability $1 - O(1/|\F|)$ over $\gamma$). Iterating from an active $c$ with $\mathsf{orig\text{-}ind}[c] = i$ and $\mathsf{int\text{-}ind}[c] = j$ yields active positions $c, c-1, c-2, \dots$ of string $i$ with internal indices $j, j-1, j-2, \dots$; since the hypercube has $2^\mu$ positions the walk cannot continue for more than $2^\mu$ steps, so $j$ is an integer below $2^\mu$ and the walk ends after exactly $j$ steps at an active position $c - j$ of string $i$ with internal index $0$. By the keyed sumcheck, string $i$ has exactly $\mathsf{a}[i]$ active positions with $\mathsf{bnd} = 1$, i.e.\ with internal index $0$; if $\mathsf{a}[i] = 0$ then no active character of $i$ exists, and otherwise there is a unique one, at some position $p_i$. Every active character of $i$ with internal index $j$ therefore sits at $p_i + j$, so distinct active characters of $i$ have distinct internal indices, and the set $J_i$ of internal indices present is closed downwards (the walk from $j$ passes through every smaller index), i.e.\ $J_i = \{0, \dots, m_i - 1\}$ with $m_i = |J_i|$. This is $\NPRelation_{\mathsf{Layout}}$.
+
 \subsection{Domain-Preserving Update Check}
 \label{sec:proof-domain-preserving}
-\cref{piop:domain-preserving-update-check} (\cref{sec:domain-preserving}) proves that the output column $\strcol^{\mathsf{new}}$ is a well-formed arithmetization in which every string is drawn from the input column $\strcol^{\mathsf{old}}$, with the same hash, length, rank, and sequence of characters:
+\cref{piop:domain-preserving-update-check} (\cref{sec:domain-preserving}) proves that the output column $\strcol^{\mathsf{new}}$ is a well-formed arithmetization, i.e.\ its activators are in $\NPRelation_{\mathsf{Cons}}$ and its char-level columns in $\NPRelation_{\mathsf{Layout}}$, in which every string is drawn from the input column $\strcol^{\mathsf{old}}$, with the same hash, length, rank, and sequence of characters:
+\ifsp
+%% S&P (two-column): conditions stacked below the tuple so the display fits one column.
+\begin{displaymath}
+\NPRelation_{\mathsf{DomPres}} = \left\{\,
+  \begin{aligned}
+    & \NPInstance = \bot,\\
+    & \NPInstancey = (\Oracle{\MLE{\strcol^{\mathsf{old}}}}, \Oracle{\MLE{\strcol^{\mathsf{new}}}}),\\
+    & \NPWitness = (\strcol^{\mathsf{old}}, \strcol^{\mathsf{new}})\\[2pt]
+    & \text{s.t.}\ \strcol^{\mathsf{new}} \in \NPRelation_{\mathsf{Cons}} \cap \NPRelation_{\mathsf{Layout}},\ \text{and}\\
+    & \phantom{\text{s.t.}}\ \text{every active row of } \strcol^{\mathsf{new}} \text{ carries the}\\
+    & \phantom{\text{s.t.}}\ \mathsf{l}, \mathsf{rk} \text{ and characters of the row}\\
+    & \phantom{\text{s.t.}}\ \text{in } \strcol^{\mathsf{old}} \text{ with the same hash } \mathsf{h}
+  \end{aligned}
+\,\right\}.
+\end{displaymath}
+\else
 \begin{displaymath}
 \NPRelation_{\mathsf{DomPres}} = \left\{\,
   \begin{aligned}
@@ -81,18 +145,20 @@ This appendix states the relations proven by the protocols of \cref{sec:string-t
   \end{aligned}
   \;\middle|\;
   \begin{aligned}
-    & \text{every active row of } \strcol^{\mathsf{new}} \text{ carries the } \mathsf{l}, \mathsf{rk}, \\
-    & \text{and characters of the row in } \strcol^{\mathsf{old}} \\
-    & \text{with the same hash } \mathsf{h}
+    & \strcol^{\mathsf{new}} \in \NPRelation_{\mathsf{Cons}} \cap \NPRelation_{\mathsf{Layout}}, \\
+    & \text{and every active row of } \strcol^{\mathsf{new}} \\
+    & \text{carries the } \mathsf{l}, \mathsf{rk} \text{ and characters} \\
+    & \text{of the row in } \strcol^{\mathsf{old}} \text{ with the same } \mathsf{h}
   \end{aligned}
 \,\right\}.
 \end{displaymath}
+\fi
 \parhead{Soundness and completeness}
 \ali{TODO: soundness and completeness proof.}
 
 \subsection{Length Filtering Check}
 \label{sec:proof-lenfilter}
-\cref{piop:len-filter} (\cref{sec:length-filtering}) proves that the new activators keep exactly the active strings of length at least $k$, together with their characters:
+\cref{piop:len-filter} (\cref{sec:length-filtering}) proves that the new activators keep exactly the active strings of length at least $k$ (of length exactly $k$ in the exact variant), together with their characters; below, ${\bowtie}$ stands for $\geq$, or for $=$ in the exact variant:
 \ifsp
 %% S&P (two-column): statement split over two lines and conditions stacked below.
 \begin{equation*}
@@ -102,7 +168,7 @@ This appendix states the relations proven by the protocols of \cref{sec:string-t
   & \NPInstancey = (\Oracle{\MLE{\mathsf{l}}}, \Oracle{\MLE{\mathsf{a}}}, \Oracle{\MLE{\mathsf{char\text{-}act}}},\\
   & \phantom{\NPInstancey = (}\Oracle{\MLE{\mathsf{a'}}}, \Oracle{\MLE{\mathsf{char\text{-}act'}}}),\\
   & \NPWitness = (\mathsf{l}, \mathsf{a}, \mathsf{char\text{-}act}, \mathsf{a'}, \mathsf{char\text{-}act'})\\[2pt]
-  & \text{s.t.}\ \mathsf{a'}[i] = 1 \Leftrightarrow \bigl(\mathsf{a}[i] = 1 \wedge \mathsf{l}[i]\geq k\bigr),\\
+  & \text{s.t.}\ \mathsf{a'}[i] = 1 \Leftrightarrow \bigl(\mathsf{a}[i] = 1 \wedge \mathsf{l}[i]\bowtie k\bigr),\\
   & \phantom{\text{s.t.}}\ \mathsf{char\text{-}act'}[j] = \mathsf{a'}[i]\ \text{for } j \in \text{string } i
 \end{aligned}
 \,\right\}.
@@ -117,7 +183,7 @@ This appendix states the relations proven by the protocols of \cref{sec:string-t
 \end{aligned}
    \;\middle|\; 
     \begin{aligned}
-   \mathsf{a'}[i] = 1 \iff \bigl(\mathsf{a}[i] = 1 \ \text{and}\ \mathsf{l}[i]\geq k\bigr) \\
+   \mathsf{a'}[i] = 1 \iff \bigl(\mathsf{a}[i] = 1 \ \text{and}\ \mathsf{l}[i]\bowtie k\bigr) \\
     \mathsf{char\text{-}act'}[j] = \mathsf{a'}[i]\ \forall\text{ char } j \text{ of string } i
     \end{aligned}
 \right\}.
@@ -278,7 +344,7 @@ For every $\bigl(x; w\bigr)\in\mathcal{R}_{\mathsf{PF}}$, $\mathsf{a'}\le\mathsf
 $\mathsf{a}[i]=1 \wedge \col[i]\sim\zeta \implies \mathsf{a'}[i]=1$.
 \end{ilemma}
 \begin{proof}
-Each $\mathsf{fp}_b$ is a binary column committed by the data owner, so $\mathsf{a'}[i]\in\{0,1\}$ and $\mathsf{a'}[i]\le\mathsf{a}[i]$. If $\col[i]$ matches $\zeta$, then $\col[i]$ contains every character and n-gram of each literal factor, and every precedence pair of the factors read in order. Hence $\mathsf{fp}_b(\col[i])=1$ for every $b\in\mathcal{F}_\zeta\supseteq\mathcal{F}_u$, so the product is $1$ and $\mathsf{a'}[i]=\mathsf{a}[i]=1$.
+Each $\mathsf{fp}_b$ is a binary column committed by the data owner, so $\mathsf{a'}[i]\in\{0,1\}$ and $\mathsf{a'}[i]\le\mathsf{a}[i]$. If $\col[i]$ matches $\zeta$, then $\col[i]$ contains every character and n-gram of each maximal run of literal characters of a factor (a run never spans a \_), and every precedence pair of the factors read in order. Hence $\mathsf{fp}_b(\col[i])=1$ for every $b\in\mathcal{F}_\zeta\supseteq\mathcal{F}_u$, so the product is $1$ and $\mathsf{a'}[i]=\mathsf{a}[i]=1$.
 \end{proof}
 \parhead{Soundness and completeness}
 \ali{TODO: soundness and completeness proof.}

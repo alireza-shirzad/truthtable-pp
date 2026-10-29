@@ -63,43 +63,12 @@ The \emph{Booleanity Check} takes a column $\col = (\mathsf{d},\mathsf{a})$ and 
 \,\right\}.
 \end{displaymath}
 \fi
-Since $\mathsf{d}[i]\in\{0,1\}$ exactly when $\mathsf{d}[i]\bigl(1-\mathsf{d}[i]\bigr)=0$, the check is a single \cref{piop:zerocheck} on the column $\mathsf{a}\cdot\mathsf{d}\cdot(1-\mathsf{d})$, which vanishes everywhere iff every active entry is boolean.
+Since $\mathsf{d}[i]\in\{0,1\}$ exactly when $\mathsf{d}[i]\bigl(1-\mathsf{d}[i]\bigr)=0$, the check is a single \cref{piop:zerocheck} on the column $\mathsf{a}\cdot\mathsf{d}\cdot(1-\mathsf{d})$, which vanishes everywhere iff every active entry is boolean. When a protocol invokes the check on a bare data column, without naming an activator, the all-ones activator $\mathbf{1}$ is meant, so that the entry is boolean at \emph{every} point of the hypercube; this is the form we use for indicator columns that are later summed over the whole hypercube.
 \begin{DefinePIOP}{Booleanity Check}{boolean-check}
   \emph{Inputs:} $\Oracle{\MLE{\col}} = (\Oracle{\MLE{\mathsf{a}}}, \Oracle{\MLE{\mathsf{d}}})$.
   \begin{enumerate}[nosep]
     \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:zerocheck} on the column $\mathsf{a}\cdot\mathsf{d}\cdot(1-\mathsf{d})$.
   \end{enumerate}
-\end{DefinePIOP}
-
-\subsection{No-Duplicate Check}
-The \emph{No-Duplicate Check} takes a column $\col = (\mathsf{d},\mathsf{a})$ and proves that the active entries of $\col$ are pairwise distinct. We package this as the relation
-\ifsp
-%% S&P (two-column): tuple and condition stacked so the display fits one column.
-\begin{displaymath}
-\NPRelation_{\mathsf{NoDup}} = \left\{\,
-  \begin{aligned}
-    & \NPInstance = \bot,\\
-    & \NPInstancey = (\Oracle{\MLE{\col}}),\\
-    & \NPWitness = (\col)\\[2pt]
-    & \text{s.t.}\ \forall i\neq j,\; \mathsf{a}[i]=\mathsf{a}[j]=1 \implies{}\\
-    & \phantom{\text{s.t.}}\ \quad \mathsf{d}[i]\neq\mathsf{d}[j]
-  \end{aligned}
-\,\right\}.
-\end{displaymath}
-\else
-\begin{displaymath}
-\NPRelation_{\mathsf{NoDup}} = \left\{\,
-  \NPInstance = \bot,\;
-  \NPInstancey = (\Oracle{\MLE{\col}}),\;
-  \NPWitness = (\col)
-  \;\middle|\;
-    \forall i\neq j,\; \mathsf{a}[i]=\mathsf{a}[j]=1 \implies \mathsf{d}[i]\neq\mathsf{d}[j]
-\,\right\}.
-\end{displaymath}
-\fi
-
-\begin{DefinePIOP}{No-Duplicate Check}{nodup-check}
-    TODO
 \end{DefinePIOP}
 
 \subsection{Limb Reconstruction Check}
@@ -260,7 +229,7 @@ where negative values are taken in $\F$ via the additive inverse. In every mode 
 \,\right\}.
 \end{displaymath}
 \fi
-We assume $\alpha < \log_2 |\F|$, so the range embeds unambiguously into $\F$.
+We assume $2^{\alpha+1} < |\F|$, so that the range embeds unambiguously into $\F$ and, as the indicator checks below require, the positive-side range $[0, 2^\alpha-1]$ and the negative-side range $[-(2^\alpha-1), -1]$ are disjoint subsets of $\F$.
 
 The whole check reduces to a non-negativity check on the \emph{magnitude} column $\mathsf{m} := s_\sigma\mult\mathsf{d}$, which the verifier obtains by negating the oracle $\MLE{\mathsf{d}}$ in the negative-side modes. The index polynomial $\idx_\alpha$, evaluated over $\BoolHCube{\alpha}$, takes exactly the values $\{0, 1, \ldots, 2^\alpha - 1\}$. Treating it as the data of an $\alpha$-variable column with the all-ones activator gives a range column $\mathsf{rng}_\alpha := (\mathbf{1}, \idx_\alpha)$ whose value multiset is precisely $[0, 2^\alpha - 1]$, so a single \cref{piop:lookup-check} of $\mathsf{m}$ into $\mathsf{rng}_\alpha$ is already an exact range check. This naive lookup is wasteful when $\alpha$ is large, since $\mathsf{rng}_\alpha$ has $2^\alpha$ rows. We do better by splitting each entry into $16$-bit \emph{limbs} and range-checking each limb against a small index column. Choosing $k$ and $\beta$ with $\alpha = 16k + \beta$ and $\beta \leq 16$, the prover sends limb columns $\mathsf{m}_1, \ldots, \mathsf{m}_{k+1}$ satisfying
 \begin{displaymath}
@@ -276,6 +245,78 @@ which a single \cref{piop:zerocheck} enforces; the activator on the left collaps
     \item For each $i \in [k]$, $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:lookup-check} on $(\mathbf{1}, \mathsf{m}_i)$ and $\mathsf{rng}_{16} := (\mathbf{1}, \idx_{16})$, proving each limb lies in $[0, 2^{16}-1]$.
     \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:lookup-check} on $(\mathbf{1}, \mathsf{m}_{k+1})$ and $\mathsf{rng}_\beta := (\mathbf{1}, \idx_\beta)$, proving the residual limb lies in $[0, 2^\beta-1]$.
     \item If $\ell_\sigma = 1$ (the strict modes $\mathsf{Pos}, \mathsf{Neg}$), $\PIOPProver$ and $\PIOPVerifier$ additionally invoke \cref{piop:nozero-check} on $\col$ to rule out zero entries, narrowing the certified range to $[1, 2^\alpha - 1]$.
+  \end{enumerate}
+\end{DefinePIOP}
+
+\subsection{Zero Indicator Check}
+\label{sec:zero-indicator}
+Several protocols need a boolean column that records \emph{where} a column vanishes, rather than an assertion that it does. The \emph{Zero Indicator Check} takes a column $\col = (\mathsf{d},\mathsf{a})$ and a column $\mathsf{z}$ sent by the prover, and proves that on the active rows $\mathsf{z}$ is boolean and marks exactly the zero entries of $\col$. We package this as the relation
+\ifsp
+\begin{displaymath}
+\NPRelation_{\mathsf{ZeroInd}} = \left\{\,
+  \begin{aligned}
+    & \NPInstance = \bot,\\
+    & \NPInstancey = (\Oracle{\MLE{\col}}, \Oracle{\MLE{\mathsf{z}}}),\\
+    & \NPWitness = (\col, \mathsf{z})\\[2pt]
+    & \text{s.t.}\ \forall i,\, \mathsf{a}[i] = 1 \implies \mathsf{z}[i] = \mathbf{1}[\mathsf{d}[i] = 0]
+  \end{aligned}
+\,\right\}.
+\end{displaymath}
+\else
+\begin{displaymath}
+\NPRelation_{\mathsf{ZeroInd}} = \left\{\,
+  \NPInstance = \bot,\;
+  \NPInstancey = (\Oracle{\MLE{\col}}, \Oracle{\MLE{\mathsf{z}}}),\;
+  \NPWitness = (\col, \mathsf{z})
+  \;\middle|\;
+    \forall i,\, \mathsf{a}[i] = 1 \implies \mathsf{z}[i] = \mathbf{1}[\mathsf{d}[i] = 0]
+\,\right\}.
+\end{displaymath}
+\fi
+The check is the conjunction of three facts: $\mathsf{z}$ is boolean on the active rows; wherever $\mathsf{z}$ is $1$ the data vanishes, which is a zerocheck on $\mathsf{a}\mult\mathsf{z}\mult\mathsf{d}$; and wherever $\mathsf{z}$ is $0$ the data is nonzero, which is a no-zero check on $\mathsf{d}$ under the activator $\mathsf{a}\mult(1-\mathsf{z})$. Together they leave the prover no freedom in $\mathsf{z}$ on the active rows.
+\begin{DefinePIOP}{Zero Indicator Check}{zero-indicator}
+  \emph{Inputs:} $\Oracle{\MLE{\col}} = (\Oracle{\MLE{\mathsf{a}}}, \Oracle{\MLE{\mathsf{d}}})$ and the indicator $\Oracle{\MLE{\mathsf{z}}}$, sent by $\PIOPProver$ with $\mathsf{z}[i] = \mathbf{1}[\mathsf{d}[i] = 0]$ at active indices.
+  \begin{enumerate}[nosep]
+    \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:boolean-check} on the column with activator $\mathsf{a}$ and data $\mathsf{z}$.
+    \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:zerocheck} on $\mathsf{a}\mult\mathsf{z}\mult\mathsf{d}$.
+    \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:nozero-check} on the column with activator $\mathsf{a}\mult(1-\mathsf{z})$ and data $\mathsf{d}$.
+  \end{enumerate}
+\end{DefinePIOP}
+
+\subsection{Comparison Indicator Check}
+\label{sec:cmp-indicator}
+The Sign Check asserts the sign of every active entry of a column. The protocols of \cref{sec:piop-for-pattern-matching} instead need a boolean column that \emph{records} the sign of each entry, so that it can be multiplied into activators. The \emph{Comparison Indicator Check} takes a column $\col = (\mathsf{d},\mathsf{a})$ whose active entries are signed integers of magnitude below $2^\alpha$ (negative values taken in $\F$ via the additive inverse, as in \cref{sec:sign-check}), and a column $\mathsf{b}$ sent by the prover, and proves that on the active rows $\mathsf{b}$ is boolean and marks exactly the non-negative entries. We package this as the relation
+\ifsp
+\begin{displaymath}
+\NPRelation_{\mathsf{CmpInd}} = \left\{\,
+  \begin{aligned}
+    & \NPInstance = \alpha,\\
+    & \NPInstancey = (\Oracle{\MLE{\col}}, \Oracle{\MLE{\mathsf{b}}}),\\
+    & \NPWitness = (\col, \mathsf{b})\\[2pt]
+    & \text{s.t.}\ \forall i,\, \mathsf{a}[i] = 1 \implies{}\\
+    & \phantom{\text{s.t.}}\ \quad \mathsf{d}[i] \in [-(2^\alpha-1), 2^\alpha-1]\ \text{and}\\
+    & \phantom{\text{s.t.}}\ \quad \mathsf{b}[i] = \mathbf{1}[\mathsf{d}[i] \ge 0]
+  \end{aligned}
+\,\right\}.
+\end{displaymath}
+\else
+\begin{displaymath}
+\NPRelation_{\mathsf{CmpInd}} = \left\{\,
+  \NPInstance = \alpha,\;
+  \NPInstancey = (\Oracle{\MLE{\col}}, \Oracle{\MLE{\mathsf{b}}}),\;
+  \NPWitness = (\col, \mathsf{b})
+  \;\middle|\;
+    \forall i,\, \mathsf{a}[i] = 1 \implies \mathsf{d}[i] \in [-(2^\alpha-1), 2^\alpha-1]\ \wedge\ \mathsf{b}[i] = \mathbf{1}[\mathsf{d}[i] \ge 0]
+\,\right\}.
+\end{displaymath}
+\fi
+The check splits the active rows according to $\mathsf{b}$ and runs a Sign Check on each part: the rows with $\mathsf{b} = 1$ must be $\mathsf{NonNeg}$ and the rows with $\mathsf{b} = 0$ must be $\mathsf{Neg}$. Since $2^{\alpha+1} < |\F|$, the two certified ranges $[0, 2^\alpha-1]$ and $[-(2^\alpha-1), -1]$ are disjoint in $\F$, so no entry can be placed on the wrong side, and an entry outside both ranges fails whichever side it is placed on. We write $\mathbf{1}[\col \ge 0]$ for the certified indicator; comparisons between two columns are reduced to this form through their difference, e.g.\ $\mathbf{1}[\mathsf{u} \ge \mathsf{v}] = \mathbf{1}[\mathsf{u} - \mathsf{v} \ge 0]$ and $\mathbf{1}[\mathsf{u} < \mathsf{v}] = 1 - \mathbf{1}[\mathsf{u} - \mathsf{v} \ge 0]$.
+\begin{DefinePIOP}{Comparison Indicator Check}{cmp-indicator}
+  \emph{Inputs:} $\Oracle{\MLE{\col}} = (\Oracle{\MLE{\mathsf{a}}}, \Oracle{\MLE{\mathsf{d}}})$, width $\alpha$, and the indicator $\Oracle{\MLE{\mathsf{b}}}$, sent by $\PIOPProver$ with $\mathsf{b}[i] = \mathbf{1}[\mathsf{d}[i] \ge 0]$ at active indices.
+  \begin{enumerate}[nosep]
+    \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:boolean-check} on the column with activator $\mathsf{a}$ and data $\mathsf{b}$.
+    \item $\PIOPProver$ and $\PIOPVerifier$ invoke the $\mathsf{NonNeg}$ \cref{piop:sign-check} with width $\alpha$ on the column with activator $\mathsf{a}\mult\mathsf{b}$ and data $\mathsf{d}$.
+    \item $\PIOPProver$ and $\PIOPVerifier$ invoke the $\mathsf{Neg}$ \cref{piop:sign-check} with width $\alpha$ on the column with activator $\mathsf{a}\mult(1-\mathsf{b})$ and data $\mathsf{d}$.
   \end{enumerate}
 \end{DefinePIOP}
 
@@ -372,11 +413,20 @@ The \emph{Multiset Equality Check} takes two columns $\col_\Left$ and $\col_\Rig
 \end{displaymath}
 \fi
 Two multisets agree exactly when every value $\elem \in \F$ occurs with the same multiplicity on both sides, i.e.\ $\forall\, \elem \in \F : \sum_{i:\,\col_\Left[i]=\elem} 1 = \sum_{j:\,\col_\Right[j]=\elem} 1$. This is precisely an $\elem$-keyed sum equality between two tables whose key is the column data and whose value is the constant $\mathbf{1}$. The parties locally form the auxiliary tables
+\ifsp
+%% S&P (two-column): the two tables stacked so the display fits one column.
+\begin{align*}
+    \Left &:= \bigl(\act = \col_\Left.\act,\; \key = \col_\Left.\mathsf{data},\; \val = \mathbf{1}\bigr)
+    \quad\text{and}\\
+    \Right &:= \bigl(\act = \col_\Right.\act,\; \key = \col_\Right.\mathsf{data},\; \val = \mathbf{1}\bigr),
+\end{align*}
+\else
 \begin{displaymath}
     \Left := \bigl(\act = \col_\Left.\act,\; \key = \col_\Left.\mathsf{data},\; \val = \mathbf{1}\bigr)
     \quad\text{and}\quad
     \Right := \bigl(\act = \col_\Right.\act,\; \key = \col_\Right.\mathsf{data},\; \val = \mathbf{1}\bigr),
 \end{displaymath}
+\fi
 and a single \cref{piop:keyedsumcheck} on $\Left$ and $\Right$ closes out the proof, with completeness and soundness inherited from the keyed sumcheck.
 \begin{DefinePIOP}{Multiset Equality Check}{mset}
   \emph{Inputs:} $\Oracle{\MLE{\col_\Left}}, \Oracle{\MLE{\col_\Right}}$.
@@ -389,50 +439,47 @@ and a single \cref{piop:keyedsumcheck} on $\Left$ and $\Right$ closes out the pr
 \parhead{Handling tables} The foregoing column protocol extends to prove that two \emph{tables} hold the same multiset of \emph{rows}: the parties first fingerprint each table to a single column with a verifier-chosen random linear combination of its data columns, and then invoke the foregoing check on the two fingerprint columns.
 
 \subsection{Rotation Check}
-The \emph{Rotation Check} takes two columns $\col$ and $\col'$ together with a shift $t \in \mathbb{Z}$, and proves that $\col'$ is the cyclic rotation of $\col$ by $t$ positions, written $\col' = \rho_t(\col)$, where $\rho_t$ sends the entry at index $p$ to index $p+t$ modulo the column length $s$. We package this as the relation
+The \emph{Rotation Check} takes two data vectors $\mathsf{d}$ and $\mathsf{d}'$ over $\BoolHCube{\mu}$, a shift $t \in \mathbb{Z}$ and a public length $s \le 2^\mu$, and proves that on the first $s$ positions $\mathsf{d}'$ is the cyclic rotation of $\mathsf{d}$ by $t$ positions, written $\mathsf{d}' = \rho_t(\mathsf{d})$, where $\rho_t$ sends the entry at index $p$ to index $p+t$ modulo $s$. We package this as the relation
 \ifsp
 %% S&P (two-column): tuple and condition stacked so the display fits one column.
 \begin{displaymath}
 \NPRelation_{\mathsf{rot}} = \left\{\,
   \begin{aligned}
-    & \NPInstance = t,\\
-    & \NPInstancey = (\Oracle{\MLE{\col}}, \Oracle{\MLE{\col'}}),\\
-    & \NPWitness = (\col, \col')\\[2pt]
-    & \text{s.t.}\ |\col| = |\col'| =: s,\\
-    & \phantom{\text{s.t.}}\ \forall\, q \in [s] : \col'[q] = \col[(q - t) \bmod s]
+    & \NPInstance = (t, s),\\
+    & \NPInstancey = (\Oracle{\MLE{\mathsf{d}}}, \Oracle{\MLE{\mathsf{d}'}}),\\
+    & \NPWitness = (\mathsf{d}, \mathsf{d}')\\[2pt]
+    & \text{s.t.}\ \forall\, q \in [s] : \mathsf{d}'[q] = \mathsf{d}[(q - t) \bmod s]
   \end{aligned}
 \,\right\}.
 \end{displaymath}
 \else
 \begin{displaymath}
 \NPRelation_{\mathsf{rot}} = \left\{\,
-  \NPInstance = t,\;
-  \NPInstancey = (\Oracle{\MLE{\col}}, \Oracle{\MLE{\col'}}),\;
-  \NPWitness = (\col, \col')
+  \NPInstance = (t, s),\;
+  \NPInstancey = (\Oracle{\MLE{\mathsf{d}}}, \Oracle{\MLE{\mathsf{d}'}}),\;
+  \NPWitness = (\mathsf{d}, \mathsf{d}')
   \;\middle|\;
-  \begin{array}{l}
-    |\col| = |\col'| =: s \\[3pt]
-    \forall\, q \in [s] : \col'[q] = \col[(q - t) \bmod s]
-  \end{array}
+    \forall\, q \in [s] : \mathsf{d}'[q] = \mathsf{d}[(q - t) \bmod s]
 \,\right\}.
 \end{displaymath}
 \fi
-We first adopt the contiguous convention so that the active rows of both columns occupy hypercube indices $0, \ldots, s-1$, which the verifier enforces by asserting $\col.\act = \col'.\act = \contig_{\mu, s}$. We then reduce the rotation condition to a single multiset equality on \emph{position-tagged} columns: tag each entry of $\col$ with its own position, and tag each entry of $\col'$ with the position it should occupy in $\col$. Concretely, the parties locally construct the tagged tables
+The length $s$ is part of the instance and is never chosen by the prover. For a column in the contiguous layout it is the active length $n$, which the calling protocol has already fixed by asserting that the activator is $\contig_{\mu,n}$, and we omit it from such invocations; for the char-level columns of \cref{sec:piop-for-pattern-matching}, whose activators are sparse, it is the full hypercube, $s = 2^\mu$, so that every position of $\mathsf{d}'$ is constrained. The relation says nothing about the positions $q \ge s$ of $\mathsf{d}'$, and a calling protocol must not read them.
+
+We reduce the rotation condition to a single multiset equality on \emph{position-tagged} columns: tag each entry of $\mathsf{d}$ with its own position, and tag each entry of $\mathsf{d}'$ with the position it should occupy in $\mathsf{d}$, restricting both to the first $s$ positions through the activator $\contig_{\mu,s}$, which the verifier evaluates on its own. Concretely, the parties locally construct the tagged tables
 \begin{displaymath}
-  \Table := \bigl(\col.\act,\; \col.\mathsf{data},\; \idx_\mu\bigr)
+  \Table := \bigl(\contig_{\mu,s},\; \mathsf{d},\; \idx_\mu\bigr)
   \quad\text{and}\quad
-  \Table' := \bigl(\col'.\act,\; \col'.\mathsf{data},\; \idxrot\bigr),
+  \Table' := \bigl(\contig_{\mu,s},\; \mathsf{d}',\; \idxrot\bigr),
 \end{displaymath}
-where $\idx_\mu$ maps each $x \in \BoolHCube{\mu}$ to its hypercube position and $\idxrot$ is the \emph{shifted} index polynomial sending each active position $q$ to $(q - t) \bmod s$. Writing $t_0 := t \bmod s$, this shift is realized exactly by
+where $\idx_\mu$ maps each $x \in \BoolHCube{\mu}$ to its hypercube position and $\idxrot$ is the \emph{shifted} index polynomial sending each position $q < s$ to $(q - t) \bmod s$. Writing $t_0 := t \bmod s$, this shift is realized exactly by
 \begin{displaymath}
   \idxrot(x) := \idx_\mu(x) - t_0 + s\mult\contig_{\mu, t_0}(x),
 \end{displaymath}
-since $\contig_{\mu, t_0}(x) = 1$ precisely when $\idx_\mu(x) < t_0$, supplying the $+s$ wraparound exactly on the positions that underflow. Because $q \mapsto (q - t) \bmod s$ is a bijection on $\{0, \ldots, s-1\}$, the tagged tables agree as multisets of rows if and only if $\col'[q] = \col[(q-t) \bmod s]$ for every $q$, which is exactly the rotation condition. A single \cref{piop:mset} on $\Table$ and $\Table'$ then proves the claim, with completeness and soundness inherited from the multiset equality check.
+since $\contig_{\mu, t_0}(x) = 1$ precisely when $\idx_\mu(x) < t_0$, supplying the $+s$ wraparound exactly on the positions that underflow. Because $q \mapsto (q - t) \bmod s$ is a bijection on $\{0, \ldots, s-1\}$, the tagged tables agree as multisets of rows if and only if $\mathsf{d}'[q] = \mathsf{d}[(q-t) \bmod s]$ for every $q < s$, which is exactly the rotation condition. A single \cref{piop:mset} on $\Table$ and $\Table'$ then proves the claim, with completeness and soundness inherited from the multiset equality check.
 \begin{DefinePIOP}{Rotation Check}{rotcheck}
-  \emph{Inputs:} $\Oracle{\MLE{\col}}, \Oracle{\MLE{\col'}}, t$.
+  \emph{Inputs:} $\Oracle{\MLE{\mathsf{d}}}, \Oracle{\MLE{\mathsf{d}'}}$, the shift $t$, and the length $s$.
   \begin{enumerate}[nosep]
-    \item $\PIOPProver$ sends $\PIOPVerifier$ the active length $s$, and $\PIOPVerifier$ asserts $\col.\act = \col'.\act = \contig_{\mu, s}$.
-    \item $\PIOPProver$ and $\PIOPVerifier$ locally construct the tagged tables $\Table$ and $\Table'$ as above, using the shifted index polynomial $\idxrot(x) = \idx_\mu(x) - t_0 + s\mult\contig_{\mu, t_0}(x)$ with $t_0 := t \bmod s$.
+    \item $\PIOPProver$ and $\PIOPVerifier$ locally construct the tagged tables $\Table$ and $\Table'$ as above, with activator $\contig_{\mu,s}$ and the shifted index polynomial $\idxrot(x) = \idx_\mu(x) - t_0 + s\mult\contig_{\mu, t_0}(x)$ with $t_0 := t \bmod s$.
     \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:mset} to prove that $\Table$ and $\Table'$ are equal as multisets of rows.
   \end{enumerate}
 \end{DefinePIOP}

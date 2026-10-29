@@ -48,12 +48,14 @@ In some protocols, we need to expand a str-level column into a char-level one by
   \label{eq:bcast-lkup}
   (\mathsf{orig\text{-}ind}, \mathsf{d}') \lookup (\mathsf{ind}, \mathsf{d}),
 \end{equation}
+where the left table is activated by a char-level activator $\mathsf{act}_c$ and the right table by a str-level activator $\mathsf{act}_s$, both supplied by the caller. By default these are the activators $\mathsf{char\text{-}act}$ and $\mathsf{a}$ of $\strcol$, so the lookup constrains exactly the active characters, and then also certifies that every active character belongs to an active string. Since $\mathsf{ind}$ is injective, membership pins $\mathsf{d}'[c]$ to the unique value $\mathsf{d}[\mathsf{orig\text{-}ind}[c]]$. The two-column lookup is reduced to a single-column one by a random linear combination: $\PIOPVerifier$ samples $\gamma \samples \F$ after $\mathsf{d}'$ has been sent, and the parties look up $\mathsf{orig\text{-}ind} + \gamma\,\mathsf{d}'$ in $\mathsf{ind} + \gamma\,\mathsf{d}$.
 
 \begin{DefinePIOP}{Broadcast Check}{broadcast}
-  \emph{Inputs:} the string column $\Oracle{\MLE{\strcol}}$ with all of its main and auxiliary oracles; a str-level column $\Oracle{\MLE{\mathsf{d}}}$; and its claimed broadcast, the char-level column $\Oracle{\MLE{\mathsf{d}'}}$.
+  \emph{Inputs:} the string column $\Oracle{\MLE{\strcol}}$ with all of its main and auxiliary oracles; a str-level column $\Oracle{\MLE{\mathsf{d}}}$; its claimed broadcast, the char-level column $\Oracle{\MLE{\mathsf{d}'}}$; and the activators $\mathsf{act}_c$ (char-level) and $\mathsf{act}_s$ (str-level), by default $\mathsf{char\text{-}act}$ and $\mathsf{a}$.
   \begin{enumerate}[nosep]
-    \item (\emph{Parse}) $\PIOPProver$ and $\PIOPVerifier$ parse $\Oracle{\MLE{\strcol}}$ to obtain $\Oracle{\MLE{\mathsf{orig\text{-}ind}}}$.
-    \item To check that $\mathsf{d}'$ is the broadcast of $\mathsf{d}$, $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:lookup-check} on \cref{eq:bcast-lkup}.
+    \item (\emph{Parse}) $\PIOPProver$ and $\PIOPVerifier$ parse $\Oracle{\MLE{\strcol}}$ to obtain $\Oracle{\MLE{\mathsf{orig\text{-}ind}}}$ and $\Oracle{\MLE{\mathsf{ind}}}$.
+    \item $\PIOPVerifier$ samples $\gamma \samples \F$ and sends it to $\PIOPProver$.
+    \item To check that $\mathsf{d}'$ is the broadcast of $\mathsf{d}$, $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:lookup-check} on \cref{eq:bcast-lkup}, i.e.\ on the column with activator $\mathsf{act}_c$ and data $\mathsf{orig\text{-}ind} + \gamma\,\mathsf{d}'$ against the column with activator $\mathsf{act}_s$ and data $\mathsf{ind} + \gamma\,\mathsf{d}$.
   \end{enumerate}
 \end{DefinePIOP}
 The formal definition and the security proofs are deferred to \cref{sec:proof-bcast}.
@@ -136,6 +138,28 @@ $\truthtable$~\cite{cryptoeprint:2026/1260} proves a \texttt{SUM GROUP BY} with 
 \end{DefinePIOP}
 The formal definition and the security proofs are deferred to \cref{sec:proof-cons}.
 
+\subsubsection{Layout Check}
+\label{sec:layout-check}
+The char-level columns of \cref{sec:string-arith} carry two kinds of position information: the \emph{logical} position of every character within its string, recorded in $(\mathsf{orig\text{-}ind}, \mathsf{int\text{-}ind})$, and its \emph{physical} position in the columns. The data owner lays the characters out so that the two agree: the characters of each string occupy consecutive positions, in order of $\mathsf{int\text{-}ind}$, and $\mathsf{bnd}$ marks the first of them. The lookups of \cref{sec:domain-preserving,sec:char-projection} read the characters through their logical positions only, but the pattern-matching protocols of \cref{sec:piop-for-pattern-matching} read a window of characters through \emph{rotations} of the character column, i.e.\ through physical adjacency, and are meaningful only when the two views agree. The \emph{Layout Check} certifies this agreement for a column whose char-level columns were freshly materialized by the untrusted prover; it is invoked by \cref{piop:domain-preserving-update-check} below.
+
+\parhead{Proof sketch} We say that the active characters of a string $i$ form a \emph{run} if they occupy positions $p_i, p_i + 1, \dots, p_i + m_i - 1$ with $\mathsf{int\text{-}ind} = 0, 1, \dots, m_i - 1$ in that order. Three conditions force the active characters of every active string into a single run. First, $\mathsf{bnd}$ marks exactly the active characters with $\mathsf{int\text{-}ind} = 0$; this is a \cref{piop:zero-indicator} on $\mathsf{int\text{-}ind}$ under the activator $\mathsf{char\text{-}act}$, with $\mathsf{bnd}$ as the indicator. Second, every active character that is not the first of its string is physically preceded by the previous character of the same string: for every active $c$ with $\mathsf{bnd}[c] = 0$, position $c - 1$ holds an active character with $\mathsf{orig\text{-}ind}[c-1] = \mathsf{orig\text{-}ind}[c]$ and $\mathsf{int\text{-}ind}[c-1] = \mathsf{int\text{-}ind}[c] - 1$. Since the verifier can evaluate the index polynomial $\idx_\mu$ on its own, this is the lookup
+\begin{equation}
+  \label{eq:layout-lkup}
+  (\idx_\mu - 1,\ \mathsf{orig\text{-}ind},\ \mathsf{int\text{-}ind} - 1) \lookup (\idx_\mu,\ \mathsf{orig\text{-}ind},\ \mathsf{int\text{-}ind}),
+\end{equation}
+with the left table activated by $\mathsf{char\text{-}act}\mult(1-\mathsf{bnd})$ and the right table by $\mathsf{char\text{-}act}$; as $\idx_\mu$ is injective, the only row that can match is the one at position $c-1$. Following these predecessors from an active character with internal index $j$ reaches, after exactly $j$ steps, an active character with internal index $0$ of the same string, $j$ positions to the left. Third, every active string has exactly one such first character and every inactive string has none, $\sum_{c:\,\mathsf{orig\text{-}ind}[c] = i} \mathsf{char\text{-}act}[c]\mult\mathsf{bnd}[c] = \mathsf{a}[i]$ for every $i$, which is a \texttt{SUM GROUP BY} as in \cref{eq:cons-groupby} and is proven by a single \cref{piop:keyedsumcheck}. Hence every active character of string $i$ with internal index $j$ sits at position $p_i + j$, where $p_i$ is the position of the unique first character of $i$: distinct active characters of a string have distinct internal indices, the internal indices present form an initial segment $\{0, \dots, m_i - 1\}$ because the chain from $j$ passes through every smaller index, and the string is a run. An inactive string has no first character, hence no active character at all.
+
+\begin{DefinePIOP}{Layout Check}{layout-check}
+  \emph{Inputs:} the string column $\Oracle{\MLE{\strcol}}$ with all of its main and auxiliary oracles.
+  \begin{enumerate}[nosep]
+    \item (\emph{Parse}) $\PIOPProver$ and $\PIOPVerifier$ parse $\Oracle{\MLE{\strcol}}$ to obtain $\Oracle{\MLE{\mathsf{a}}}$, $\Oracle{\MLE{\mathsf{ind}}}$, $\Oracle{\MLE{\mathsf{orig\text{-}ind}}}$, $\Oracle{\MLE{\mathsf{int\text{-}ind}}}$, $\Oracle{\MLE{\mathsf{char\text{-}act}}}$ and $\Oracle{\MLE{\mathsf{bnd}}}$.
+    \item (\emph{Boundaries}) To check that $\mathsf{bnd}$ marks exactly the active characters with $\mathsf{int\text{-}ind} = 0$, $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:zero-indicator} on the column with activator $\mathsf{char\text{-}act}$ and data $\mathsf{int\text{-}ind}$, with $\mathsf{bnd}$ as the indicator.
+    \item (\emph{Predecessors}) To check that every other active character is physically preceded by the previous character of its string, $\PIOPVerifier$ samples $\gamma \samples \F$ and the parties invoke \cref{piop:lookup-check} on \cref{eq:layout-lkup}, with the three columns of each side combined as $\mathsf{x} + \gamma\,\mathsf{y} + \gamma^2\,\mathsf{z}$, the left side activated by $\mathsf{char\text{-}act}\mult(1-\mathsf{bnd})$ and the right side by $\mathsf{char\text{-}act}$.
+    \item (\emph{One start per string}) To check that every active string has exactly one first character and every inactive string none, $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:keyedsumcheck} on the tables $\bigl(\act = \mathsf{char\text{-}act},\, \key = \mathsf{orig\text{-}ind},\, \val = \mathsf{bnd}\bigr)$ and $\bigl(\act = \mathbf{1},\, \key = \mathsf{ind},\, \val = \mathsf{a}\bigr)$.
+  \end{enumerate}
+\end{DefinePIOP}
+The formal definition and the security proofs are deferred to \cref{sec:proof-layout}.
+
 \subsubsection{Domain-Preserving Update}
 \label{sec:domain-preserving}
 
@@ -153,7 +177,7 @@ which binds the length and rank of every new row to those of the old string with
   (\mathsf{h}'^{\mathsf{new}}, \strcol^{\mathsf{new}}.\mathsf{aux}[\mathsf{char}, \mathsf{int\text{-}ind}]) \\
   \lookup (\mathsf{h}'^{\mathsf{old}}, \strcol^{\mathsf{old}}.\mathsf{aux}[\mathsf{char}, \mathsf{int\text{-}ind}]),
 \end{multline}
-The two lookups certify that every attribute present is genuine; they do not certify that none is missing or repeated. The data-preserving check closes the first gap, by forcing every active string to have exactly as many active characters as its length, and a no-duplicate check on the pairs $(\mathsf{orig\text{-}ind}, \mathsf{int\text{-}ind})$ closes the second, by forcing those characters to occupy distinct positions.
+The two lookups certify that every attribute present is genuine; they do not certify that none is missing or repeated, nor that the characters are laid out as \cref{sec:string-arith} prescribes. The data-preserving check closes the first gap, by forcing every active string to have exactly as many active characters as its length, and the layout check of \cref{sec:layout-check} closes the other two: it forces the active characters of every string to occupy consecutive positions with the distinct internal indices $0, 1, \dots$, so that a string with exactly $\mathsf{l}[i]$ of them, each drawn from the characters of the old string with the same hash, is a character-by-character copy of that string.
 
 \begin{DefinePIOP}{Domain-Preserving Update Check}{domain-preserving-update-check}
   \emph{Inputs:} the input column $\Oracle{\MLE{\strcol^{\mathsf{old}}}}$ and the output column $\Oracle{\MLE{\strcol^{\mathsf{new}}}}$, each with all of its main and auxiliary oracles; and the char-level hash columns $\Oracle{\MLE{\mathsf{h}'^{\mathsf{old}}}}$ and $\Oracle{\MLE{\mathsf{h}'^{\mathsf{new}}}}$, sent by $\PIOPProver$.
@@ -162,7 +186,7 @@ The two lookups certify that every attribute present is genuine; they do not cer
     \item To check that each $\mathsf{h}'$ is the broadcast of the corresponding $\mathsf{h}$, $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:broadcast} on $(\strcol^{\mathsf{old}}, \mathsf{h}^{\mathsf{old}}, \mathsf{h}'^{\mathsf{old}})$ and on $(\strcol^{\mathsf{new}}, \mathsf{h}^{\mathsf{new}}, \mathsf{h}'^{\mathsf{new}})$.
     \item To check that no new string is introduced, $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:lookup-check} on \cref{eq:main-lkup} and on \cref{eq:aux-lkup}.
     \item To check that the str-level and char-level activators are consistent, $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:data-preserving-update-check} on $\strcol^{\mathsf{new}}$.
-    \item To check that no character of a string is duplicated, $\PIOPVerifier$ samples $r \samples \F$ and sends it to $\PIOPProver$; the parties then invoke \cref{piop:nodup-check} on the column with data $\mathsf{orig\text{-}ind}^{\mathsf{new}} + r\,\mathsf{int\text{-}ind}^{\mathsf{new}}$ and activator $\mathsf{char\text{-}act}^{\mathsf{new}}$.
+    \item To check that the characters of every string are laid out consecutively, in order and without repetition, $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:layout-check} on $\strcol^{\mathsf{new}}$.
   \end{enumerate}
 \end{DefinePIOP}
 
@@ -170,21 +194,22 @@ The formal definition and the security proofs are deferred to \cref{sec:proof-do
 \subsection{Length Filtering}
 \label{sec:length-filtering}
 
-Length filtering certifies that every string shorter than a threshold $k$ was correctly discarded. We apply it as a first step in every pattern matching operation in  \cref{sec:multi-char-pattern-matching}, since a string can match a pattern only if it is at least as long as the pattern; any shorter string is a guaranteed non-match and can be removed before the filter runs. Interestingly, this is not merely an optimization: length filtering is a necessary condition for the pattern-matching protocols of \cref{sec:multi-char-pattern-matching} to be complete and sound.
+Length filtering certifies that every string shorter than a threshold $k$ was correctly discarded; its exact variant certifies instead that every string of length other than $k$ was discarded. We apply it as a first step in every pattern matching operation in  \cref{sec:multi-char-pattern-matching}, since a string can match a pattern only if it is at least as long as the pattern; any shorter string is a guaranteed non-match and can be removed before the filter runs. Interestingly, this is not merely an optimization: length filtering is a necessary condition for the pattern-matching protocols of \cref{sec:multi-char-pattern-matching} to be complete and sound.
 
 \parhead{Proof sketch} We first verify that the new main and auxiliary string columns are internally consistent by invoking \cref{piop:data-preserving-update-check}, since length filtering is a data-preserving update. Having established this, we treat the problem as a general filtering operation and use the machinery of $\truthtable$~\cite{cryptoeprint:2026/1260}. We invoke a zerocheck on $\mathsf{a'}\cdot(1-\mathsf{a})$ to ensure that rows were only deactivated and none was newly activated. Finally, we check that no active string has length below $k$ and no deactivated string has length at least $k$, by invoking \cref{piop:sign-check} on the following:
 \begin{equation}
   \label{eq:fp-fn-len-filtering}
   (\mathsf{a}\cdot(1-\mathsf{a'}),\; \mathsf{l}-k) < 0 \qquad (\mathsf{a'},\; \mathsf{l}-k) \geq 0.
 \end{equation}
+Patterns without a multi-character wild-card must match the whole string, and for them we use the \emph{exact variant}, which keeps exactly the strings of length $k$. Its last step replaces the two sign checks by a \cref{piop:zerocheck} on $\mathsf{a'}\cdot(\mathsf{l}-k)$, so every kept string has length $k$, and a \cref{piop:nozero-check} on the column with data $\mathsf{l}-k$ and activator $\mathsf{a}\cdot(1-\mathsf{a'})$, so every discarded string has a different length.
 
 \begin{DefinePIOP}{Length Filtering Check}{len-filter}
-  \emph{Inputs:} the input column $\Oracle{\MLE{\strcol}}$ and the output column $\Oracle{\MLE{\strcol'}}$, each with all of its main and auxiliary oracles; and threshold $k$.
+  \emph{Inputs:} the input column $\Oracle{\MLE{\strcol}}$ and the output column $\Oracle{\MLE{\strcol'}}$, each with all of its main and auxiliary oracles; threshold $k$; and a flag selecting the exact variant.
   \begin{enumerate}[nosep]
     \item (\emph{Parse}) $\PIOPProver$ and $\PIOPVerifier$ parse $\Oracle{\MLE{\strcol}}$ to obtain $\Oracle{\MLE{\mathsf{a}}}$ and $\Oracle{\MLE{\mathsf{l}}}$, and $\Oracle{\MLE{\strcol'}}$ to obtain $\Oracle{\MLE{\mathsf{a}'}}$ and $\Oracle{\MLE{\mathsf{char\text{-}act}'}}$.
     \item To check that the new activators are internally consistent, $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:data-preserving-update-check} on $\strcol'$.
     \item To check that no new string was activated, $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:zerocheck} on $\mathsf{a'}\cdot(1-\mathsf{a})$.
-    \item To check that there are no false positives and no false negatives, $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:sign-check} on \cref{eq:fp-fn-len-filtering}.
+    \item To check that there are no false positives and no false negatives, $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:sign-check} on \cref{eq:fp-fn-len-filtering}; in the exact variant, they instead invoke \cref{piop:zerocheck} on $\mathsf{a'}\cdot(\mathsf{l}-k)$ and \cref{piop:nozero-check} on data $\mathsf{l}-k$ with activator $\mathsf{a}\cdot(1-\mathsf{a'})$.
   \end{enumerate}
 \end{DefinePIOP}
 The formal definition and the security proofs are deferred to \cref{sec:proof-lenfilter}.
@@ -246,7 +271,7 @@ For a long string $i$, the triple $(i, k, \mathsf{c}_k[i])$ must be the index, i
   \label{eq:proj-lkup}
   (\mathsf{ind}, k, \mathsf{c}_k) \lookup \strcol.\mathsf{aux}[\mathsf{orig\text{-}ind}, \mathsf{int\text{-}ind}, \mathsf{char}],
 \end{equation}
-where the left-hand side is activated by $\mathsf{g}_k$. Since the active pairs $(\mathsf{orig\text{-}ind}, \mathsf{int\text{-}ind})$ are distinct in a well-formed arithmetization (\cref{sec:domain-preserving}), membership pins $\mathsf{c}_k[i]$ to the unique character at that position. Finally, for the short strings we force the sentinel by a zerocheck on
+where the left-hand side is activated by $\mathsf{g}_k$. Since the active pairs $(\mathsf{orig\text{-}ind}, \mathsf{int\text{-}ind})$ are distinct in a well-formed arithmetization (\cref{sec:layout-check}), membership pins $\mathsf{c}_k[i]$ to the unique character at that position. Finally, for the short strings we force the sentinel by a zerocheck on
 \begin{equation}
   \label{eq:proj-sentinel}
   \mathsf{a} \mult (1 - \mathsf{g}_k) \mult (\mathsf{c}_k + 1).

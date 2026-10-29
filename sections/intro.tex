@@ -4,9 +4,13 @@
 
 Storing data in a database and querying it with SQL is one of the most common patterns in modern applications, and increasingly the party that holds the database and the party that queries it sit in different trust domains. A query issuer then has no guarantee that the answers it receives are correct, and in some settings the responder is actively incentivized to lie. A loan-issuing smart contract, for instance, may price a loan from a risk profile computed by a query over the borrower's transaction history; since it is the borrower who supplies the query result, a high-risk borrower has every reason to report a flattering one.
 
-\emph{Verifiable databases} close this gap. The database owner publishes a commitment to the database, and whoever executes a query returns, alongside the result, a succinct proof that the result is exactly what the query evaluates to on the committed data. The last few years have seen a proliferation of such systems~\cite{ZhangKC15,ZhangGKPP17,GuFN25,posql,qedb,cryptoeprint:2026/1260}.
+\emph{Verifiable databases (VDBs)} close this gap. The database owner publishes a commitment to the database, and whoever executes a query returns, alongside the result, a succinct proof that the result is exactly what the query evaluates to on the committed data. The last few years have seen a proliferation of such systems~\cite{ZhangKC15,ZhangGKPP17,GuFN25,posql,qedb,cryptoeprint:2026/1260}.
 
-\parhead{Research Gap}Surprisingly, none of these systems supports operations on the contents of data with \emph{string type}. Across design paradigms, string columns are treated as opaque values: each string is encoded or hashed into a single field element, and equality (and possibly non-equality) is the only supported string operation. \Cref{tab:prior-strings} summarizes the state of affairs: wherever a benchmark query contains a string predicate, the predicate, the column, or the whole query is dropped. Strikingly, this includes the circuit-based systems, which could in principle embed the characters of every string directly in the circuit, but refrain from doing so because of the sheer complexity and efficiency concerns involved.
+\parhead{Research Gap}Surprisingly, \emph{none} of these systems supports operations on the contents of data with string type. With the rise of large language models~\cite{OuyangWJAWMZASRSHKMSAWCLL22,TouvronLIMLLRGHARJGL23}, text has become a dominant form of data, and analytics workloads reflect it. Across more than $60{,}000$ real-world business-intelligence repositories, $48\%$ of stored values are strings~\cite{VogelsgesangHFKLMNT18}, and across the Amazon Redshift fleet, strings make up $52.1\%$ of all columns~\cite{RenenHPVDNLSK24}. Even $6$ of the $22$ TPC-H queries~\cite{PoessF00} filter rows with \texttt{LIKE} patterns.
+As a result, a large and growing class of real-world queries lies outside the reach of verifiable databases, and this gap has so far been left open.
+
+
+As shown in \Cref{tab:prior-strings}, across different design paradigms, string columns are always treated as opaque values: each string is encoded or hashed into a single field element, and equality (and possibly non-equality) is the only supported string operation. As a result, wherever a benchmark query contains a string predicate, the predicate, the column, or the whole query is dropped. Strikingly, this includes the circuit-based systems, which could in principle express any NP statement in the circuit, but refrain from doing so because of the sheer complexity and efficiency concerns involved with the strings.
 
 \ifsp\begin{table*}[t]\else\begin{table}[t]\fi
 \centering
@@ -30,18 +34,17 @@ This work & interactive proofs & $=$, $\neq$, \texttt{LIKE}, ordering & all stri
 \label{tab:prior-strings}
 \ifsp\end{table*}\else\end{table}\fi
 
-With the rise of large language models~\cite{OuyangWJAWMZASRSHKMSAWCLL22,TouvronLIMLLRGHARJGL23}, text has become a dominant form of data, and analytics workloads reflect it. Across more than $60{,}000$ real-world business-intelligence repositories, $48\%$ of stored values are strings~\cite{VogelsgesangHFKLMNT18}, and across the Amazon Redshift fleet, strings make up $52.1\%$ of all columns~\cite{RenenHPVDNLSK24}. Even $6$ of the $22$ TPC-H queries~\cite{PoessF00} filter rows with \texttt{LIKE} patterns.
-As a result, a large and growing class of real-world queries lies outside the reach of verifiable databases, and this gap has so far been left open.
+
 
 \subsection{Our Contribution}
 
 
-In this work we present \emph{the first} verifiable database that supports white-box operations on the contents of strings. We extend $\truthtable$~\cite{cryptoeprint:2026/1260}, a state-of-the-art verifiable query engine, with pattern matching and lexicographic ordering over string columns, and restore to TPC-H every string predicate that prior systems drop.
+In this work we present \emph{the first} verifiable database that supports white-box operations on the contents of strings. We extend $\truthtable$~\cite{cryptoeprint:2026/1260}, a state-of-the-art verifiable query engine, with novel string arithmetizations and protocols to prove statements about strings. As a result, we restore to TPC-H every string predicate that prior systems drop.
 
 We are able to prove these queries efficiently: 
-on the TPC-H benchmark, restoring the string predicates that $\truthtable$ removes from the queries increases the average proving time by only $\mathbf{XX}\%$, the average verification time by $\mathbf{XX}\%$, and the average proof size by $\mathbf{XX}\%$ over the simplified queries that $\truthtable$ evaluates.\ali{Fill in from \cref{sec:eval-tpch}.}
+on the {TPC-H} benchmark, restoring the string predicates that $\truthtable$ removes from the queries increases the average proving time by only \XXX, the average verification time by \XXX, the average proof size by \XXX, the average commitment size by \XXX, and the commitment time by \XXX over the simplified queries that $\truthtable$ evaluates.
 
-We achieve this through two categories of techniques: \emph{cryptographic protocols} that prove string operations white-box, over the characters of the strings, and \emph{preprocessing} that the data owner performs once at ingestion to make those protocols cheap at query time. We elaborate on these next.
+We achieve this through three categories of techniques: (1) \emph{novel string arithmetization} techniques that allow us access the content of the strings, (2) \emph{cryptographic protocols} that prove string white-box operations white-box, and (3) \emph{preprocessing techniques} that the data owner performs once at ingestion to make those protocols cheap at query time. We elaborate on these next.
 
 \textbf{We propose a new way of encoding string columns} (\cref{sec:string-arith}) which enables PIOPs to operate on the contents of strings and prove white-box properties about them. We extend the encoding of $\truthtable$, in which a string column is a single polynomial holding only the hashes of the strings, with a few auxiliary polynomials. Most importantly, we add one that holds the characters of all the strings, concatenated one after another which gives us power to reason about the strings in a character level.
 
@@ -49,5 +52,5 @@ We achieve this through two categories of techniques: \emph{cryptographic protoc
 \textbf{Our cryptographic protocols}
 are polynomial IOPs~\cite{ChiesaHMMVW20,BunzFS20} over these polynomials, composed of modular subprotocols: (1) a \emph{string toolbox} (\cref{sec:string-toolbox}) of checks that keep the encoding well formed and consistent as the query plan filters, joins, and rematerializes tables, which serves as the building block for the operator-level protocols; (2) protocols for \emph{wild-card pattern matching} over the strings (\cref{sec:piop-for-pattern-matching}), the most common white-box string operation in practice; and (3) protocols for \emph{lexicographic ordering} of the strings (\cref{sec:lex-order}), which underlie \texttt{ORDER BY} on string columns.
 
-\textbf{We propose novel preprocessing techniques} for the both wild-card pattern matching and lexicographic ordering operations to speed up the prover. We use a database technique called "String fingerprinting" which gives us XXX speed up in the wild-card pattern matching. To improve the prover time for string ordering, we simply attach an auxiliary ranking column and sort based on that.
+\textbf{We propose novel preprocessing techniques} for the both wild-card pattern matching and lexicographic ordering operations to speed up the prover. We use a database technique called "String fingerprinting" which gives us \XXX speed up in the wild-card pattern matching. To improve the prover time for string ordering, we simply attach an auxiliary ranking column and sort based on that which gives us \XXX speed up.
 

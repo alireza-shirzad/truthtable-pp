@@ -1,4 +1,10 @@
 % !TEX root = ../paper.tex
 \begin{abstract}
-  In the paper we present something cool
+  Verifiable databases (VDBs) let clients outsource their data without trusting the provider: a client holding only a short digest can verify every query response against a compact proof supplied by the server. Yet no existing VDB, in academia or industry, supports \emph{white-box} string operations, which inspect the contents of strings rather than treating each string as an opaque value. This is despite roughly half of the columns in real-world business-intelligence repositories being string-typed. As a result, every prior evaluation, including those on TPC-H, abridges the benchmark queries by stripping out their white-box string operations.
+
+  To fill this gap, we build the first VDB that natively supports white-box string operations such as pattern matching and string sorting. Our system extends $\truthtable$ (Namboothiry et al., ePrint 2026): we introduce a new polynomial representation that arithmetizes string-typed columns down to their characters, and design new cryptographic subprotocols that prove the correct execution of white-box string operators over this representation.
+
+  We further reduce the prover's cost of string operations with new preprocessing techniques that adapt known database methods, such as string fingerprinting. Depending on the query and the data distribution, these techniques speed up pattern matching by up to \XXX and string sorting by up to \XXX.
+
+  Finally, we restore to the TPC-H queries the white-box string operations that prior work omitted for lack of support, and show that this comes at only \XXX prover overhead, \XXX verifier overhead, \XXX proof-size overhead, \XXX commitment-time overhead, and \XXX commitment-size overhead.
 \end{abstract}

@@ -49,7 +49,7 @@ We next study how the cost of pattern matching grows with the structure of the p
 \ali{Discussion: each factor adds one sweep round (\cref{piop:sweep-factors}), so the prover cost should grow roughly linearly in $n_\zeta$; relate the slope to the per-factor terms of the cost model.}
 
 \subsubsection{TPC-H with String Predicates}
-\label{sec:eval-tpch}
+\label{sec:eval-{TPC-H}}
 
 $\truthtable$ evaluates TPC-H after removing every string predicate other than equality from the queries. Since the extended system supports string predicates, we restore them and re-measure the benchmark, taking a step toward verifying the complete TPC-H suite end to end.
 \ali{List the queries whose string predicates are restored (\texttt{LIKE} appears in Q2, Q9, Q13, Q14, Q16 and Q20; Q13 and Q16 additionally need \texttt{NOT LIKE} and join types that $\truthtable$ does not support) and the scale factor.}

@@ -50,9 +50,10 @@ All of our protocol design occurs at the PIOP layer. We build PIOPs that prove c
     \item \textbf{\hyperref[{piop:ratsumcheck}]{Rational Sumcheck}} proves claims of the form $\sum_{x \in \BoolHCube{\mu}} \frac{p(x)}{q(x)} = s$ for polynomials $p,q$, under the promise that $q(x) \neq 0$ for all $x \in \BoolHCube{\mu}$.
     \item \textbf{\hyperref[{piop:nozero-check}]{NoZero Check}} proves that every active entry of a column is nonzero.
     \item \textbf{\hyperref[{piop:boolean-check}]{Booleanity Check}} proves that every active entry of a column is $0$ or $1$.
-    \item \textbf{\hyperref[{piop:nodup-check}]{No-Duplicate Check}} proves that the active entries of a column are pairwise distinct.
     \item \textbf{\hyperref[{piop:range-check}]{Range Check}} proves that every active entry of a column lies in $[0, 2^n-1]$ for a given width $n$.
-    \item \textbf{\hyperref[{piop:sign-check}]{Sign Check}} proves that every active entry of a column is non-negative, positive, non-positive or negative, within a given width; we use it to derive indicator columns for comparisons.
+    \item \textbf{\hyperref[{piop:sign-check}]{Sign Check}} proves that every active entry of a column is non-negative, positive, non-positive or negative, within a given width.
+    \item \textbf{\hyperref[{piop:zero-indicator}]{Zero Indicator Check}} proves that a boolean column marks exactly the zero entries of a column.
+    \item \textbf{\hyperref[{piop:cmp-indicator}]{Comparison Indicator Check}} proves that a boolean column marks exactly the non-negative entries of a column, within a given width; it turns a comparison into an indicator that other checks can multiply into activators.
     \item \textbf{\hyperref[{piop:limb-check}]{Limb Reconstruction Check}} proves that each entry of a column is the concatenation of the corresponding entries of $k$ narrower limb columns.
     \item \textbf{\hyperref[{piop:lookup-check}]{Lookup Check}} proves $\col_1 \lookup \col_2$, i.e., that every active value of $\col_1$ occurs among the active values of $\col_2$; applied to random linear combinations of several columns, it proves that every active row of one table occurs in another.
     \item \textbf{\hyperref[{piop:mset}]{Multiset Equality Check}} proves that two columns (or tables) hold the same multiset of active values (or rows).
