@@ -14,42 +14,42 @@ For example, suppose we have $m=4$ bins, where bin $i\in\{1,2,3,4\}$ is computed
 \ifsp
 %% S&P (two-column): one predicate per row so the display fits one column.
 \begin{align*}
- \mathsf{fp}_1(\mathsf{s}) &= \begin{cases}
-  1 & \text{if $\mathsf{s}$ contains `a', `b', or `c'}\\
+ \mathsf{fp}_1(s) &= \begin{cases}
+  1 & \text{if $s$ contains `a', `b', or `c'}\\
   0 & \text{otherwise}
  \end{cases}\\
- \mathsf{fp}_2(\mathsf{s}) &= \begin{cases}
-  1 & \text{if $\mathsf{s}$ contains any of `d', `e', \dots, `l'}\\
+ \mathsf{fp}_2(s) &= \begin{cases}
+  1 & \text{if $s$ contains any of `d', `e', \dots, `l'}\\
   0 & \text{otherwise}
  \end{cases}\\
- \mathsf{fp}_3(\mathsf{s}) &= \begin{cases}
-  1 & \text{if $\mathsf{s}$ contains `m' or `n'}\\
+ \mathsf{fp}_3(s) &= \begin{cases}
+  1 & \text{if $s$ contains `m' or `n'}\\
   0 & \text{otherwise}
  \end{cases}\\
- \mathsf{fp}_4(\mathsf{s}) &= \begin{cases}
-  1 & \text{if $\mathsf{s}$ contains any of `o', `p', \dots, `z'}\\
+ \mathsf{fp}_4(s) &= \begin{cases}
+  1 & \text{if $s$ contains any of `o', `p', \dots, `z'}\\
   0 & \text{otherwise}
  \end{cases}
 \end{align*}
 \else
 \begin{align*}
- &\mathsf{fp}_1(\mathsf{s}) = \begin{cases}
-  1 & \text{if $\mathsf{s}$ contains `a', `b', or `c'}\\
+ &\mathsf{fp}_1(s) = \begin{cases}
+  1 & \text{if $s$ contains `a', `b', or `c'}\\
   0 & \text{otherwise}
  \end{cases}
  \qquad
- &\mathsf{fp}_2(\mathsf{s}) = \begin{cases}
-  1 & \text{if $\mathsf{s}$ contains any of `d', `e', \dots, `l'}\\
+ &\mathsf{fp}_2(s) = \begin{cases}
+  1 & \text{if $s$ contains any of `d', `e', \dots, `l'}\\
   0 & \text{otherwise}
  \end{cases}
  \\
- &\mathsf{fp}_3(\mathsf{s}) = \begin{cases}
-  1 & \text{if $\mathsf{s}$ contains `m' or `n'}\\
+ &\mathsf{fp}_3(s) = \begin{cases}
+  1 & \text{if $s$ contains `m' or `n'}\\
   0 & \text{otherwise}
  \end{cases}
  \qquad
- &\mathsf{fp}_4(\mathsf{s}) = \begin{cases}
-  1 & \text{if $\mathsf{s}$ contains any of `o', `p', \dots, `z'}\\
+ &\mathsf{fp}_4(s) = \begin{cases}
+  1 & \text{if $s$ contains any of `o', `p', \dots, `z'}\\
   0 & \text{otherwise}
  \end{cases}
 \end{align*}
@@ -72,44 +72,44 @@ A string can match \texttt{\%dar\%} only if it contains every character of \text
 
 \subsection{Fingerprint Design}
 \label{sec:fp-design}
-The effectiveness of pre-filtering hinges on the features assigned to each bin, so a crucial question is how to choose them. Prior works (see \cref{sec:fp-prior}) mostly aim to minimize the execution time of the fingerprinting-based filtering; However, our objective is to minimze the prover effort to certify ther this process. Therefore, we design our own fingerprinting as follows: Given a string column $\col$ as the corpus, the data owner extracts (1) the single-character, (2) bigram, (3) trigram, and (4) precedence features occurring in the corpus, where a string has the precedence feature $(a, b)$ for alphanumerics $a$ and $b$ if some occurrence of $a$ lies before the last occurrence of $b$, with the followin two restrictions:
+The effectiveness of pre-filtering hinges on the features assigned to each bin, so a crucial question is how to choose them. Prior works (see \cref{sec:fp-prior}) mostly aim to minimize the execution time of the fingerprinting-based filtering; However, our objective is to minimze the prover effort to certify ther this process. Therefore, we design our own fingerprinting as follows: Given a string column $\strcol$ as the corpus, the data owner extracts (1) the single-character, (2) bigram, (3) trigram, and (4) precedence features occurring in the corpus, where a string has the precedence feature $(a, b)$ for alphanumerics $a$ and $b$ if some occurrence of $a$ lies before the last occurrence of $b$, with the followin two restrictions:
 \begin{itemize}[nosep]
   \item  A feature present in every row does not help us in filtering task, hence discarded;
 \item If more than $m_{\max}$ features remain, the data owner keeps the $m_{\max}$ that occur in the most rows ($m_{\max} = 2048$ in our implementation).
 \end{itemize}
 
 % Bigrams and trigrams are read over an alphabet that keeps the alphanumerics and the space and merges every other character into a single symbol, so that an n-gram can also record where a word starts or ends, as patterns such as \texttt{\% i\%} require.
-Every feature receives its own bin, i.e.\ $\mathsf{fp}_i(\mathsf{s}) = 1$ if and only if the string $\mathsf{s}$ has the $i$-th feature. This yields the fingerprint $\mathcal{F}_\col=\{\mathsf{fp_1},\dots,\mathsf{fp}_m\}$ where $m\leq m_{\max}$. On the pattern side, characters and n-grams are read only from the maximal runs of literal characters, so that no n-gram spans a wild-card: the pattern \texttt{a\_c\%d} yields the characters \texttt{a}, \texttt{c} and \texttt{d}, no bigram, and the precedence features $(\texttt{a},\texttt{c})$, $(\texttt{a},\texttt{d})$ and $(\texttt{c},\texttt{d})$, all of which every matching string has. 
+Every feature receives its own bin, i.e.\ $\mathsf{fp}_i(s) = 1$ if and only if the string $s$ has the $i$-th feature. This yields the fingerprint $\mathcal{F}_\strcol=\{\mathsf{fp_1},\dots,\mathsf{fp}_m\}$ where $m\leq m_{\max}$. On the pattern side, characters and n-grams are read only from the maximal runs of literal characters, so that no n-gram spans a wild-card: the pattern \texttt{a\_c\%d} yields the characters \texttt{a}, \texttt{c} and \texttt{d}, no bigram, and the precedence features $(\texttt{a},\texttt{c})$, $(\texttt{a},\texttt{d})$ and $(\texttt{c},\texttt{d})$, all of which every matching string has. 
 
 Note that no optimization takes place at fingerprinting time; the data owner only extracts features. Instead, all bins are made available to the prover, who selects the most useful subset for the workload at hand, namely the pattern given at query time.
 
-For each bin $i$, the data owner forms the binary \emph{bin column} $\mathsf{bin}_i = \bigl(\mathsf{fp}_i(\col[j])\bigr)_{j=1}^{N}$ and commits to its multilinear extension, the \emph{bin polynomial} $\MLE{\mathsf{bin}}_i$, separately; instead of publishing the $m$ commitments it publishes only the root of a Merkle tree whose $i$-th leaf is the commitment to $\MLE{\mathsf{bin}}_i$ (\cref{alg:fp-commit}). The published commitment therefore grows by a single hash per column, however large $m$ is. 
+For each bin $i$, the data owner forms the binary \emph{bin column} $\mathsf{bin}_i = \bigl(\mathsf{fp}_i(\strcol[j])\bigr)_{j \in [N]}$ and commits to its multilinear extension, the \emph{bin polynomial} $\MLE{\mathsf{bin}_i}$, separately; instead of publishing the $m$ commitments it publishes only the root of a Merkle tree whose $i$-th leaf is the commitment to $\MLE{\mathsf{bin}_i}$ (\cref{alg:fp-commit}). The published commitment therefore grows by a single hash per column, however large $m$ is. 
 
 \begin{algorithm}[h]
 \caption{Fingerprint construction by the data owner.}
 \label{alg:fp-commit}
 \begin{algorithmic}[1]
-\Require string column $\col$ with $N$ rows; feature categories $\mathcal{K}$ (here $\mathcal{K} = \{\textsc{char}, \textsc{bigram}, \textsc{trigram}, \textsc{prec}\}$); bin budget $m_{\max}$
-\Ensure the fingerprint $\mathcal{F}_\col = \{\mathsf{fp}_1, \dots, \mathsf{fp}_m\}$, the commitments $\mathsf{com}_1, \dots, \mathsf{com}_m$ to the bin polynomials $\MLE{\mathsf{bin}}_1, \dots, \MLE{\mathsf{bin}}_m$, and their Merkle root $\rho_\col$
-\State $\mathcal{F}_\col \gets \emptyset$;\quad $\mathrm{cnt}[\cdot] \gets 0$
+\Require string column $\strcol$ with $N$ rows; feature categories $\mathcal{K}$ (here $\mathcal{K} = \{\textsc{char}, \textsc{bigram}, \textsc{trigram}, \textsc{prec}\}$); bin budget $m_{\max}$
+\Ensure the fingerprint $\mathcal{F}_\strcol = \{\mathsf{fp}_1, \dots, \mathsf{fp}_m\}$, the commitments $\Commitment_1, \dots, \Commitment_m$ to the bin polynomials $\MLE{\mathsf{bin}_1}, \dots, \MLE{\mathsf{bin}_m}$, and their Merkle root $\rho_\strcol$
+\State $\mathcal{F}_\strcol \gets \emptyset$;\quad $\mathrm{cnt}[\cdot] \gets 0$
 % \Comment{features seen, and rows having each}
-\For{$i = 1, \dots, N$}
-  \For{$f \in \mathrm{features}_{\mathcal{K}}(\col[i])$}
+\For{$i \in [N]$}
+  \For{$f \in \mathrm{features}_{\mathcal{K}}(\strcol[i])$}
   % \Comment{each distinct feature of the row, once}
-    \State $\mathcal{F}_\col \gets \mathcal{F}_\col \cup \{f\}$;\quad $\mathrm{cnt}[f] \gets \mathrm{cnt}[f] + 1$
+    \State $\mathcal{F}_\strcol \gets \mathcal{F}_\strcol \cup \{f\}$;\quad $\mathrm{cnt}[f] \gets \mathrm{cnt}[f] + 1$
   \EndFor
 \EndFor
-\State $\mathcal{F}_\col \gets \{f \in \mathcal{F}_\col : \mathrm{cnt}[f] < N\}$
+\State $\mathcal{F}_\strcol \gets \{f \in \mathcal{F}_\strcol : \mathrm{cnt}[f] < N\}$
 % \Comment{a feature in every row discards no row}
-\State sort $\mathcal{F}_\col$ by $\mathrm{cnt}$, descending
+\State sort $\mathcal{F}_\strcol$ by $\mathrm{cnt}$, descending
 % \Comment{ties broken by a fixed order on features}
-\State $m \gets \min(|\mathcal{F}_\col|, m_{\max})$;\quad $(f_1, \dots, f_m) \gets$ the first $m$ features of $\mathcal{F}_\col$
+\State $m \gets \min(|\mathcal{F}_\strcol|, m_{\max})$;\quad $(f_1, \dots, f_m) \gets$ the first $m$ features of $\mathcal{F}_\strcol$
 \For{$b = 1, \dots, m$} \Comment{one binary column per bin}
-  \State $\mathsf{fp}_b(\mathsf{s}) := [\,f_b \in \mathrm{features}_{\mathcal{K}}(\mathsf{s})\,]$ \Comment{bin predicate}
-  \State $\mathsf{bin}_b \gets \bigl(\mathsf{fp}_b(\col[i])\bigr)_{i=1}^{N}$;\quad $\mathsf{com}_b \gets \mathsf{Commit}(\MLE{\mathsf{bin}}_b)$
+  \State $\mathsf{fp}_b(s) := [\,f_b \in \mathrm{features}_{\mathcal{K}}(s)\,]$ \Comment{bin predicate}
+  \State $\mathsf{bin}_b \gets \bigl(\mathsf{fp}_b(\strcol[i])\bigr)_{i \in [N]}$;\quad $\Commitment_b \gets \Commit(\MLE{\mathsf{bin}_b})$
 \EndFor
-\State $\rho_\col \gets \mathsf{MerkleRoot}(\mathsf{com}_1, \dots, \mathsf{com}_m)$
-\State \Return $\mathcal{F}_\col \gets \{\mathsf{fp}_1, \dots, \mathsf{fp}_m\}$, $(\mathsf{com}_1, \dots, \mathsf{com}_m)$ and $\rho_\col$
+\State $\rho_\strcol \gets \mathsf{MerkleRoot}(\Commitment_1, \dots, \Commitment_m)$
+\State \Return $\mathcal{F}_\strcol \gets \{\mathsf{fp}_1, \dots, \mathsf{fp}_m\}$, $(\Commitment_1, \dots, \Commitment_m)$ and $\rho_\strcol$
 \end{algorithmic}
 \end{algorithm}
 
@@ -119,20 +119,20 @@ For each bin $i$, the data owner forms the binary \emph{bin column} $\mathsf{bin
 
 
 
-Let $\col$ be a string column with $N$ rows whose bins $\mathsf{fp}_1,\dots,\mathsf{fp}_m$ the data owner committed under the Merkle root $\rho_\col$ (\cref{alg:fp-commit}), and let $\mathcal{F}_\zeta=\{b : \mathsf{fp}_b(\zeta)=1\}$ be the bins of pattern $\zeta$. The Pre-Filtering Check (\cref{piop:prefilter-check}) proves membership in the relation $\mathcal{R}_{\mathsf{PF}}$, stated in \cref{sec:proof-pf}: the prover chooses a non-empty subset $\mathcal{F}_u \subseteq \mathcal{F}_\zeta$ of the pattern\textquotesingle s bins and opens their commitments under $\rho_\col$; the new str-level activator is the old one multiplied by the opened bin columns, $\mathsf{a}^\prime[i] = \mathsf{a}[i]\cdot\prod_{b\in\mathcal{F}_u}\mathsf{fp}_b[i]$; and the new char-level activator keeps exactly the characters of the kept strings. Since every matching string lies in every bin of the pattern, the filter never discards a matching row (\cref{lem:prefilter-sound}). The bin columns are indexed by the rows of the committed column, so the check applies to a column that still holds the data owner's rows in their original order, i.e.\ one that has undergone only data-preserving updates since ingestion. The planner therefore applies the pre-filter only when the \texttt{LIKE} predicate sits directly above the base scan, which is where it is pushed whenever possible (\cref{sec:string-arith}); above a join or a sort, whose output rows are freshly materialized, the pre-filter is omitted and the full protocol runs on its own.
+Let $\strcol$ be a string column with $N$ rows whose bin columns $\mathsf{bin}_1,\dots,\mathsf{bin}_m$ the data owner committed under the Merkle root $\rho_\strcol$ (\cref{alg:fp-commit}), and let $\mathcal{F}_\zeta=\{b : \mathsf{fp}_b(\zeta)=1\}$ be the bins of pattern $\zeta$. The Pre-Filtering Check (\cref{piop:prefilter-check}) proves membership in the relation $\NPRelation_{\mathsf{PF}}$, stated in \cref{sec:proof-pf}: the prover chooses a non-empty subset $\mathcal{F}_u \subseteq \mathcal{F}_\zeta$ of the pattern\textquotesingle s bins and opens their commitments under $\rho_\strcol$; the new str-level activator is the old one multiplied by the opened bin columns, $\mathsf{a}^{\mathsf{new}}[i] = \mathsf{a}^{\mathsf{old}}[i]\cdot\prod_{b\in\mathcal{F}_u}\mathsf{bin}_b[i]$; and the new char-level activator keeps exactly the characters of the kept strings. Since every matching string lies in every bin of the pattern, the filter never discards a matching row (\cref{lem:prefilter-sound}). The bin columns are indexed by the rows of the committed column, so the check applies to a column that still holds the data owner's rows in their original order, i.e.\ one that has undergone only data-preserving updates since ingestion. The planner therefore applies the pre-filter only when the \texttt{LIKE} predicate sits directly above the base scan, which is where it is pushed whenever possible (\cref{sec:string-arith}); above a join or a sort, whose output rows are freshly materialized, the pre-filter is omitted and the full protocol runs on its own.
 
 
 \begin{DefinePIOP}{Pre-Filtering Check}{prefilter-check}[Pre-Filtering Check]
   \emergencystretch=3em\relax
-  \emph{Inputs:} the pattern $\zeta$ and its bins $\mathcal{F}_\zeta=\{b : \mathsf{fp}_b(\zeta)=1\}$, which both parties derive from the public pattern; the Merkle root $\rho_\col$ over the bin commitments of column $\col$ (\cref{alg:fp-commit}); the input activators $\Oracle{\MLE{\mathsf{a}}}$ and $\Oracle{\MLE{\mathsf{char\text{-}act}}}$; and the fixed columns $\Oracle{\MLE{\mathsf{orig\text{-}ind}}}, \Oracle{\MLE{\mathsf{ind}}}, \Oracle{\MLE{\mathsf{l}}}$.
+  \emph{Inputs:} the pattern $\zeta$ and its bins $\mathcal{F}_\zeta=\{b : \mathsf{fp}_b(\zeta)=1\}$, which both parties derive from the public pattern; the Merkle root $\rho_\strcol$ over the bin commitments of column $\strcol$ (\cref{alg:fp-commit}); the input activators $\Oracle{\MLE{\mathsf{a}^{\mathsf{old}}}}$ and $\Oracle{\MLE{\mathsf{char\text{-}act}^{\mathsf{old}}}}$; and the fixed columns $\Oracle{\MLE{\mathsf{orig\text{-}ind}}}, \Oracle{\MLE{\mathsf{ind}}}, \Oracle{\MLE{\mathsf{l}}}$.
   \vspace{2mm}
   \begin{enumerate}[nosep]
     \item (\emph{Bin selection})\label[step]{pf:select} $\PIOPProver$ chooses the bins to test, $\mathcal{F}_u$, via \cref{alg:greedy-bins} and sends them to $\PIOPVerifier$. $\PIOPVerifier$ checks that $\mathcal{F}_u\neq\emptyset$ and $\mathcal{F}_u\subseteq\mathcal{F}_\zeta$, and rejects otherwise.
-    \item (\emph{Opening the bins})\label[step]{pf:open} $\PIOPProver$ sends the commitments $(\mathsf{com}_b)_{b\in\mathcal{F}_u}$ together with a Merkle multiproof $\pi$ for the leaves $\mathcal{F}_u$. $\PIOPVerifier$ checks that $\pi$ opens $\rho_\col$ to $\mathsf{com}_b$ at leaf $b$ for every $b\in\mathcal{F}_u$, and rejects otherwise. From then on the parties hold the bin oracles $\Oracle{\MLE{\mathsf{fp}_b}}$ for $b\in\mathcal{F}_u$.
-    \item (\emph{Filtered activators})\label[step]{pf:filter} $\PIOPProver$ computes the str-level activator $\mathsf{a'}[i] := \mathsf{a}[i]\cdot\prod_{b\in\mathcal{F}_u}\mathsf{fp}_b[i]$. It also computes its char-level counterpart $\mathsf{char\text{-}act'}$, which keeps exactly the active characters of the strings kept by $\mathsf{a'}$. $\PIOPProver$ sends $\Oracle{\MLE{\mathsf{a'}}}$ and $\Oracle{\MLE{\mathsf{char\text{-}act'}}}$ to $\PIOPVerifier$.
-    \item (\emph{Subset test})\label[step]{pf:subset} The parties invoke a \cref{piop:zerocheck}, of degree $|\mathcal{F}_u|+1$, on $\mathsf{a'}-\mathsf{a}\cdot\prod_{b\in\mathcal{F}_u}\mathsf{fp}_b$.
-    \item (\emph{Activator update validity})\label[step]{pf:dpuc} The parties invoke \cref{piop:data-preserving-update-check} on the updated column $\strcol'$, binding $\mathsf{char\text{-}act'}$ to $\mathsf{a'}$.
-    \item (\emph{Output})\label[step]{pf:output} $\PIOPProver$ and $\PIOPVerifier$ output the filtered activators $\mathsf{a'}$ and $\mathsf{char\text{-}act'}$.
+    \item (\emph{Opening the bins})\label[step]{pf:open} $\PIOPProver$ sends the commitments $(\Commitment_b)_{b\in\mathcal{F}_u}$ together with a Merkle multiproof $\pi$ for the leaves $\mathcal{F}_u$. $\PIOPVerifier$ checks that $\pi$ opens $\rho_\strcol$ to $\Commitment_b$ at leaf $b$ for every $b\in\mathcal{F}_u$, and rejects otherwise. From then on the parties hold the bin oracles $\Oracle{\MLE{\mathsf{bin}_b}}$ for $b\in\mathcal{F}_u$.
+    \item (\emph{Filtered activators})\label[step]{pf:filter} $\PIOPProver$ computes the str-level activator $\mathsf{a}^{\mathsf{new}}[i] := \mathsf{a}^{\mathsf{old}}[i]\cdot\prod_{b\in\mathcal{F}_u}\mathsf{bin}_b[i]$. It also computes its char-level counterpart $\mathsf{char\text{-}act}^{\mathsf{new}}$, which keeps exactly the active characters of the strings kept by $\mathsf{a}^{\mathsf{new}}$. $\PIOPProver$ sends $\Oracle{\MLE{\mathsf{a}^{\mathsf{new}}}}$ and $\Oracle{\MLE{\mathsf{char\text{-}act}^{\mathsf{new}}}}$ to $\PIOPVerifier$.
+    \item (\emph{Subset test})\label[step]{pf:subset} The parties invoke a \cref{piop:zerocheck}, of degree $|\mathcal{F}_u|+1$, on $\mathsf{a}^{\mathsf{new}}-\mathsf{a}^{\mathsf{old}}\cdot\prod_{b\in\mathcal{F}_u}\mathsf{bin}_b$.
+    \item (\emph{Activator update validity})\label[step]{pf:dpuc} The parties invoke \cref{piop:data-preserving-update-check} on the updated column $\strcol^{\mathsf{new}}$, binding $\mathsf{char\text{-}act}^{\mathsf{new}}$ to $\mathsf{a}^{\mathsf{new}}$.
+    \item (\emph{Output})\label[step]{pf:output} $\PIOPProver$ and $\PIOPVerifier$ output the filtered activators $\mathsf{a}^{\mathsf{new}}$ and $\mathsf{char\text{-}act}^{\mathsf{new}}$.
   \end{enumerate}
 \end{DefinePIOP}
 
@@ -175,7 +175,7 @@ To prevent the prover to actually run the prover each time it wants to test a ne
 ]
 % ---------------- input column ----------------
 \node[stage] at (1.3,0.95) {Input column};
-\node[hdr] at (0.7,0.42) {$\mathsf{str}$}; \node[hdr] at (1.95,0.42) {$\mathsf{char}$};
+\node[hdr] at (0.7,0.42) {$\strcol$}; \node[hdr] at (1.95,0.42) {$\mathsf{char}$};
 \node[scell,] at (0.7,-0) {fig};
 \node[scell,surv] at (0.7,-0.42) {dart};
 \node[scell,] at (0.7,-0.84) {sun};
@@ -211,7 +211,7 @@ To prevent the prover to actually run the prover each time it wants to test a ne
 \draw[flow] (2.8,-0.63) -- (5.4,-0.63) node[midway,above,stage] {Pre-filter} node[midway,below,param] {tests $n_{\mathrm{bin}}$\\fingerprint bins};
 % ---------------- rematerialized column ----------------
 \node[stage] at (7.15,0.95) {Rematerialized \normalfont\small(if $\mathrm{remat}$)};
-\node[hdr] at (6.4,0.42) {$\mathsf{str}$}; \node[hdr] at (7.9,0.42) {$\mathsf{char}$};
+\node[hdr] at (6.4,0.42) {$\strcol$}; \node[hdr] at (7.9,0.42) {$\mathsf{char}$};
 \node[scell,surv] at (6.4,-0) {dart};
 \node[scell,surv] at (6.4,-0.42) {zebra};
 \node[scell,surv] at (6.4,-0.84) {dare};
@@ -242,7 +242,7 @@ To prevent the prover to actually run the prover each time it wants to test a ne
 \draw[flow] (8.6,-0.63) -- (10.6,-0.63) node[midway,above,stage] {Pattern\\matching} node[midway,below,param] {$\zeta = \texttt{\%dar\%}$\\$L_\zeta$, $n_\zeta$};
 % ---------------- matches ----------------
 \node[stage] at (12.15,0.95) {Matches};
-\node[hdr] at (11.4,0.42) {$\mathsf{str}$}; \node[hdr] at (12.9,0.42) {$\mathsf{char}$};
+\node[hdr] at (11.4,0.42) {$\strcol$}; \node[hdr] at (12.9,0.42) {$\mathsf{char}$};
 \node[scell,match] at (11.4,-0) {dart};
 \node[scell,match] at (11.4,-0.42) {dare};
 \node[ccell,match] at (12.9,-0) {d};
@@ -262,7 +262,7 @@ To prevent the prover to actually run the prover each time it wants to test a ne
 \node[param,gray,fill=white,inner sep=2pt] at (7.0,1.85) {no $\mathrm{remat}$: pattern matching runs on $(N', M') = (N, M)$};
 \end{tikzpicture}%
 }
-\caption{Shape of a pattern-matching plan with fingerprint pre-filtering, with the size parameters of the cost model. Each stage shows the str-level column $\mathsf{str}$ next to its character column $\mathsf{char}$, with thick rules marking string boundaries. The pre-filter tests $n_{\mathrm{bin}}$ fingerprint bins and keeps $S$ of the $N$ input rows (shaded). If $\mathrm{remat}$ holds, the survivors are compacted into new columns padded to $D(S)$ rows and $D(M_S)$ characters (dashed cells), and pattern matching runs on $(N', M') = (S, M_S)$; otherwise it runs on the full input (dashed path). Pattern matching then keeps the $T$ matching rows, discarding the survivors that were false positives.}
+\caption{Shape of a pattern-matching plan with fingerprint pre-filtering, with the size parameters of the cost model. Each stage shows the str-level column $\strcol$ next to its character column $\mathsf{char}$, with thick rules marking string boundaries. The pre-filter tests $n_{\mathrm{bin}}$ fingerprint bins and keeps $S$ of the $N$ input rows (shaded). If $\mathrm{remat}$ holds, the survivors are compacted into new columns padded to $D(S)$ rows and $D(M_S)$ characters (dashed cells), and pattern matching runs on $(N', M') = (S, M_S)$; otherwise it runs on the full input (dashed path). Pattern matching then keeps the $T$ matching rows, discarding the survivors that were false positives.}
 \label{fig:plan-shape}
 \end{figure}
 
@@ -347,17 +347,17 @@ The cost model prices a given set of bins, but the prover still has to decide wh
 The whole chain is priced rather than stopped at the first bin that does not pay off, because the cost is not convex in the number of bins: it drops in steps whenever $S$ or $M_S$ crosses a power of two, so a bin that saves nothing may precede one that crosses a step. Building the chain costs $O(|\mathcal{F}_\zeta|^2 N)$ bit operations on bitsets over the rows, which is negligible next to proving (about one second per query in our experiments). As discussed above, any prefix is sound, so the choice needs no agreement with the verifier beyond the list of bins, and an inaccurate cost model costs proving time, never correctness.
 
 \begin{algorithm}[t]
-\caption{Greedy bin assignment for pattern $\zeta$ over column $\col$.}
+\caption{Greedy bin assignment for pattern $\zeta$ over column $\strcol$.}
 \label{alg:greedy-bins}
 \begin{algorithmic}[1]
-\Require pattern bins $\mathcal{F}_\zeta$; row sets $R_b = \{i : \mathsf{fp}_b(\col[i]) = 1\}$ for $b \in \mathcal{F}_\zeta$; cost model $C$
+\Require pattern bins $\mathcal{F}_\zeta$; row sets $R_b = \{i : \mathsf{fp}_b(\strcol[i]) = 1\}$ for $b \in \mathcal{F}_\zeta$; cost model $C$
 \Ensure bins to test $\mathcal{F}_u \subseteq \mathcal{F}_\zeta$
-\State $A \gets \{1, \dots, N\}$ \Comment{rows still alive}
+\State $A \gets [N]$ \Comment{rows still alive}
 \State $Q_0 \gets \emptyset$;\quad $c_0 \gets C(S{=}N,\ M_S{=}M,\ n_{\mathrm{bin}}{=}0)$ \Comment{no pre-filter}
 \For{$k = 1, \dots, |\mathcal{F}_\zeta|$}
   \State $b_k \gets \arg\min_{b \in \mathcal{F}_\zeta \setminus Q_{k-1}} |A \cap R_b|$ \Comment{ties to the lowest bin}
   \State $Q_k \gets Q_{k-1} \cup \{b_k\}$;\quad $A \gets A \cap R_{b_k}$
-  \State $c_k \gets C\bigl(S{=}|A|,\ M_S{=}\textstyle\sum_{i \in A} |\col[i]|,\ n_{\mathrm{bin}}{=}k\bigr)$
+  \State $c_k \gets C\bigl(S{=}|A|,\ M_S{=}\textstyle\sum_{i \in A} |\strcol[i]|,\ n_{\mathrm{bin}}{=}k\bigr)$
 \EndFor
 \State $k^\star \gets \min\, \arg\min_{k} c_k$ \Comment{cheapest prefix, shortest on a tie}
 \State \Return $\mathcal{F}_u \gets Q_{k^\star}$

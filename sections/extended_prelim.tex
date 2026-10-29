@@ -34,13 +34,13 @@ The idea of sumcheck is to reduce an exponential sum to a sequence of univariate
   \emph{Inputs:} $\Oracle{p}, s$.
   \begin{enumerate}[nosep]
 	    \item $\PIOPProver$ sends to $\PIOPVerifier$ a univariate polynomial oracle $p_1$ such that $
-	      p_1(X_1) = \sum_{\{x_2, \dots, x_\mu\} \in \BoolHCube{\mu-1}} p(X_1, x_2, \dots, x_\mu)$.
-    \item $\PIOPVerifier$ checks that the degree of $ p_1(x_1) $ is at most the degree of $ p $ in $ x_1 $. It computes $ s_1 = p_1(0) + p_1(1) $ and checks that $ s_1 = s $. If not, $\PIOPVerifier$ rejects. It then picks a random $ r_1 \in \F $ and sends it to $\PIOPProver$.
+	      p_1(X_1) = \sum_{(x_2, \dots, x_\mu) \in \BoolHCube{\mu-1}} p(X_1, x_2, \dots, x_\mu)$.
+    \item $\PIOPVerifier$ checks that the degree of $p_1(X_1)$ is at most the degree of $ p $ in $ x_1 $. It computes $ s_1 = p_1(0) + p_1(1) $ and checks that $ s_1 = s $. If not, $\PIOPVerifier$ rejects. It then picks a random $ r_1 \in \F $ and sends it to $\PIOPProver$.
     \item For each $ i $ from 2 to $ \mu $ (subsequent rounds):
     \begin{enumerate}[noitemsep, topsep=0pt]
 	      \item $\PIOPProver$ sends to $\PIOPVerifier$ the univariate polynomial
-	            $p_i(x_i) = \sum_{\{x_{i+1}, \dots, x_\mu\} \in \BoolHCube{\mu-i}} p(r_1, \dots, r_{i-1}, x_i, \dots, x_\mu)$.
-      \item $\PIOPVerifier$ checks that the degree of $ p_i(x_i) $ is at most the degree of $ p $ in $ x_i $. It computes $ s_i = p_i(0) + p_i(1) $ and checks that $ s_i = p_{i-1}(r_{i-1}) $. If not, $\PIOPVerifier$ rejects. It picks a random $ r_i \in \F $ and sends it to $\PIOPProver$.
+	            $p_i(X_i)$ that sums $p(r_1, \dots, r_{i-1}, X_i, x_{i+1}, \dots, x_\mu)$ over all $(x_{i+1}, \dots, x_\mu) \in \BoolHCube{\mu-i}$.
+      \item $\PIOPVerifier$ checks that the degree of $p_i(X_i)$ is at most the degree of $ p $ in $ x_i $. It computes $ s_i = p_i(0) + p_i(1) $ and checks that $ s_i = p_{i-1}(r_{i-1}) $. If not, $\PIOPVerifier$ rejects. It picks a random $ r_i \in \F $ and sends it to $\PIOPProver$.
     \end{enumerate}
     \item $\PIOPProver$ sends the value $ p(r_1, \dots, r_\mu) $ for the random values $ r_1, \dots, r_\mu $ chosen by $\PIOPVerifier$.
     \item $\PIOPVerifier$ checks that this value is correct by querying $p$ at $(r_1, \dots, r_\mu)$.

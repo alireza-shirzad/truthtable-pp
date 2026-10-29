@@ -126,7 +126,7 @@ Completeness is immediate from the layout of \cref{sec:string-arith}. For soundn
 \NPRelation_{\mathsf{DomPres}} = \left\{\,
   \begin{aligned}
     & \NPInstance = \bot,\\
-    & \NPInstancey = (\Oracle{\MLE{\strcol^{\mathsf{old}}}}, \Oracle{\MLE{\strcol^{\mathsf{new}}}}),\\
+    & \NPInstancey = (\Oracle{\hat{\strcol}^{\mathsf{old}}}, \Oracle{\hat{\strcol}^{\mathsf{new}}}),\\
     & \NPWitness = (\strcol^{\mathsf{old}}, \strcol^{\mathsf{new}})\\[2pt]
     & \text{s.t.}\ \strcol^{\mathsf{new}} \in \NPRelation_{\mathsf{Cons}} \cap \NPRelation_{\mathsf{Layout}},\ \text{and}\\
     & \phantom{\text{s.t.}}\ \text{every active row of } \strcol^{\mathsf{new}} \text{ carries the}\\
@@ -140,7 +140,7 @@ Completeness is immediate from the layout of \cref{sec:string-arith}. For soundn
 \NPRelation_{\mathsf{DomPres}} = \left\{\,
   \begin{aligned}
     & \NPInstance = \bot,\\
-    & \NPInstancey = (\Oracle{\MLE{\strcol^{\mathsf{old}}}}, \Oracle{\MLE{\strcol^{\mathsf{new}}}}),\\
+    & \NPInstancey = (\Oracle{\hat{\strcol}^{\mathsf{old}}}, \Oracle{\hat{\strcol}^{\mathsf{new}}}),\\
     & \NPWitness = (\strcol^{\mathsf{old}}, \strcol^{\mathsf{new}})
   \end{aligned}
   \;\middle|\;
@@ -165,11 +165,15 @@ Completeness is immediate from the layout of \cref{sec:string-arith}. For soundn
 \NPRelation_{\mathsf{LenFilter}} = \left\{\,
 \begin{aligned}
   & \NPInstance = k,\\
-  & \NPInstancey = (\Oracle{\MLE{\mathsf{l}}}, \Oracle{\MLE{\mathsf{a}}}, \Oracle{\MLE{\mathsf{char\text{-}act}}},\\
-  & \phantom{\NPInstancey = (}\Oracle{\MLE{\mathsf{a'}}}, \Oracle{\MLE{\mathsf{char\text{-}act'}}}),\\
-  & \NPWitness = (\mathsf{l}, \mathsf{a}, \mathsf{char\text{-}act}, \mathsf{a'}, \mathsf{char\text{-}act'})\\[2pt]
-  & \text{s.t.}\ \mathsf{a'}[i] = 1 \Leftrightarrow \bigl(\mathsf{a}[i] = 1 \wedge \mathsf{l}[i]\bowtie k\bigr),\\
-  & \phantom{\text{s.t.}}\ \mathsf{char\text{-}act'}[j] = \mathsf{a'}[i]\ \text{for } j \in \text{string } i
+  & \NPInstancey = (\Oracle{\MLE{\mathsf{l}}}, \Oracle{\MLE{\mathsf{a}^{\mathsf{old}}}},\\
+  & \phantom{\NPInstancey = (}\Oracle{\MLE{\mathsf{char\text{-}act}^{\mathsf{old}}}}, \Oracle{\MLE{\mathsf{a}^{\mathsf{new}}}},\\
+  & \phantom{\NPInstancey = (}\Oracle{\MLE{\mathsf{char\text{-}act}^{\mathsf{new}}}}),\\
+  & \NPWitness = (\mathsf{l}, \mathsf{a}^{\mathsf{old}}, \mathsf{char\text{-}act}^{\mathsf{old}},\\
+  & \phantom{\NPWitness = (}\mathsf{a}^{\mathsf{new}}, \mathsf{char\text{-}act}^{\mathsf{new}})\\[2pt]
+  & \text{s.t.}\ \mathsf{a}^{\mathsf{new}}[i] = 1 \Leftrightarrow{}\\
+  & \phantom{\text{s.t.}}\ \quad \bigl(\mathsf{a}^{\mathsf{old}}[i] = 1 \wedge \mathsf{l}[i]\bowtie k\bigr),\\
+  & \phantom{\text{s.t.}}\ \mathsf{char\text{-}act}^{\mathsf{new}}[j] = \mathsf{a}^{\mathsf{new}}[i]\\
+  & \phantom{\text{s.t.}}\ \quad \text{for every character } j \text{ of string } i
 \end{aligned}
 \,\right\}.
 \end{equation*}
@@ -178,13 +182,13 @@ Completeness is immediate from the layout of \cref{sec:string-arith}. For soundn
 \NPRelation_{\mathsf{LenFilter}} = \left\{
 \begin{aligned}
   & \NPInstance = k,\; \\
-  & \NPInstancey = (\Oracle{\MLE{\mathsf{l}}}, \Oracle{\MLE{\mathsf{a}}}, \Oracle{\MLE{\mathsf{char\text{-}act}}}, \Oracle{\MLE{\mathsf{a'}}}, \Oracle{\MLE{\mathsf{char\text{-}act'}}}),\; \\
-  & \NPWitness = (\mathsf{l}, \mathsf{a}, \mathsf{char\text{-}act}, \mathsf{a'}, \mathsf{char\text{-}act'})
+  & \NPInstancey = (\Oracle{\MLE{\mathsf{l}}}, \Oracle{\MLE{\mathsf{a}^{\mathsf{old}}}}, \Oracle{\MLE{\mathsf{char\text{-}act}^{\mathsf{old}}}}, \Oracle{\MLE{\mathsf{a}^{\mathsf{new}}}}, \Oracle{\MLE{\mathsf{char\text{-}act}^{\mathsf{new}}}}),\; \\
+  & \NPWitness = (\mathsf{l}, \mathsf{a}^{\mathsf{old}}, \mathsf{char\text{-}act}^{\mathsf{old}}, \mathsf{a}^{\mathsf{new}}, \mathsf{char\text{-}act}^{\mathsf{new}})
 \end{aligned}
    \;\middle|\; 
     \begin{aligned}
-   \mathsf{a'}[i] = 1 \iff \bigl(\mathsf{a}[i] = 1 \ \text{and}\ \mathsf{l}[i]\bowtie k\bigr) \\
-    \mathsf{char\text{-}act'}[j] = \mathsf{a'}[i]\ \forall\text{ char } j \text{ of string } i
+   \mathsf{a}^{\mathsf{new}}[i] = 1 \iff \bigl(\mathsf{a}^{\mathsf{old}}[i] = 1 \ \text{and}\ \mathsf{l}[i]\bowtie k\bigr) \\
+    \mathsf{char\text{-}act}^{\mathsf{new}}[j] = \mathsf{a}^{\mathsf{new}}[i]\ \forall\text{ char } j \text{ of string } i
     \end{aligned}
 \right\}.
 \end{equation*}
@@ -194,7 +198,7 @@ Completeness is immediate from the layout of \cref{sec:string-arith}. For soundn
 
 \subsection{Character Projection Check}
 \label{sec:proof-proj}
-\cref{piop:char-proj} (\cref{sec:char-projection}) proves that the str-level column $\mathsf{c}_k$ holds the $k$-th character of every active string, and the sentinel $\bot = -1$ for strings that have no $k$-th character:
+\cref{piop:char-proj} (\cref{sec:char-projection}) proves that the str-level column $\mathsf{ch}_k$ holds the $k$-th character of every active string, and the sentinel $\bot = -1$ for strings that have no $k$-th character:
 \ifsp
 %% S&P (two-column): conditions stacked below the tuple so the display fits one column.
 \begin{displaymath}
@@ -202,12 +206,14 @@ Completeness is immediate from the layout of \cref{sec:string-arith}. For soundn
   \begin{aligned}
     & \NPInstance = k,\\
     & \NPInstancey = (\Oracle{\MLE{\mathsf{char}}}, \Oracle{\MLE{\mathsf{orig\text{-}ind}}}, \Oracle{\MLE{\mathsf{int\text{-}ind}}},\\
-    & \phantom{\NPInstancey = (}\Oracle{\MLE{\mathsf{char\text{-}act}}}, \Oracle{\MLE{\mathsf{l}}}, \Oracle{\MLE{\mathsf{a}}}, \Oracle{\MLE{\mathsf{c}_k}}),\\
-    & \NPWitness = (\mathsf{char}, \mathsf{orig\text{-}ind}, \mathsf{int\text{-}ind}, \mathsf{char\text{-}act}, \mathsf{l}, \mathsf{a}, \mathsf{c}_k)\\[2pt]
+    & \phantom{\NPInstancey = (}\Oracle{\MLE{\mathsf{char\text{-}act}}}, \Oracle{\MLE{\mathsf{l}}}, \Oracle{\MLE{\mathsf{a}}}, \Oracle{\MLE{\mathsf{ch}_k}}),\\
+    & \NPWitness = (\mathsf{char}, \mathsf{orig\text{-}ind}, \mathsf{int\text{-}ind}, \mathsf{char\text{-}act},\\
+    & \phantom{\NPWitness = (}\mathsf{l}, \mathsf{a}, \mathsf{ch}_k)\\[2pt]
     & \text{s.t.}\ \forall i\ \text{with}\ \mathsf{a}[i] = 1:\\
-    & \phantom{\text{s.t.}}\ \mathsf{c}_k[i] = \mathsf{char}[j]\ \text{for the } j \text{ with } \mathsf{orig\text{-}ind}[j] = i,\\
-    & \phantom{\text{s.t.}\ \mathsf{c}_k[i] = \mathsf{char}[j]\ }\mathsf{int\text{-}ind}[j] = k\ \text{if } \mathsf{l}[i] > k,\\
-    & \phantom{\text{s.t.}}\ \mathsf{c}_k[i] = \bot\ \text{if } \mathsf{l}[i] \le k
+    & \phantom{\text{s.t.}}\ \mathsf{ch}_k[i] = \mathsf{char}[j]\ \text{if } \mathsf{l}[i] > k,\\
+    & \phantom{\text{s.t.}}\ \quad \text{for the } j \text{ with } \mathsf{orig\text{-}ind}[j] = i\\
+    & \phantom{\text{s.t.}}\ \quad \text{and } \mathsf{int\text{-}ind}[j] = k,\\
+    & \phantom{\text{s.t.}}\ \mathsf{ch}_k[i] = \bot\ \text{if } \mathsf{l}[i] \le k
   \end{aligned}
 \,\right\}.
 \end{displaymath}
@@ -216,35 +222,35 @@ Completeness is immediate from the layout of \cref{sec:string-arith}. For soundn
 \NPRelation_{\mathsf{Proj}} = \left\{\,
   \begin{aligned}
     \NPInstance &= k,\\
-    \NPInstancey &= (\Oracle{\MLE{\mathsf{char}}}, \Oracle{\MLE{\mathsf{orig\text{-}ind}}}, \Oracle{\MLE{\mathsf{int\text{-}ind}}}, \Oracle{\MLE{\mathsf{char\text{-}act}}}, \Oracle{\MLE{\mathsf{l}}}, \Oracle{\MLE{\mathsf{a}}}, \Oracle{\MLE{\mathsf{c}_k}}),\\
-    \NPWitness &= (\mathsf{char}, \mathsf{orig\text{-}ind}, \mathsf{int\text{-}ind}, \mathsf{char\text{-}act}, \mathsf{l}, \mathsf{a}, \mathsf{c}_k)
+    \NPInstancey &= (\Oracle{\MLE{\mathsf{char}}}, \Oracle{\MLE{\mathsf{orig\text{-}ind}}}, \Oracle{\MLE{\mathsf{int\text{-}ind}}}, \Oracle{\MLE{\mathsf{char\text{-}act}}}, \Oracle{\MLE{\mathsf{l}}}, \Oracle{\MLE{\mathsf{a}}}, \Oracle{\MLE{\mathsf{ch}_k}}),\\
+    \NPWitness &= (\mathsf{char}, \mathsf{orig\text{-}ind}, \mathsf{int\text{-}ind}, \mathsf{char\text{-}act}, \mathsf{l}, \mathsf{a}, \mathsf{ch}_k)
   \end{aligned}
   \;\middle|\;
   \begin{array}{l}
     \forall i\ \text{with}\ \mathsf{a}[i] = 1: \\[3pt]
-    \quad \mathsf{c}_k[i] = \mathsf{char}[j]\ \text{for the } j \text{ with } \mathsf{orig\text{-}ind}[j] = i,\ \mathsf{int\text{-}ind}[j] = k,\ \text{if } \mathsf{l}[i] > k, \\[3pt]
-    \quad \mathsf{c}_k[i] = \bot\ \text{if } \mathsf{l}[i] \le k
+    \quad \mathsf{ch}_k[i] = \mathsf{char}[j]\ \text{for the } j \text{ with } \mathsf{orig\text{-}ind}[j] = i,\ \mathsf{int\text{-}ind}[j] = k,\ \text{if } \mathsf{l}[i] > k, \\[3pt]
+    \quad \mathsf{ch}_k[i] = \bot\ \text{if } \mathsf{l}[i] \le k
   \end{array}
 \,\right\}.
 \end{displaymath}
 \fi
-In other words, $\mathsf{c}_k[i] = \pad{s_i}[k]$ is the $k$-th entry of the padded string of \cref{sec:sql-string-order}.
+In other words, $\mathsf{ch}_k[i] = \pad{s_i}[k]$ is the $k$-th entry of the padded string of \cref{sec:sql-string-order}.
 \parhead{Soundness and completeness}
 \ali{TODO: soundness and completeness proof.}
 
 \subsection{Lexicographic Sortedness Check}
 \label{sec:proof-lexsorted}
-\cref{piop:lex-sorted-check} (\cref{sec:lex-sorted-check}) proves that a string column with $n$ active rows in the contiguous layout is sorted in the lexicographic order of \cref{sec:sql-string-order}:
+\cref{piop:lex-sorted-check} (\cref{sec:lex-sorted-check}) proves that a string column with $N$ active rows in the contiguous layout is sorted in the lexicographic order of \cref{sec:sql-string-order}:
 \ifsp
 %% S&P (two-column): tuple and condition stacked so the display fits one column.
 \begin{displaymath}
 \NPRelation_{\mathsf{LexSorted}} = \left\{\,
   \begin{aligned}
     & \NPInstance = \bot,\\
-    & \NPInstancey = \Oracle{\MLE{\strcol}},\\
+    & \NPInstancey = \Oracle{\hat{\strcol}},\\
     & \NPWitness = \strcol\\[2pt]
-    & \text{s.t.}\ \mathsf{a} = \contig_{\mu,n},\\
-    & \phantom{\text{s.t.}}\ s_i \lexle s_{i+1}\ \text{for all } 0 \le i < n-1
+    & \text{s.t.}\ \mathsf{a} = \contig_{\mu,N},\\
+    & \phantom{\text{s.t.}}\ s_i \lexle s_{i+1}\ \text{for all } 0 \le i < N-1
   \end{aligned}
 \,\right\}.
 \end{displaymath}
@@ -252,19 +258,19 @@ In other words, $\mathsf{c}_k[i] = \pad{s_i}[k]$ is the $k$-th entry of the padd
 \begin{displaymath}
 \NPRelation_{\mathsf{LexSorted}} = \left\{\,
   \NPInstance = \bot,\;
-  \NPInstancey = \Oracle{\MLE{\strcol}},\;
+  \NPInstancey = \Oracle{\hat{\strcol}},\;
   \NPWitness = \strcol
   \;\middle|\;
   \begin{array}{l}
-    \mathsf{a} = \contig_{\mu,n}, \\[3pt]
-    s_i \lexle s_{i+1}\ \text{for all } 0 \le i < n-1
+    \mathsf{a} = \contig_{\mu,N}, \\[3pt]
+    s_i \lexle s_{i+1}\ \text{for all } 0 \le i < N-1
   \end{array}
 \,\right\}.
 \end{displaymath}
 \fi
 Only adjacent rows are constrained, which suffices because $\lexle$ is transitive.
 \parhead{Soundness and completeness}
-\Cref{ls:same} pins $\mathsf{same}$ exactly: a marked pair has equal hashes, hence equal strings by the collision resistance of the hash, and an unmarked pair of $\mathsf{t}_{\mathsf{in}}$ has distinct hashes. \Cref{ls:sort} then proves, for every pair of $\mathsf{eq}_0$, that the rows $(\mathsf{c}_0, \dots, \mathsf{c}_{R-1})[i]$ and $(\mathsf{c}_0, \dots, \mathsf{c}_{R-1})[i+1]$ are in strictly increasing lexicographic order, i.e.\ that there is a first position $k < R$ at which they differ and $\mathsf{c}_k[i] < \mathsf{c}_k[i+1]$ there. By \cref{ls:proj} these rows are the first $R$ entries of $\pad{s_i}$ and $\pad{s_{i+1}}$, so $s_i \lexlt s_{i+1}$ by \cref{lem:padded-lex}. Every pair of $\mathsf{t}_{\mathsf{in}}$ is thus either equal or strictly increasing, which is $\NPRelation_{\mathsf{LexSorted}}$. For completeness, the padded sequences of two distinct adjacent strings in a sorted column differ at some position, the first such position is at most the longer length, and the honest prover's $R$ is one more than the largest first-difference position over all adjacent distinct pairs, so after $R$ keys no pair of $\mathsf{eq}_0$ remains tied and the strict check passes.
+\Cref{ls:same} pins $\mathsf{same}$ exactly: a marked pair has equal hashes, hence equal strings by the collision resistance of the hash, and an unmarked pair of $\mathsf{t}_{\mathsf{in}}$ has distinct hashes. \Cref{ls:sort} then proves, for every pair of $\mathsf{eq}_0$, that the rows $(\mathsf{ch}_0, \dots, \mathsf{ch}_{R-1})[i]$ and $(\mathsf{ch}_0, \dots, \mathsf{ch}_{R-1})[i+1]$ are in strictly increasing lexicographic order, i.e.\ that there is a first position $k < R$ at which they differ and $\mathsf{ch}_k[i] < \mathsf{ch}_k[i+1]$ there. By \cref{ls:proj} these rows are the first $R$ entries of $\pad{s_i}$ and $\pad{s_{i+1}}$, so $s_i \lexlt s_{i+1}$ by \cref{lem:padded-lex}. Every pair of $\mathsf{t}_{\mathsf{in}}$ is thus either equal or strictly increasing, which is $\NPRelation_{\mathsf{LexSorted}}$. For completeness, the padded sequences of two distinct adjacent strings in a sorted column differ at some position, the first such position is at most the longer length, and the honest prover's $R$ is one more than the largest first-difference position over all adjacent distinct pairs, so after $R$ keys no pair of $\mathsf{eq}_0$ remains tied and the strict check passes.
 
 \subsection{Rank Certification Check}
 \label{sec:proof-rankvalid}
@@ -274,11 +280,12 @@ Only adjacent rows are constrained, which suffices because $\lexle$ is transitiv
 \NPRelation_{\mathsf{RankValid}} = \left\{\,
   \begin{aligned}
     & \NPInstance = \bot,\\
-    & \NPInstancey = (\Oracle{\MLE{\strcol}}, \Oracle{\MLE{\mathsf{rk}}}),\\
+    & \NPInstancey = (\Oracle{\hat{\strcol}}, \Oracle{\MLE{\mathsf{rk}}}),\\
     & \NPWitness = (\strcol, \mathsf{rk})\\[2pt]
-    & \text{s.t.}\ \forall\, 0 \le i < n-1:\\
+    & \text{s.t.}\ \forall\, 0 \le i < N-1:\\
     & \phantom{\text{s.t.}}\ s_{\pi(i)} \lexle s_{\pi(i+1)},\\
-    & \phantom{\text{s.t.}}\ \mathsf{rk}[\pi(i)] = \mathsf{rk}[\pi(i+1)] \iff s_{\pi(i)} = s_{\pi(i+1)}
+    & \phantom{\text{s.t.}}\ \mathsf{rk}[\pi(i)] = \mathsf{rk}[\pi(i+1)]\\
+    & \phantom{\text{s.t.}}\ \quad \iff s_{\pi(i)} = s_{\pi(i+1)}
   \end{aligned}
 \,\right\}.
 \end{displaymath}
@@ -286,12 +293,12 @@ Only adjacent rows are constrained, which suffices because $\lexle$ is transitiv
 \begin{displaymath}
 \NPRelation_{\mathsf{RankValid}} = \left\{\,
   \NPInstance = \bot,\;
-  \NPInstancey = (\Oracle{\MLE{\strcol}}, \Oracle{\MLE{\mathsf{rk}}}),\;
+  \NPInstancey = (\Oracle{\hat{\strcol}}, \Oracle{\MLE{\mathsf{rk}}}),\;
   \NPWitness = (\strcol, \mathsf{rk})
   \;\middle|\;
   \begin{array}{l}
-    \forall\, 0 \le i < n-1:\quad s_{\pi(i)} \lexle s_{\pi(i+1)}\ \text{ and} \\[3pt]
-    \phantom{\forall\, 0 \le i < n-1:\quad} \mathsf{rk}[\pi(i)] = \mathsf{rk}[\pi(i+1)] \iff s_{\pi(i)} = s_{\pi(i+1)}
+    \forall\, 0 \le i < N-1:\quad s_{\pi(i)} \lexle s_{\pi(i+1)}\ \text{ and} \\[3pt]
+    \phantom{\forall\, 0 \le i < N-1:\quad} \mathsf{rk}[\pi(i)] = \mathsf{rk}[\pi(i+1)] \iff s_{\pi(i)} = s_{\pi(i+1)}
   \end{array}
 \,\right\}.
 \end{displaymath}
@@ -302,49 +309,55 @@ Adjacent consistency along $\pi$ implies the global property by transitivity: ra
 
 \subsection{Pre-Filtering Check}
 \label{sec:proof-pf}
-Let $\col$ be a string column with $N$ rows whose bins $\mathsf{fp}_1,\dots,\mathsf{fp}_m$ the data owner committed under the Merkle root $\rho_\col$ (\cref{alg:fp-commit}), and let $\mathcal{F}_\zeta=\{b : \mathsf{fp}_b(\zeta)=1\}$ be the bins of pattern $\zeta$. \cref{piop:prefilter-check} (\cref{sec:fp-piop}) proves membership in
+Let $\strcol$ be a string column with $N$ rows whose bin columns $\mathsf{bin}_1,\dots,\mathsf{bin}_m$ the data owner committed under the Merkle root $\rho_\strcol$ (\cref{alg:fp-commit}), and let $\mathcal{F}_\zeta=\{b : \mathsf{fp}_b(\zeta)=1\}$ be the bins of pattern $\zeta$. \cref{piop:prefilter-check} (\cref{sec:fp-piop}) proves membership in
 \ifsp
 %% S&P (two-column): instance, witness and conditions stacked so the display fits one column.
 \begin{equation*}
-\mathcal{R}_{\mathsf{PF}} = \left\{\,
+\NPRelation_{\mathsf{PF}} = \left\{\,
 \begin{aligned}
-  & \NPInstance = \bigl(\zeta,\ \rho_\col,\ \Oracle{\MLE{\mathsf{a}}}, \Oracle{\MLE{\mathsf{char\text{-}act}}},\\
+  & \NPInstance = (\zeta,\ \rho_\strcol),\\
+  & \NPInstancey = \bigl(\Oracle{\MLE{\mathsf{a}^{\mathsf{old}}}}, \Oracle{\MLE{\mathsf{char\text{-}act}^{\mathsf{old}}}},\\
   & \qquad \Oracle{\MLE{\mathsf{orig\text{-}ind}}}, \Oracle{\MLE{\mathsf{ind}}}, \Oracle{\MLE{\mathsf{l}}},\\
-  & \qquad \Oracle{\MLE{\mathsf{a'}}}, \Oracle{\MLE{\mathsf{char\text{-}act'}}}\bigr),\\
-  & \NPWitness = \bigl(\mathcal{F}_u,\ (\mathsf{com}_b)_{b\in\mathcal{F}_u},\ \pi\bigr)\\[2pt]
+  & \qquad \Oracle{\MLE{\mathsf{a}^{\mathsf{new}}}}, \Oracle{\MLE{\mathsf{char\text{-}act}^{\mathsf{new}}}}\bigr),\\
+  & \NPWitness = \bigl(\mathsf{a}^{\mathsf{old}}, \mathsf{char\text{-}act}^{\mathsf{old}}, \mathsf{orig\text{-}ind}, \mathsf{ind}, \mathsf{l},\\
+  & \qquad \mathsf{a}^{\mathsf{new}}, \mathsf{char\text{-}act}^{\mathsf{new}},\ \mathcal{F}_u,\ (\Commitment_b)_{b\in\mathcal{F}_u},\ \pi\bigr)\\[2pt]
   & \text{s.t.}\ \emptyset \neq \mathcal{F}_u \subseteq \mathcal{F}_\zeta,\\
-  & \phantom{\text{s.t.}}\ \pi \text{ opens } \rho_\col \text{ to } \mathsf{com}_b = \mathsf{Commit}(\mathsf{fp}_b)\\
+  & \phantom{\text{s.t.}}\ \pi \text{ opens } \rho_\strcol \text{ to } \Commitment_b = \Commit(\MLE{\mathsf{bin}_b})\\
   & \phantom{\text{s.t.}}\ \quad \text{at leaf } b,\ \forall b\in\mathcal{F}_u,\\
-  & \phantom{\text{s.t.}}\ \mathsf{a'}[i] = \mathsf{a}[i]\cdot\textstyle\prod_{b\in\mathcal{F}_u}\mathsf{fp}_b[i],\ \forall i\in[N],\\
-  & \phantom{\text{s.t.}}\ \mathsf{char\text{-}act'}[c] = \mathsf{char\text{-}act}[c]\\
-  & \phantom{\text{s.t.}}\ \quad \cdot\,\mathsf{a'}[\mathsf{orig\text{-}ind}[c]],\ \forall c
+  & \phantom{\text{s.t.}}\ \mathsf{a}^{\mathsf{new}}[i] = \mathsf{a}^{\mathsf{old}}[i]\cdot\textstyle\prod_{b\in\mathcal{F}_u}\mathsf{bin}_b[i]\\
+  & \phantom{\text{s.t.}}\ \quad \forall i\in[N],\\
+  & \phantom{\text{s.t.}}\ \mathsf{char\text{-}act}^{\mathsf{new}}[c] = \mathsf{char\text{-}act}^{\mathsf{old}}[c]\\
+  & \phantom{\text{s.t.}}\ \quad \cdot\,\mathsf{a}^{\mathsf{new}}[\mathsf{orig\text{-}ind}[c]],\ \forall c
 \end{aligned}
 \,\right\}.
 \end{equation*}
 \else
 \begin{equation*}
-\mathcal{R}_{\mathsf{PF}} = \left\{
-\begin{array}{l}
-\bigl(\,(\zeta,\ \rho_\col,\ \Oracle{\MLE{\mathsf{a}}}, \Oracle{\MLE{\mathsf{char\text{-}act}}}, \Oracle{\MLE{\mathsf{orig\text{-}ind}}}, \Oracle{\MLE{\mathsf{ind}}}, \Oracle{\MLE{\mathsf{l}}}, \Oracle{\MLE{\mathsf{a'}}}, \Oracle{\MLE{\mathsf{char\text{-}act'}}}) \,;\ \\
-\phantom{\bigl(}\ (\mathcal{F}_u,\ (\mathsf{com}_b)_{b\in\mathcal{F}_u},\ \pi)\,\bigr)
-\end{array}
+\NPRelation_{\mathsf{PF}} = \left\{
+\begin{aligned}
+  & \NPInstance = (\zeta,\ \rho_\strcol),\\
+  & \NPInstancey = (\Oracle{\MLE{\mathsf{a}^{\mathsf{old}}}}, \Oracle{\MLE{\mathsf{char\text{-}act}^{\mathsf{old}}}}, \Oracle{\MLE{\mathsf{orig\text{-}ind}}}, \Oracle{\MLE{\mathsf{ind}}}, \Oracle{\MLE{\mathsf{l}}},\\
+  & \phantom{\NPInstancey = (} \Oracle{\MLE{\mathsf{a}^{\mathsf{new}}}}, \Oracle{\MLE{\mathsf{char\text{-}act}^{\mathsf{new}}}}),\\
+  & \NPWitness = (\mathsf{a}^{\mathsf{old}}, \mathsf{char\text{-}act}^{\mathsf{old}}, \mathsf{orig\text{-}ind}, \mathsf{ind}, \mathsf{l}, \mathsf{a}^{\mathsf{new}}, \mathsf{char\text{-}act}^{\mathsf{new}},\\
+  & \phantom{\NPWitness = (} \mathcal{F}_u, (\Commitment_b)_{b\in\mathcal{F}_u}, \pi)
+\end{aligned}
 \ \middle|\
 \begin{array}{l}
 \emptyset \neq \mathcal{F}_u \subseteq \mathcal{F}_\zeta,\\
-\pi \text{ opens } \rho_\col \text{ to } \mathsf{com}_b = \mathsf{Commit}(\mathsf{fp}_b) \text{ at leaf } b,\ \forall b\in\mathcal{F}_u,\\
-\mathsf{a'}[i] = \mathsf{a}[i]\cdot\prod_{b\in\mathcal{F}_u}\mathsf{fp}_b[i],\quad \forall i\in[N],\\
-\mathsf{char\text{-}act'}[c] = \mathsf{char\text{-}act}[c]\cdot\mathsf{a'}[\mathsf{orig\text{-}ind}[c]],\quad \forall c
+\pi \text{ opens } \rho_\strcol \text{ to } \Commitment_b = \Commit(\MLE{\mathsf{bin}_b}) \text{ at leaf } b,\ \forall b\in\mathcal{F}_u,\\
+\mathsf{a}^{\mathsf{new}}[i] = \mathsf{a}^{\mathsf{old}}[i]\cdot\prod_{b\in\mathcal{F}_u}\mathsf{bin}_b[i],\quad \forall i\in[N],\\
+\mathsf{char\text{-}act}^{\mathsf{new}}[c] = \mathsf{char\text{-}act}^{\mathsf{old}}[c]\cdot\mathsf{a}^{\mathsf{new}}[\mathsf{orig\text{-}ind}[c]],\quad \forall c
 \end{array}
 \right\}.
 \end{equation*}
 \fi
 
 \begin{ilemma}[No false negatives]\label{lem:prefilter-sound}
-For every $\bigl(x; w\bigr)\in\mathcal{R}_{\mathsf{PF}}$, $\mathsf{a'}\le\mathsf{a}$ pointwise, $\mathsf{a'}$ is binary, and every active row that matches the pattern survives:
-$\mathsf{a}[i]=1 \wedge \col[i]\sim\zeta \implies \mathsf{a'}[i]=1$.
+For every $(\NPInstance, \NPInstancey, \NPWitness)\in\NPRelation_{\mathsf{PF}}$, $\mathsf{a}^{\mathsf{new}}\le\mathsf{a}^{\mathsf{old}}$ pointwise, $\mathsf{a}^{\mathsf{new}}$ is binary, and every active row that matches the pattern survives:
+$\mathsf{a}^{\mathsf{old}}[i]=1 \wedge \strcol[i]\ \text{matches}\ \zeta \implies \mathsf{a}^{\mathsf{new}}[i]=1$.
 \end{ilemma}
 \begin{proof}
-Each $\mathsf{fp}_b$ is a binary column committed by the data owner, so $\mathsf{a'}[i]\in\{0,1\}$ and $\mathsf{a'}[i]\le\mathsf{a}[i]$. If $\col[i]$ matches $\zeta$, then $\col[i]$ contains every character and n-gram of each maximal run of literal characters of a factor (a run never spans a \_), and every precedence pair of the factors read in order. Hence $\mathsf{fp}_b(\col[i])=1$ for every $b\in\mathcal{F}_\zeta\supseteq\mathcal{F}_u$, so the product is $1$ and $\mathsf{a'}[i]=\mathsf{a}[i]=1$.
+Each $\mathsf{bin}_b$ is a binary column committed by the data owner, so $\mathsf{a}^{\mathsf{new}}[i]\in\{0,1\}$ and $\mathsf{a}^{\mathsf{new}}[i]\le\mathsf{a}^{\mathsf{old}}[i]$. If $\strcol[i]$ matches $\zeta$, then $\strcol[i]$ contains every character and n-gram of each maximal run of literal characters of a factor (a run never spans a \_), and every precedence pair of the factors read in order. Hence $\mathsf{fp}_b(\strcol[i])=1$ for every $b\in\mathcal{F}_\zeta\supseteq\mathcal{F}_u$, so the product is $1$ and $\mathsf{a}^{\mathsf{new}}[i]=\mathsf{a}^{\mathsf{old}}[i]=1$.
 \end{proof}
 \parhead{Soundness and completeness}
 \ali{TODO: soundness and completeness proof.}
