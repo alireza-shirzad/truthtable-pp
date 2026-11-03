@@ -49,7 +49,7 @@ The idea of sumcheck is to reduce an exponential sum to a sequence of univariate
 
 
 \parhead{Zerocheck}
-By the Schwartz--Zippel lemma, it suffices for the prover to convince the verifier that $p$ is zero on a random point. This check is executed via a sumcheck over the polynomial $p(x) \eqPoly{}(x, r)$. Throughout this paper we use this style of PIOP composition, enabling us to reason about more complex polynomial properties while growing our toolbox.
+By the Schwartz--Zippel lemma, it suffices for the prover to convince the verifier that $p$ is zero on a random point. This check is executed via a sumcheck over the polynomial $p(x) \eqPoly{}(x, r)$, where the \emph{equality} polynomial $\eqPoly(X, Y) := \prod_{i=1}^{\mu} ((1- X_i)(1- Y_i) + X_i Y_i)$ satisfies, for $x, y \in \BoolHCube{\mu}$, $\eqPoly(x, y) = 1$ if $x = y$ and $0$ otherwise. Throughout this paper we use this style of PIOP composition, enabling us to reason about more complex polynomial properties while growing our toolbox.
 \begin{DefinePIOP}{Zerocheck}{zerocheck}
   \emph{Inputs:} $\Oracle{p}$.
   \begin{enumerate}[nosep]

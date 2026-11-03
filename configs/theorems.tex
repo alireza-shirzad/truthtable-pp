@@ -5,27 +5,25 @@
 \newtheorem{idefinition}{Definition}%[section]
 \newtheorem{icorollary}{Corollary}%[section]
 \newtheorem{ilemma}{Lemma}%[section]
-\iflncs
-\else
+% llncs defines these itself; every other class (IEEEtran, article) needs them.
+\makeatletter\@ifclassloaded{llncs}{}{%
 \newtheorem{theorem}{Theorem}[section]
 \newtheorem{lemma}[theorem]{Lemma}
 \newtheorem{proposition}[theorem]{Proposition}
 \newtheorem{claim}[theorem]{Claim}
 \newtheorem{definition}[theorem]{Definition}
 \newtheorem{corollary}[theorem]{Corollary}
-\fi
+}\makeatother
 \newtheorem{assumption}{Assumption}
 \newtheorem{construction}{Construction}
 
 \theoremstyle{definition} % not italics
-\iflncs
-\else
+\makeatletter\@ifclassloaded{llncs}{}{%
 \newtheorem{remark}[theorem]{Remark}
 \newtheorem{example}[theorem]{Example}
-\fi
+}\makeatother
 
 \theoremstyle{remark} %
-\iflncs
-\else
+\makeatletter\@ifclassloaded{llncs}{}{%
 \newtheorem{case}{Case}
-\fi
+}\makeatother

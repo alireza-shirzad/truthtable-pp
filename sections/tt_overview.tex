@@ -1,7 +1,7 @@
 % !TEX root = ../paper.tex
 \doclearpage
-\section{Overview of \texorpdfstring{$\truthtable$}{TruthTable}}
-\label{sec:overview}
+\section{Background: \texorpdfstring{$\truthtable$}{TruthTable}}
+\label{sec:background}
 
 Our protocols extend $\truthtable$~\cite{cryptoeprint:2026/1260}; therefore, we recall in this section the system model that $\truthtable$ realizes and the structure of its construction, and point out where each of our contributions enters. The material in this section is due to $\truthtable$; we refer the reader to its paper for the full treatment.
 
@@ -46,26 +46,24 @@ The cc-SNARK algorithms specialized to this relation are:
 These algorithms must satisfy the standard completeness and knowledge-soundness properties of cc-SNARKs~\cite{CampanelliFQ19}; see \cref{sec:extended_preliminaries}.
 
 \subsection{Construction Strategy}
-\label{sec:overview:construction-strategy}
+\label{sec:background:construction-strategy}
 
 We now describe how $\truthtable$ realizes the commitment, prover, and verifier algorithms.
 
 \parhead{Commit}
-$\truthtable$ represents SQL tables as tuples of (multilinear) polynomials, and commits to these via a polynomial commitment scheme~\cite{KateZG10}.
+$\truthtable$ commits to the \emph{arithmetization} of each SQL table, its encoding as a tuple of multilinear polynomials (\cref{sec:general-approach}), via a polynomial commitment scheme~\cite{KateZG10}.
 Each column is represented as a separate polynomial, so the size of a table commitment, and the cost of producing it, is the number of columns times that of a single column.
-The polynomial encoding of a table $\Table$ is called its \emph{arithmetization}, denoted $\hat{\Table}$; the same hat convention extends to columns and other table-derived objects throughout the paper.
 The encoding is designed so that efficient protocols can check that SQL operators were correctly applied to the encoded tables.
-\Cref{sec:arithmetization} recalls this encoding and presents our extension of it to string columns, which adds the auxiliary polynomials that the rest of the paper operates on; the extra commitments are produced at this step.
+\Cref{sec:our_techniques} presents our extension of it to string columns, which adds the auxiliary polynomials that the rest of the paper operates on; the extra commitments are produced at this step.
 
 \parhead{Prover and verifier}
 To check that a claimed instance $(\Query, \QueryResult)$ is valid for a committed database $\Database$, i.e.\ $((\Query, \QueryResult), \Database) \in \Relation{\SQL}$, $\truthtable$'s prover and verifier proceed in three steps.
 First, they invoke a parser to transform the query $\Query$ into a \emph{query plan} $\QueryPlan$, a tree representation of the query that makes analysis and optimization easier.
-Next, both invoke the query planner to optimize the plan.
-Finally, both invoke the proof engine on the optimized plan: they traverse it node by node and execute subprotocols that prove the correctness of each node.
+Next, both invoke the query planner and then the proof engine on the plan (\cref{sec:background-proof-engine}).
 
 A \textbf{query plan} $\QueryPlan$ for a query $\Query$ is a tree whose nodes represent relational operators (e.g.\ filter, join, limit) and whose edges represent the flow of data between them; edges into the leaves carry the input database tables, and the edge leaving the root carries the output table.
 \Cref{fig:example-qp} depicts the query plan obtained by parsing the query in \cref{fig:example-query}.
-The modular nature of plans makes protocol construction and analysis simpler: instead of $\Relation{\SQL}$, $\truthtable$ works with the equivalent relation
+The modular nature of plans makes protocol construction and analysis simpler: instead of $\Relation{\SQL}$, $\truthtable$ works with the relation
 {\small
 \begin{displaymath}
  \Relation{\QueryPlan} = \left\{\,
@@ -110,15 +108,50 @@ WHERE orders.amount > 100;
 \end{figure}
 
 \subsection{Proof Engine}
-\label{sec:overview-proof-engine}
+\label{sec:background-proof-engine}
 
 The query planner first rewrites $\QueryPlan$ into an equivalent plan $\QueryPlan_\opt$ that is cheaper to prove.
 On input $\QueryPlan_\opt$, the proof engine constructs a protocol for proving that $((\QueryPlan_\opt, \QueryResult), \Database) \in \Language{\QP}$.
-$\truthtable$ designs a Polynomial Interactive Oracle Proof (PIOP)~\cite{ChiesaHMMVW20,BunzFS20} for this relation and compiles it to a succinct argument with the same polynomial commitment scheme used in the commit phase; the compilation is standard, so the paper, like ours, focuses on the PIOPs.
+$\truthtable$ designs a PIOP for this relation and compiles it to a succinct argument as in \cref{sec:prelims}; since the compilation is a black box, the paper, like ours, focuses exclusively on designing the PIOPs.
 
 The prover first generates a \emph{table assignment} $\{\Table_i\}_{i=1}^m$ of intermediate result tables labelling the $m$ non-leaf edges of the plan, encodes them as polynomials, and sends their oracles to the verifier.
 Then, for each node $\nu$ of the plan, the prover and verifier engage in a sub-PIOP asserting that the output table oracle $\TableOut_\nu$ is a valid result of executing $\nu.\op$ on the input table oracles $\{\TableIn\}_\nu$.\footnote{Since an operation may admit several correct results, the output table is required to lie in the set of possible results $\ResultSet_{\nu.\op}(\{\TableIn\})$.}
 Finally, the prover and verifier engage in a \emph{result check} to verify that the root oracle opens to the purported query result $\QueryResult$.
-Each node-specific sub-PIOP proves membership in a ``node relation'' that restricts $\Relation{\QP}$ to the operation of that node; for a filter with predicate $p$, for instance, the relation requires that every row of $\TableOut$ appears in $\TableIn$, that every row of $\TableOut$ satisfies $p$, and that every row of $\TableIn$ absent from $\TableOut$ fails $p$.\footnote{Precisely, the sub-PIOPs prove ``arithmetized'' versions of the node relations, in which each table is replaced by its arithmetization; see \cref{sec:arithmetization}.}
+Each node-specific sub-PIOP proves membership in a ``node relation'' that restricts $\Relation{\QP}$ to the operation of that node; for a filter with predicate $p$, for instance, the relation requires that every row of $\TableOut$ appears in $\TableIn$, that every row of $\TableOut$ satisfies $p$, and that every row of $\TableIn$ absent from $\TableOut$ fails $p$.
 The strategy is complete and sound as long as the per-node checks are, which $\truthtable$ proves formally.
 Our operator protocols for pattern matching (\cref{sec:piop-for-pattern-matching}) and ordering (\cref{sec:lex-order}) are exactly such node sub-PIOPs, for the filter and sort nodes whose predicates and keys involve string columns, and the consistency checks of \cref{sec:string-toolbox} accompany every node whose output carries a string column.
+
+\subsection{Arithmetization}
+\label{sec:general-approach}
+Throughout, tables and columns are encoded as multilinear polynomials over the Boolean hypercube $\BoolHCube{\mu}$, with arithmetic in a finite field $\F$ of large prime characteristic $p$.
+
+\parhead{Notation: arithmetized objects}
+A concrete table or column is written plainly as $\Table$ or $\col$, and its \emph{arithmetized} polynomial form carries a hat, $\hat{\Table}$ or $\hat{\col}$. A concrete object is indexed by integers in square brackets, as in $\col[i]$ or $\Table.\key[i]$ for $i \in [|\Table|]$, whereas its arithmetization is evaluated at hypercube points in parentheses, as in $\hat{\Table}.\key(x)$ for $x \in \BoolHCube{\mu}$.
+
+\parhead{Representing table data as field elements}
+$\truthtable$ maps each column into the prime field $\F$ according to its declared type. For all non-string types---integers, booleans, durations, intervals, dates, and timestamps---we follow $\truthtable$~\cite{cryptoeprint:2026/1260}, to which we refer the reader for the encodings.
+The encoding of strings as field elements is the subject of \cref{sec:string-arith}.
+
+\parhead{Columns}
+A column $\col$ of $n$ entries lives in $\BoolHCube{\mu}$ for any $\mu \ge \lceil \log_2 n \rceil$, and its arithmetization splits into two multilinear polynomials, $\hat{\col} := (\hat{\col}.\act,\, \hat{\col}.\data)$. The \emph{activator} $\hat{\col}.\act \colon \F^{\mu} \to \{0,1\}$ flags the $n$ \emph{active} indices---those carrying real rows rather than padding---while the \emph{data} polynomial $\hat{\col}.\data \colon \F^{\mu} \to \F$ holds the entries at those indices. Where the column is clear from context, we abbreviate the two to $\act$ and $\data$. Each is the multilinear extension (\cref{sec:prelims}) of the corresponding concrete vector, $\hat{\col}.\act = \MLE{\act}$ and $\hat{\col}.\data = \MLE{\data}$. Throughout, a tilde thus denotes the multilinear extension of a single vector, and a hat the arithmetization of a composite object, i.e.\ the tuple of the multilinear extensions of its parts: a column together with its activator, a table, or the string column of \cref{sec:string-arith}.
+
+\parhead{Tables}
+A $k$-column table $\Table$ with $n$ rows arithmetizes to $\hat{\Table} := (\hat{\Table}.\act,\, [\hat{\Table}.\data_1, \dots, \hat{\Table}.\data_k])$: a single activator $\hat{\Table}.\act$, active at $n$ points of $\BoolHCube{\mu}$, shared across all $k$ data polynomials. Each active point $x$---one with $\hat{\Table}.\act(x) = 1$---then yields a row $(\hat{\Table}.\data_1(x),\dots,\hat{\Table}.\data_k(x))$ of $\Table$. A column is just the $k=1$ case, and we reuse the $\hat{\Table}.\act$, $\hat{\Table}.\data_i$ notation for tables.
+
+\parhead{Active indices and layouts.}
+The \emph{active set} of $\hat{\col}$ (or $\hat{\Table}$) gathers its active points, $\actset(\hat{\col}) := \{x \in \BoolHCube{\mu} \mid \hat{\col}.\act(x) = 1\}$, and for a value $k \in \F$ we single out those carrying it as $\actset_k(\hat{\col}) := \{x \in \actset(\hat{\col}) \mid \hat{\col}.\data(x) = k\}$.
+
+$\truthtable$ uses one of two layouts for the active set. In the default \emph{contiguous} layout, $\actset(\hat\Table) = \{0, \dots, n - 1\}$, so the activator is the closed-form $n$-contiguous polynomial $\contig_{\mu,n}$ (\cref{sec:prelims}) that the prover need neither commit to nor prove boolean. In the \emph{sparse} layout the active indices are scattered arbitrarily, and the prover must commit to the activator and prove its booleanity.
+
+
+\parhead{Arithmetized relations}
+The node relation of an operator $\op$ (\cref{sec:background-proof-engine}) is the \emph{table language}
+$\Language{\op} = \{(x, \{\TableIn\}, \TableOut)\}$ of input and output tables linked by $\op$. What the node sub-PIOP actually proves is its \emph{arithmetized} counterpart, which replaces each concrete table with its polynomial form, $
+\hat{\NPLanguage}_{\op} := \{
+    (\NPInstance = x,
+    \NPInstancey = (\{\hat{\TableIn}\}, \hat{\TableOut}))
+  \;|\;
+  (x, \{\TableIn\}, \TableOut) \in \Language{\op}
+\}
+$,
+where each $\hat{\Table} \in \{\hat{\TableIn}\} \cup \{\hat{\TableOut}\}$ is the arithmetization of the corresponding concrete table $\Table$.

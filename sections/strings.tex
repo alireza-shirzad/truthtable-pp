@@ -1,72 +1,101 @@
 \doclearpage
-\section{PIOPs for Wild-Card Pattern Matching}
+\section{Protocols for Wild-Card Pattern Matching}
 \label{sec:piop-for-pattern-matching}
 
-In this section we develop PIOPs for SQL \emph{wild-card} pattern matching --- the predicates written with the \texttt{LIKE} operator. A \texttt{LIKE} pattern may use two kinds of wild-card: the multi-character \texttt{\%}, which matches any (possibly empty) run of characters, and the single-character \texttt{\_}, which matches exactly one character. \Cref{fig:wildcard-taxonomy} shows the taxonomy of patterns we support: three kinds --- single-character, multi-character, and mixed.
+In this section we develop protocols for \emph{wild-card} pattern matching, the most common white-box string operation in SQL workloads; in SQL it takes the form of a predicate written with the \texttt{LIKE} operator.
+We build protocols to support both kinds of wild-card that a \texttt{LIKE} pattern may use: the variable-length \texttt{\%}, which matches any run of zero or more characters (e.g.\ \texttt{ab\%bd\%ef}), and the fixed-length \texttt{\_}, which matches exactly one character (e.g.\ \texttt{a\_c}), alone or combined in one pattern (e.g.\ \texttt{a\_b\%ef}).
 
-\begin{figure}[H]
-\centering
-\resizebox{\ifsp\columnwidth\else\width\fi}{!}{%
-\begin{tikzpicture}[
-    level 1/.style={sibling distance=40mm, level distance=13mm},
-    every node/.style={draw, rounded corners, align=center, font=\normalsize, inner sep=3pt},
-    edge from parent/.style={draw, semithick}
-  ]
-  \node {Wild-card\\pattern matching}
-    child { node {Single-character\\{\small e.g.\ \texttt{a\_c}}} }
-    child { node {Multi-character\\{\small e.g.\ \texttt{ab\%bd\%ef}}} }
-    child { node {Mixed\\{\small e.g.\ \texttt{a\_b\%ef}}} };
-\end{tikzpicture}%
-}
-\caption{Taxonomy of wild-card pattern matching}
-\label{fig:wildcard-taxonomy}
-\end{figure}
+\parhead{Definitions} Every pattern can be written as $\zeta = p_1 \% p_2 \% \dots \% p_{n_\zeta}$ with $n_\zeta \ge 1$ and $p_i \in (\Sigma \cup \{\text{\_}\})^{+}$, optionally preceded and followed by a further \%; we call the $p_i$ the \emph{factors} of $\zeta$. For example, ``ab\%bd\%ef'' has the three factors ``ab'', ``bd'' and ``ef'', the \%-free pattern ``a\_c'' is the single factor $p_1 = $ ``a\_c'', and ``a\_b\%ef'' has the factors ``a\_b'' and ``ef''.
+A string matches $\zeta$ iff the factors occur in it \emph{in order} and \emph{without overlap}, so ``abcbd'' matches ``ab\%bd'' whereas ``abd'' and ``bdab'' do not.
 
+ Each factor $p_j$ is of the form $p_j=(\mathsf{str}_j,\mathsf{mode}_j)$, where $\mathsf{str}_j\in(\Sigma\cup\{\text{\_}\})^{+}$ is its literal content and $\mathsf{mode}_j\in\{\mathsf{prefix},\mathsf{infix},\mathsf{suffix},\mathsf{exact}\}$ records where it may occur in the string. If the pattern contains no \% at all, it consists of a single factor of mode $\mathsf{exact}$, which must cover the entire string. Otherwise, the first factor has mode $\mathsf{prefix}$ if the pattern does not begin with \%, the last factor has mode $\mathsf{suffix}$ if the pattern does not end with \%, and every other factor has mode $\mathsf{infix}$. We write $L_\zeta:=\sum_{j}|\mathsf{str}_j|$ for the length of the pattern, counting each \_ as one character; no string shorter than $L_\zeta$ can match. For example, the mixed pattern ``a\_b\%ef'' has factors $(\text{``a\_b''},\mathsf{prefix})$ and $(\text{``ef''},\mathsf{suffix})$ and $L_\zeta=5$, whereas ``a\_c'' has the single factor $(\text{``a\_c''},\mathsf{exact})$ and $L_\zeta=3$.
 
-\subsection{Pattern Matching Protocol}
-\label{sec:multi-char-pattern-matching}
-
-The most common kind of string pattern matching in natural SQL workloads is a multi-character pattern $\zeta$ of the form $p_1 \% p_2 \% \dots \% p_{n_\zeta}$, where each of the $n_\zeta$ factors $p_i$ is a literal string and \% matches an arbitrary-length run of characters; the predicate holds iff the factors occur \emph{in order} and \emph{without overlap} within the value. For example, for the pattern ``ab\%bd'', the strings ``abd'' and ``bdab'' do not match: the former has an overlap, and the latter does not respect the ordering. The string ``abcbd'', however, does satisfy the pattern.
-
-\parhead{Single-character wild-cards} A factor may itself contain the single-character wild-card \_, which matches exactly one arbitrary character; e.g.\ the factor ``a\_c'' matches ``abc'' and ``axc'' but not ``ac''. Since each \_ consumes exactly one character, a factor still occupies a window of fixed length $|p_i|$, with each \_ counted as one character. Single-character and mixed patterns are therefore handled by the very same protocol, with only two adjustments: wild-card positions are skipped when fingerprinting a window (\cref{fp:window}), and a pattern without any \% must span the whole string, which the length filter enforces (\cref{mc:filter}).
-
-\parhead{Factor modes} Each factor $p_j=(\mathsf{str}_j,\mathsf{mode}_j)$ carries a mode that records where it may occur. If the pattern contains no \% at all, it consists of a single factor of mode $\mathsf{exact}$, which must cover the entire string. Otherwise, the first factor has mode $\mathsf{prefix}$ if the pattern does not begin with \%, the last factor has mode $\mathsf{suffix}$ if the pattern does not end with \%, and every other factor has mode $\mathsf{infix}$. We write $L_\zeta:=\sum_{j}|\mathsf{str}_j|$ for the length of the pattern, counting each \_ as one character and each \% as none; no string shorter than $L_\zeta$ can match. For example, the mixed pattern ``a\_b\%ef'' has factors $(\text{``a\_b''},\mathsf{prefix})$ and $(\text{``ef''},\mathsf{suffix})$ and $L_\zeta=5$, whereas the single-character pattern ``a\_c'' has the single factor $(\text{``a\_c''},\mathsf{exact})$ and $L_\zeta=3$.
-
-In this section, we present \cref{piop:multi-char-pattern-matching}, a protocol that convinces the verifier that the activators were correctly updated from $\Oracle{\MLE{\mathsf{a^{old}}}}$ (with its corresponding char-level activator $\Oracle{\MLE{\mathsf{char\text{-}act^{old}}}}$) to $\Oracle{\MLE{\mathsf{a^{new}}}}$ (with its corresponding char-level activator $\Oracle{\MLE{\mathsf{char\text{-}act^{new}}}}$); that is, every string that is kept active satisfies the pattern (no false positives) and every string that is discarded does not (no false negatives).
-
-We now describe the protocol at a high level.
-
-\parhead{Activator Update Validity} The prover and the verifier first check if the updated activators are consistent with each other. As mentioned in \cref{sec:consistency-checking}, the prover cannot update the string activators arbitrarily and needs to prove that all the main and auxiliary columns are consistent. This is done in \cref{mc:validity}.
-
-\parhead{Length Filtering} Before inspecting the patterns, we filter the strings by their length. This step drops every string whose length is smaller than $L_\zeta$, since such a string cannot possibly satisfy the pattern. It not only reduces the number of strings---making the subsequent steps faster---but is also necessary for the completeness and soundness of the protocol. For a pattern of mode $\mathsf{exact}$, the filter instead drops every string whose length differs from $L_\zeta$, since only those can be covered by the single factor. This is done in \cref{mc:filter}.
-
-\parhead{Containment} In any filtering operation, including this pattern matching, we must ensure that every element active in the output was already active in the input; that is, the filter does not introduce any new strings. This is done in \cref{mc:containment}.
-
-
-
-\parhead{Layout} The sweep reads each window of characters through \emph{rotations} of the character column, i.e.\ through physical adjacency, whereas it decides where a window may start from the logical positions $(\mathsf{orig\text{-}ind}, \mathsf{int\text{-}ind})$ and the string lengths. The two views agree exactly when the char-level columns satisfy the layout invariant of \cref{sec:layout-check}: the characters of every string occupy consecutive positions in order of $\mathsf{int\text{-}ind}$, and $\mathsf{bnd}$ marks the first of them. This holds for the data owner's columns by construction and is re-established by \cref{piop:layout-check} inside every domain-preserving update, so the protocol inherits it from its input column; the data-preserving updates of \cref{mc:validity,mc:filter} leave the layout untouched.
-
-\parhead{Sweep \& Verdict} We then sweep through all $n_\zeta$ factors, discarding at each round the strings that do not contain the current factor. Finally, the strings that remain alive are exactly those in which every factor was placed---that is, the strings that satisfy the entire pattern. The sweep records this survival information in the str-level activator $\mathsf{alive_h}$, so $\mathsf{alive_h}$ marks precisely the matching strings. In the honest case it therefore equals $\mathsf{a^{new}}$, which \cref{mc:verdict} verifies with a single zerocheck.
+ \subsection{PIOP Description}
+  \label{sec:pattern-matching-piop-descr}
+In this section, we present \cref{piop:multi-char-pattern-matching}, a PIOP that convinces the verifier that the activators were correctly updated from $\Oracle{\MLE{\mathsf{a^{old}}}}$ and $\Oracle{\MLE{\mathsf{char\text{-}act^{old}}}}$ to $\Oracle{\MLE{\mathsf{a^{new}}}}$ and $\Oracle{\MLE{\mathsf{char\text{-}act^{new}}}}$; that is, every string that is kept active satisfies the pattern (no false positives) and every string that is discarded does not (no false negatives).
 
 \begin{DefinePIOP}{Pattern Matching}{multi-char-pattern-matching}[Pattern Matching]
   \emergencystretch=3em\relax
-  \emph{Inputs:} $\zeta,\Oracle{\MLE{\mathsf{a^{old}}}},\Oracle{\MLE{\mathsf{char\text{-}act^{old}}}},\Oracle{\MLE{\mathsf{a^{new}}}},\Oracle{\MLE{\mathsf{char\text{-}act^{new}}}},\Oracle{\MLE{\mathsf{char}}},\allowbreak \Oracle{\MLE{\mathsf{bnd}}}, \Oracle{\MLE{\mathsf{orig\text{-}ind}}}, \Oracle{\MLE{\mathsf{int\text{-}ind}}}, \Oracle{\MLE{\mathsf{ind}}}, \Oracle{\MLE{\mathsf{l}}}$.
+  \emph{Inputs:} the pattern $\zeta$; the input column $\Oracle{\hat{\strcol}^{\mathsf{old}}}$ and the output column $\Oracle{\hat{\strcol}^{\mathsf{new}}}$, each with all of its main and auxiliary oracles.
   \vspace{2mm}
   \begin{enumerate}[nosep]
-    \item (\emph{Activator validity})\label[step]{mc:validity} $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:data-preserving-update-check} on the updated column $\strcol^{\mathsf{new}}$, whose activators are $\mathsf{a^{new}}$ and $\mathsf{char\text{-}act^{new}}$.
-    \item (\emph{Length filtering})\label[step]{mc:filter} $\PIOPProver$ computes $\mathsf{a^{old'}}$ and $\mathsf{char\text{-}act^{old'}}$, the result of dropping strings shorter than $L_\zeta$ (or, if $\mathsf{mode}_1=\mathsf{exact}$, strings of length other than $L_\zeta$), and the parties invoke \cref{piop:len-filter} on $(\mathsf{a^{old}}, \mathsf{char\text{-}act^{old}}, \mathsf{a^{old'}}, \mathsf{char\text{-}act^{old'}})$ with threshold $k = L_\zeta$, in its exact variant if $\mathsf{mode}_1=\mathsf{exact}$.
-    \item (\emph{Containment})\label[step]{mc:containment} $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:zerocheck} on $\mathsf{a^{new}}\cdot(1-\mathsf{a^{old'}})$.
-    \item (\emph{Sweep Factors})\label[step]{mc:sweep} $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:sweep-factors} on $(\zeta, \mathsf{a^{old'}}, \mathsf{char\text{-}act^{old'}}, \Oracle{\MLE{\mathsf{char}}}, \Oracle{\MLE{\mathsf{bnd}}}, \Oracle{\MLE{\mathsf{orig\text{-}ind}}}, \Oracle{\MLE{\mathsf{int\text{-}ind}}}, \allowbreak\Oracle{\MLE{\mathsf{ind}}}, \Oracle{\MLE{\mathsf{l}}})$, which sweeps the factors $p_1,\dots,p_{n_\zeta}$ in order and returns the final str-level activator $\mathsf{alive_h}$.
-    \item (\emph{Verdict})\label[step]{mc:verdict} $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:zerocheck} on $\mathsf{a^{new}}-\mathsf{alive_h}$.
+    \item \label[step]{mc:parse} $\PIOPProver$ and $\PIOPVerifier$ parse $\Oracle{\hat{\strcol}^{\mathsf{old}}}$ to obtain $\Oracle{\MLE{\mathsf{a^{old}}}}$, $\Oracle{\MLE{\mathsf{char\text{-}act^{old}}}}$, $\Oracle{\MLE{\mathsf{char}}}$, $\Oracle{\MLE{\mathsf{bnd}}}$, $\Oracle{\MLE{\mathsf{orig\text{-}ind}}}$, $\Oracle{\MLE{\mathsf{int\text{-}ind}}}$, $\Oracle{\MLE{\mathsf{ind}}}$ and $\Oracle{\MLE{\mathsf{l}}}$, and $\Oracle{\hat{\strcol}^{\mathsf{new}}}$ to obtain $\Oracle{\MLE{\mathsf{a^{new}}}}$ and $\Oracle{\MLE{\mathsf{char\text{-}act^{new}}}}$.
+    \item \label[step]{mc:validity} To check if the new table is well-formed, $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:data-preserving-update-check} on the updated column $\strcol^{\mathsf{new}}$.
+    \item \label[step]{mc:filter}  $\PIOPProver$ computes and sends the length-filtered activators $\mathsf{a^{old'}}$ and $\mathsf{char\text{-}act^{old'}}$, which together with the remaining oracles of $\Oracle{\hat{\strcol}^{\mathsf{old}}}$ form the filtered column $\Oracle{\hat{\strcol}^{\mathsf{old'}}}$, as follows:
+    \begin{enumerate}[nosep,label=(\alph*)]
+      \item If $\mathsf{mode}_1=\mathsf{exact}$, $\PIOPProver$ drops every string whose length differs from $L_\zeta$, and the parties invoke the exact variant of \cref{piop:len-filter} on $(\Oracle{\hat{\strcol}^{\mathsf{old}}}, \Oracle{\hat{\strcol}^{\mathsf{old'}}})$ with $k = L_\zeta$.
+      \item Otherwise, $\PIOPProver$ drops every string shorter than $L_\zeta$, and the parties invoke \cref{piop:len-filter} on $(\Oracle{\hat{\strcol}^{\mathsf{old}}}, \Oracle{\hat{\strcol}^{\mathsf{old'}}})$ with threshold $k = L_\zeta$.
+    \end{enumerate}
+    \item \label[step]{mc:containment} To check that no new row was added, $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:zerocheck} on \cref{eq:pm-containment}.
+    \item \label[step]{mc:sweep} To find which strings contain all the factors in order, $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:sweep-factors} on $(\zeta, \Oracle{\hat{\strcol}^{\mathsf{old'}}})$, which sweeps the factors $p_1,\dots,p_{n_\zeta}$ in order and returns the final str-level activator $\mathsf{alive_h}$.
+    \item \label[step]{mc:verdict} To check that exactly the matching strings were kept, $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:zerocheck} on $\mathsf{a^{new}}-\mathsf{alive_h}$.
   \end{enumerate}
 \end{DefinePIOP}
+
+We now go over the PIOP steps and describe the purpose of each of them at a high level which serves as a proof sketch for the soundness of the protocol.
+
+
+\parhead{Activator Update Validity (\cref{mc:validity})}\label{sec:data-preserving} The prover first needs to establish that the str-level and char-level activators are consistent with each other. The prover cannot update the string activators arbitrarily by sending new columns; it needs to at least prove that the two activators are internally consistent.
+
+Here \emph{only the activators} are freshly materialized, while every other column is inherited unchanged; we call such an update \emph{data-preserving}. Besides the booleanity of both activators, which \cref{piop:boolean-check} certifies, the check must establish that every character inherits the active bit of its string, i.e.\ that string $i$ has exactly $\mathsf{a}[i]\cdot\mathsf{l}[i]$ active characters. In terms of the tables of \cref{sec:string-arith}, this is the \texttt{SUM GROUP BY} identity
+\begin{equation}\label{eq:cons-groupby}
+\begin{array}{@{}l@{}}
+\sqlline{\sqlkw{SELECT} orig\_ind,}\\
+\sqlline{\ \ \ \ \ \ \ \sqlkw{SUM}(char\_act)}\\
+\sqlline{\ \ \sqlkw{FROM} s.aux\_chars}\\
+\sqlline{\ \sqlkw{GROUP BY} orig\_ind;}
+\end{array}
+\quad=\quad
+\begin{array}{@{}l@{}}
+\sqlline{\sqlkw{SELECT} ind, l}\\
+\sqlline{\ \ \sqlkw{FROM} s.aux\_strs;}
+\end{array}
+\end{equation}
+which $\truthtable$~\cite{cryptoeprint:2026/1260} proves with a single \cref{piop:keyedsumcheck}; we reuse that protocol verbatim.
+\begin{DefinePIOP}{Data-Preserving Update Check}{data-preserving-update-check}
+  \emph{Inputs:} the updated string column $\Oracle{\hat{\strcol}}$ with all of its main and auxiliary oracles.
+  \begin{enumerate}[nosep]
+    \item (\emph{Parse}) $\PIOPProver$ and $\PIOPVerifier$ parse $\Oracle{\hat{\strcol}}$ to obtain $\Oracle{\MLE{\mathsf{a}}}$, $\Oracle{\MLE{\mathsf{char\text{-}act}}}$, $\Oracle{\MLE{\mathsf{orig\text{-}ind}}}$ and $\Oracle{\MLE{\mathsf{l}}}$.
+    \item To check that both activators are boolean, $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:boolean-check} on $\mathsf{a}$ and on $\mathsf{char\text{-}act}$.
+    \item To check that the two activators are consistent, $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:keyedsumcheck} on \cref{eq:cons-groupby}, which forces $\sum_{j:\,\mathsf{orig\text{-}ind}[j]=i}\mathsf{char\text{-}act}[j] = \mathsf{a}[i]\cdot\mathsf{l}[i]$ for every key $i$.
+  \end{enumerate}
+\end{DefinePIOP}
+The formal definition and the security proofs are deferred to \cref{sec:proof-cons}.
+
+
+
+\parhead{Length Filtering (\Cref{mc:filter})}\label{sec:length-filtering} Before inspecting the pattern, we filter the strings by their length: a string can match $\zeta$ only if it is at least $L_\zeta$ long, so every shorter string is a guaranteed non-match and is dropped in \cref{mc:filter}. This not only shrinks the input of the subsequent steps but is also necessary for their completeness and soundness. For a pattern of mode $\mathsf{exact}$, the filter instead drops every string whose length differs from $L_\zeta$, since only those can be covered by the single factor. The check proceeds in three steps. Since this is again a data-preserving update, we first invoke \cref{piop:data-preserving-update-check} on the new column. Then, as for any filter in $\truthtable$~\cite{cryptoeprint:2026/1260}, a zerocheck on $\mathsf{a}^{\mathsf{new}}\cdot(1-\mathsf{a}^{\mathsf{old}})$ ensures that rows were only deactivated and none was newly activated. Finally, \cref{piop:sign-check} on
+\begin{equation}
+  \label{eq:fp-fn-len-filtering}
+  (\mathsf{a}^{\mathsf{old}}\cdot(1-\mathsf{a}^{\mathsf{new}}),\; \mathsf{l}-k) < 0 \qquad (\mathsf{a}^{\mathsf{new}},\; \mathsf{l}-k) \geq 0
+\end{equation}
+ensures that no kept string is shorter than the threshold $k = L_\zeta$ and no dropped string is at least that long. In the exact variant, the two sign checks are replaced by a \cref{piop:zerocheck} on $\mathsf{a}^{\mathsf{new}}\cdot(\mathsf{l}-k)$, so every kept string has length $k$, and a \cref{piop:nozero-check} on $\mathsf{l}-k$ with activator $\mathsf{a}^{\mathsf{old}}\cdot(1-\mathsf{a}^{\mathsf{new}})$, so every dropped string has a different length.
+\begin{DefinePIOP}{Length Filtering Check}{len-filter}
+  \emph{Inputs:} the input column $\Oracle{\hat{\strcol}^{\mathsf{old}}}$ and the output column $\Oracle{\hat{\strcol}^{\mathsf{new}}}$, each with all of its main and auxiliary oracles; threshold $k$; and a flag selecting the exact variant.
+  \begin{enumerate}[nosep]
+    \item (\emph{Parse}) $\PIOPProver$ and $\PIOPVerifier$ parse $\Oracle{\hat{\strcol}^{\mathsf{old}}}$ to obtain $\Oracle{\MLE{\mathsf{a}^{\mathsf{old}}}}$ and $\Oracle{\MLE{\mathsf{l}}}$, and $\Oracle{\hat{\strcol}^{\mathsf{new}}}$ to obtain $\Oracle{\MLE{\mathsf{a}^{\mathsf{new}}}}$ and $\Oracle{\MLE{\mathsf{char\text{-}act}^{\mathsf{new}}}}$.
+    \item To check that the new activators are internally consistent, $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:data-preserving-update-check} on $\strcol^{\mathsf{new}}$.
+    \item To check that no new string was activated, $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:zerocheck} on $\mathsf{a}^{\mathsf{new}}\cdot(1-\mathsf{a}^{\mathsf{old}})$.
+    \item To check that there are no false positives and no false negatives, $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:sign-check} on \cref{eq:fp-fn-len-filtering}; in the exact variant, they instead invoke \cref{piop:zerocheck} on $\mathsf{a}^{\mathsf{new}}\cdot(\mathsf{l}-k)$ and \cref{piop:nozero-check} on data $\mathsf{l}-k$ with activator $\mathsf{a}^{\mathsf{old}}\cdot(1-\mathsf{a}^{\mathsf{new}})$.
+  \end{enumerate}
+\end{DefinePIOP}
+The formal definition and the security proofs are deferred to \cref{sec:proof-lenfilter}.
+
+\parhead{Containment (\Cref{mc:containment})} In any filtering operation, including this pattern matching, we must ensure that every element active in the output was already active in the input; that is, the filter does not introduce any new strings. Since the activators are boolean, this holds iff
+\begin{equation}\label{eq:pm-containment}
+  \mathsf{a^{new}}\cdot(1-\mathsf{a^{old'}}) = 0,
+\end{equation}
+which \cref{mc:containment} certifies with a single zerocheck.
+
+\parhead{Sweep \& Verdict} We then sweep through all $n_\zeta$ factors, discarding at each round the strings that do not contain the current factor. Finally, the strings that remain alive are exactly those in which every factor was placed---that is, the strings that satisfy the entire pattern. The sweep records this survival information in the str-level activator $\mathsf{alive_h}$, so $\mathsf{alive_h}$ marks precisely the matching strings. In the honest case it therefore equals $\mathsf{a^{new}}$, which \cref{mc:verdict} verifies with a single zerocheck.
+
 
 Next we discuss the main building block of \cref{piop:multi-char-pattern-matching}, namely \cref{piop:sweep-factors}, which carries out the entire sweep and returns the final str-level activator $\mathsf{alive_h}$, marking exactly the strings that contain all $n_\zeta$ factors in order and without overlap.
 
 
 \parhead{Easy case: Single Factor} We first explain how to check if a column of strings satisfy a single factor $p=(\mathsf{str},\mathsf{mode})$, then extend it to a multi-factor scenario. Let $\ell=|\mathsf{str}|$, then the prover needs to convince the verifier that (i) there exist \emph{a window of length $\ell$} that has the exact pattern $\mathsf{str}$, and (ii) there does not exist such a window for the discarded strings. Also the start position of this window matters. For $\mathsf{mode}=\mathsf{prefix}$, we want this window to start at the 0th location of the survived strings, for $\mathsf{mode}=\mathsf{suffix}$, we want this window to end at the last location of the survived strings, for $\mathsf{mode}=\mathsf{infix}$, the window can start from anywhere inside the string; and for $\mathsf{mode}=\mathsf{exact}$, the window must start at the 0th location and cover the whole string.
 
-To reason about a ``window'' of characters and its location, we introduce a \emph{window fingerprint} column. The prover forms the $\ell$ shifted copies $\mathsf{char}^{(0)},\dots,\mathsf{char}^{(\ell-1)}$ of the character column and combines them into a single column $\mathsf{wf}:=\sum_{\delta=0}^{\ell-1}r_\delta\,\mathsf{char}^{(\delta)}$ using random coefficients $r_\delta$ supplied by the verifier, so that $\mathsf{wf}[c]$ is a fingerprint of the length-$\ell$ window starting at position $c$. The prover and verifier then fingerprint the pattern itself in the same way, computing the \emph{pattern fingerprint} $\mathsf{pf}:=\sum_{\delta=0}^{\ell-1}r_\delta\,\mathsf{str}[\delta]$. With both fingerprints in hand, matching a single factor reduces to a numerical equality test: wherever $\mathsf{wf}[c]=\mathsf{pf}$, the pattern occurs starting at position $c$. To support the single-character wild-card, we simply omit its offsets from both sums: writing $W:=\{\delta:\mathsf{str}[\delta]=\text{\_}\}$, the two fingerprints range over $\delta\notin W$ only, so the equality test ignores whichever characters sit under a \_ while the window keeps its full length $\ell$.
+To reason about a ``window'' of characters and its location, we introduce a \emph{window fingerprint} column. The prover forms the $\ell$ shifted copies $\mathsf{char}^{(0)},\dots,\mathsf{char}^{(\ell-1)}$ of the character column and combines them into a single column $\mathsf{wf}:=\sum_{\delta=0}^{\ell-1}r_\delta\,\mathsf{char}^{(\delta)}$ using random coefficients $r_\delta$ supplied by the verifier, so that $\mathsf{wf}[c]$ is a fingerprint of the length-$\ell$ window starting at position $c$. The prover and verifier then fingerprint the pattern itself in the same way, computing the \emph{pattern fingerprint} $\mathsf{pf}:=\sum_{\delta=0}^{\ell-1}r_\delta\,\mathsf{str}[\delta]$. With both fingerprints in hand, matching a single factor reduces to a numerical equality test: wherever $\mathsf{wf}[c]=\mathsf{pf}$, the pattern occurs starting at position $c$. To support the fixed-length wild-card \_, we simply omit its offsets from both sums: writing $W:=\{\delta:\mathsf{str}[\delta]=\text{\_}\}$, the two fingerprints range over $\delta\notin W$ only, so the equality test ignores whichever characters sit under a \_ while the window keeps its full length $\ell$.
 
 As noted, the valid starting location of the match depends on the factor's mode, so we introduce a boolean \emph{attention mask} that tells the verifier where a window is allowed to begin. In every mode a window must lie inside its string, so the mask is derived from the internal index of each character and from the length of its string, which the prover broadcasts to character level once for the whole sweep. For a prefix or an exact factor the mask is $1$ at the first character of each string (the boundary marker $\mathsf{bnd}$, certified by \cref{sec:layout-check}), the length filter having ensured that the window fits and, in the exact mode, covers the whole string; for a suffix it is $1$ at the character exactly $\ell$ positions before the end of its string, $\mathsf{int\text{-}ind} + \ell = \mathsf{l}$; and for an infix it is $1$ at every character from which a window of length $\ell$ still fits, $\mathsf{int\text{-}ind} + \ell \le \mathsf{l}$. Both conditions are certified by the indicator checks of \cref{sec:zero-indicator,sec:cmp-indicator}, and the masks are set up in \cref{fp:att_mask}. Because the characters of a string occupy consecutive positions (\cref{sec:layout-check}), a window that starts at a masked character reads only characters of that string, never the padding or a neighbouring string.
 
@@ -80,9 +109,10 @@ For example, consider the pattern ``\%ab\%bd\%t'' and the string ``kabyabrbdut''
 
 \begin{DefinePIOP}{Sweep Factors}{sweep-factors}[Sweep Factors]
   \emergencystretch=3em\relax
-  \emph{Inputs:} the pattern $\zeta$ with its ordered factors $(p_1,\dots,p_{n_\zeta})$, $p_j=(\mathsf{str}_j,\mathsf{mode}_j)$, where $\mathsf{str}_j$ may contain \_; the initial activators $\Oracle{\MLE{\mathsf{a^{old'}}}}$ and $\Oracle{\MLE{\mathsf{char\text{-}act^{old'}}}}$; and the fixed columns $\Oracle{\MLE{\mathsf{char}}}, \Oracle{\MLE{\mathsf{bnd}}}, \Oracle{\MLE{\mathsf{orig\text{-}ind}}}, \Oracle{\MLE{\mathsf{int\text{-}ind}}}, \Oracle{\MLE{\mathsf{ind}}}, \Oracle{\MLE{\mathsf{l}}}$. Throughout, $\mu$ is the dimension of the char-level hypercube, $\alpha_L$ is the bit width of the length column, and every \cref{piop:broadcast} is activated by $\mathsf{char\text{-}act^{old'}}$ on the character side.
+  \emph{Inputs:} the pattern $\zeta$ with its ordered factors $(p_1,\dots,p_{n_\zeta})$, $p_j=(\mathsf{str}_j,\mathsf{mode}_j)$, where $\mathsf{str}_j$ may contain \_; and the length-filtered column $\Oracle{\hat{\strcol}^{\mathsf{old'}}}$ with all of its main and auxiliary oracles. Throughout, $\mu$ is the dimension of the char-level hypercube, $\alpha_L$ is the bit width of the length column, and every \cref{piop:broadcast} is activated by $\mathsf{char\text{-}act^{old'}}$ on the character side.
   \vspace{2mm}
   \begin{enumerate}[nosep]
+    \item (\emph{Parse})\label[step]{sf:parse} $\PIOPProver$ and $\PIOPVerifier$ parse $\Oracle{\hat{\strcol}^{\mathsf{old'}}}$ to obtain $\Oracle{\MLE{\mathsf{a^{old'}}}}$, $\Oracle{\MLE{\mathsf{char\text{-}act^{old'}}}}$, $\Oracle{\MLE{\mathsf{char}}}$, $\Oracle{\MLE{\mathsf{bnd}}}$, $\Oracle{\MLE{\mathsf{orig\text{-}ind}}}$, $\Oracle{\MLE{\mathsf{int\text{-}ind}}}$, $\Oracle{\MLE{\mathsf{ind}}}$ and $\Oracle{\MLE{\mathsf{l}}}$.
     \item (\emph{Initialization})\label[step]{sf:init} $\PIOPProver$ and $\PIOPVerifier$ set $\mathsf{alive_h^{(0)}}:=\mathsf{a^{old'}}$ and $\mathsf{alive_c^{(0)}}:=\mathsf{char\text{-}act^{old'}}$. They then prepare the data shared by every round:
     \begin{enumerate}[nosep]
       \item (\textit{Rotated characters})\label[step]{sf:rot} writing $\ell_{\max}:=\max_j|\mathsf{str}_j|$ for the maximum factor length, $\PIOPProver$ computes the rotated character columns $\mathsf{char}^{(1)},\dots,\mathsf{char}^{(\ell_{\max}-1)}$ and sends them to $\PIOPVerifier$, where $\mathsf{char}^{(0)}:=\mathsf{char}$ and each $\mathsf{char}^{(\delta)}$ is the rotation of $\mathsf{char}^{(\delta-1)}$ by $-1$ over the full hypercube, so that $\mathsf{char}^{(\delta)}[p]=\mathsf{char}[p+\delta]$ for every $p$ with $p+\delta<2^{\mu}$; for $\delta=1,\dots,\ell_{\max}-1$ the parties invoke \cref{piop:rotcheck} on $(\mathsf{char}^{(\delta-1)},\mathsf{char}^{(\delta)},-1)$ with length $s=2^{\mu}$. $\PIOPVerifier$ then samples $r_0,\dots,r_{\ell_{\max}-1}\samples\F$.

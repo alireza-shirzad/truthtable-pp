@@ -12,27 +12,29 @@ As a result, a large and growing class of real-world queries lies outside the re
 
 As shown in \Cref{tab:prior-strings}, across different design paradigms, string columns are always treated as opaque values: each string is encoded or hashed into a single field element, and equality (and possibly non-equality) is the only supported string operation. As a result, wherever a benchmark query contains a string predicate, the predicate, the column, or the whole query is dropped. Strikingly, this includes the circuit-based systems, which could in principle express any NP statement in the circuit, but refrain from doing so because of the sheer complexity and efficiency concerns involved with the strings.
 
-\ifsp\begin{table*}[t]\else\begin{table}[t]\fi
+\ifsp\begin{table}[H]\else\begin{table}[H]\fi
 \centering
-\small
-\begin{tabular}{@{}l l l l@{}}
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.1}
+\begin{tabular}{@{}l l c c c@{}}
 \toprule
-System & Paradigm & String operations & String operations in TPC-H evaluation \\
+System & Paradigm & ZK & BB & WB \\
 \midrule
-IntegriDB~\cite{ZhangKC15} & authenticated data structures & $=$ & none evaluated \\
-qedb~\cite{qedb} & authenticated data structures & $=$ & none evaluated \\
-vSQL~\cite{ZhangGKPP17} & interactive proofs & $=$ & columns dropped, left to future work \\
-ZKSQL~\cite{LiWXWR23} & circuits & $=$ & \texttt{LIKE} predicate of Q9 omitted \\
-PoneglyphDB~\cite{GuFN25} & circuits & $=$ & \texttt{LIKE} predicate of Q9 omitted, as ZKSQL \\
-Proof of SQL~\cite{posql} & interactive proofs & $=$, $\neq$ & none evaluated \\
-$\truthtable$~\cite{cryptoeprint:2026/1260} & interactive proofs & $=$, $\neq$ & all but (in)equality removed \\
+IntegriDB~\cite{ZhangKC15} & ADS & \xmark & \xmark & \xmark \\
+qedb~\cite{qedb} & ADS & \xmark & \xmark & \xmark \\
+vSQL~\cite{ZhangGKPP17} & IP & \xmark & \xmark & \xmark \\
+ZKSQL~\cite{LiWXWR23} & circuits & \cmark & \cmark & \xmark \\
+PoneglyphDB~\cite{GuFN25} & circuits & \cmark & \cmark & \xmark \\
+Proof of SQL~\cite{posql} & PIOP & \xmark & \cmark & \xmark \\
+$\truthtable$~\cite{cryptoeprint:2026/1260} & PIOP & \xmark & \cmark & \xmark \\
 \midrule
-This work & interactive proofs & $=$, $\neq$, \texttt{LIKE}, ordering & all string operations supported \\
+This work & PIOP & \xmark & \cmark & \cmark \\
 \bottomrule
 \end{tabular}
-\caption{String support in verifiable database systems.}
+\caption{String support in verifiable database systems. ADS: authenticated data structures; IP: interactive proofs; PIOP: polynomial interactive oracle proofs; ZK: zero-knowledge; BB: black-box string operations, which treat strings as opaque values (e.g.\ $=$, $\neq$); WB: white-box string operations, which inspect their characters (e.g.\ \texttt{LIKE}).}
 \label{tab:prior-strings}
-\ifsp\end{table*}\else\end{table}\fi
+\ifsp\end{table}\else\end{table}\fi
 
 
 

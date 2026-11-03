@@ -167,7 +167,7 @@
 \newcommand{\lexlt}{\prec}                % lexicographic <
 \newcommand{\pad}[1]{\overline{#1}}       % string padded with the sentinel \bot to length L
 
-% System model and cc-SNARK syntax (sections/overview.tex), after TruthTable's notation
+% System model and cc-SNARK syntax (sections/tt_overview.tex), after TruthTable's notation
 \newcommand{\Server}{\mathcal{S}}
 \newcommand{\Client}{\mathcal{C}}
 \newcommand{\DataOwner}{\mathcal{D}}
@@ -188,3 +188,9 @@
 \newcommand{\pk}{\mathsf{pk}}
 \newcommand{\vk}{\mathsf{vk}}
 \newcommand{\ck}{\mathsf{ck}}
+
+% Table marks: green tick and red cross
+\definecolor{tickgreen}{RGB}{0,128,0}
+\definecolor{crossred}{RGB}{200,0,0}
+\newcommand{\cmark}{\textcolor{tickgreen}{\ding{51}}}
+\newcommand{\xmark}{\textcolor{crossred}{\ding{55}}}

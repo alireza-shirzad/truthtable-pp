@@ -44,7 +44,7 @@ We first evaluate a single \texttt{LIKE} predicate over a synthetic string colum
 \subsubsection{Number of Factors}
 \label{sec:eval-factors}
 
-We next study how the cost of pattern matching grows with the structure of the pattern. We fix the column and vary the number of factors $n_\zeta$ of a multi-character pattern $p_1\%p_2\%\cdots\%p_{n_\zeta}$ from $1$ to \ali{max}, keeping the factor lengths fixed.
+We next study how the cost of pattern matching grows with the structure of the pattern. We fix the column and vary the number of factors $n_\zeta$ of a pattern $p_1\%p_2\%\cdots\%p_{n_\zeta}$ with literal factors from $1$ to \ali{max}, keeping the factor lengths fixed.
 \ali{Plot: prover time, verifier time, and proof size against $n_\zeta$.}
 \ali{Discussion: each factor adds one sweep round (\cref{piop:sweep-factors}), so the prover cost should grow roughly linearly in $n_\zeta$; relate the slope to the per-factor terms of the cost model.}
 
