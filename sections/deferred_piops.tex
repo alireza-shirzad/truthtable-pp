@@ -320,6 +320,54 @@ The check splits the active rows according to $\mathsf{b}$ and runs a Sign Check
   \end{enumerate}
 \end{DefinePIOP}
 
+\subsection{Grouped Minimum Check}
+\label{sec:grp-min}
+The sweep of \cref{sec:piop-for-pattern-matching} repeatedly needs, for every string, two facts about a set of \emph{selected} characters: whether the string contains any selected character, and the position of the leftmost one. Relationally this is a \texttt{MIN GROUP BY} over the auxiliary character table,
+\begin{equation}\label{eq:grp-min-sql}
+\begin{array}{@{}l@{}}
+\sqlline{\sqlkw{SELECT} orig\_ind, \sqlkw{MIN}(int\_ind)}\\
+\sqlline{\ \ \sqlkw{FROM} s.aux\_chars}\\
+\sqlline{\ \sqlkw{WHERE} sel = 1}\\
+\sqlline{\ \sqlkw{GROUP BY} orig\_ind;}
+\end{array}
+\end{equation}
+where $\mathsf{sel}$ is a boolean char-level column chosen by the caller. The \emph{Grouped Minimum Check} takes a string column $\strcol$ with its char-level columns $\mathsf{orig\text{-}ind}, \mathsf{int\text{-}ind}$ and str-level index $\mathsf{ind}$, the selector $\mathsf{sel}$, and two str-level columns sent by the prover, $\mathsf{any}$ and $\mathsf{min}$, and proves that $\mathsf{any}[i] = \mathbf{1}[S_i \neq \emptyset]$ and $\mathsf{min}[i] = \min S_i$ whenever $S_i \neq \emptyset$ (and $\mathsf{min}[i]$ is unconstrained otherwise), where $S_i := \{\mathsf{int\text{-}ind}[c] : \mathsf{orig\text{-}ind}[c] = i,\ \mathsf{sel}[c] = 1\}$ is the set of selected positions of string $i$. It assumes that $\mathsf{sel}$ is boolean, that selected characters of one string have distinct positions, as the layout invariant of \cref{sec:layout-check} guarantees, that positions are below $2^\alpha$ for the given width $\alpha$ with $2^{\alpha+1} < |\F|$, and that the char-level activator of its Broadcast Checks covers every selected character. We package this as the relation
+\ifsp
+\begin{displaymath}
+\NPRelation_{\mathsf{GrpMin}} = \left\{\,
+  \begin{aligned}
+    & \NPInstance = \alpha,\\
+    & \NPInstancey = (\Oracle{\hat{\strcol}}, \Oracle{\MLE{\mathsf{sel}}}, \Oracle{\MLE{\mathsf{any}}}, \Oracle{\MLE{\mathsf{min}}}),\\
+    & \NPWitness = (\strcol, \mathsf{sel}, \mathsf{any}, \mathsf{min})\\[2pt]
+    & \text{s.t.}\ \forall i,\ \mathsf{any}[i] = \mathbf{1}[S_i \neq \emptyset]\ \text{and}\\
+    & \phantom{\text{s.t.}}\ \mathsf{any}[i] = 1 \implies \mathsf{min}[i] = \min S_i
+  \end{aligned}
+\,\right\}.
+\end{displaymath}
+\else
+\begin{displaymath}
+\NPRelation_{\mathsf{GrpMin}} = \left\{\,
+  \NPInstance = \alpha,\;
+  \NPInstancey = (\Oracle{\hat{\strcol}}, \Oracle{\MLE{\mathsf{sel}}}, \Oracle{\MLE{\mathsf{any}}}, \Oracle{\MLE{\mathsf{min}}}),\;
+  \NPWitness = (\strcol, \mathsf{sel}, \mathsf{any}, \mathsf{min})
+  \;\middle|\;
+    \forall i,\ \mathsf{any}[i] = \mathbf{1}[S_i \neq \emptyset]\ \wedge\ (\mathsf{any}[i] = 1 \implies \mathsf{min}[i] = \min S_i)
+\,\right\}.
+\end{displaymath}
+\fi
+The prover additionally sends a char-level \emph{marker} $\mathsf{mark}$ that is $1$ exactly at the selected character sitting at the minimum position of its string. Four facts then pin down the outputs: every selected character lies in a string with $\mathsf{any} = 1$ (no false negatives); every string with $\mathsf{any} = 1$ carries exactly one mark and every other string none, which is a \texttt{SUM GROUP BY} of $\mathsf{mark}$ against $\mathsf{any}$ and hence a \cref{piop:keyedsumcheck}; the mark of a string sits at position $\mathsf{min}$ of that string, which is a lookup of $(\mathsf{ind}, \mathsf{min})$ into $(\mathsf{orig\text{-}ind}, \mathsf{int\text{-}ind})$ restricted to marks; and no selected character precedes the mark of its string, which is a $\mathsf{NonNeg}$ sign check on $\mathsf{int\text{-}ind} - \mathsf{min}'$ over the selected characters, where $\mathsf{min}'$ is $\mathsf{min}$ broadcast to character level. The completeness and soundness of this gadget are proven in \cref{sec:proof-grp-min}.
+\begin{DefinePIOP}{Grouped Minimum Check}{grp-min}
+  \emph{Inputs:} the string column $\Oracle{\hat{\strcol}}$, giving $\Oracle{\MLE{\mathsf{orig\text{-}ind}}}$, $\Oracle{\MLE{\mathsf{int\text{-}ind}}}$, $\Oracle{\MLE{\mathsf{ind}}}$ and the activators of the Broadcast Checks; the selector $\Oracle{\MLE{\mathsf{sel}}}$; the width $\alpha$; and the outputs $\Oracle{\MLE{\mathsf{any}}}$, $\Oracle{\MLE{\mathsf{min}}}$ sent by $\PIOPProver$.
+  \begin{enumerate}[nosep]
+    \item $\PIOPProver$ sends the marker $\mathsf{mark}$ with $\mathsf{mark}[c] := \mathbf{1}[\mathsf{sel}[c] = 1 \ \text{and}\ \mathsf{int\text{-}ind}[c] = \mathsf{min}[\mathsf{orig\text{-}ind}[c]]]$.
+    \item $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:boolean-check} on $\mathsf{any}$ and on $\mathsf{mark}$, both over the whole hypercube.
+    \item (\emph{No false negatives}) $\PIOPProver$ broadcasts $\mathsf{any}$ to character level as $\mathsf{any}'$ via \cref{piop:broadcast}, and the parties invoke \cref{piop:zerocheck} on $\mathsf{sel}\mult(1-\mathsf{any}')$.
+    \item (\emph{One mark per group}) $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:zerocheck} on $\mathsf{mark}\mult(1-\mathsf{sel})$, and \cref{piop:keyedsumcheck} on the tables $(\act = \mathbf{1}, \key = \mathsf{orig\text{-}ind}, \val = \mathsf{mark})$ and $(\act = \mathbf{1}, \key = \mathsf{ind}, \val = \mathsf{any})$.
+    \item (\emph{Value}) $\PIOPVerifier$ samples $\gamma \samples \F$ and the parties invoke \cref{piop:lookup-check} on $(\mathsf{any},\ \mathsf{ind} + \gamma\,\mathsf{min}) \lookup (\mathsf{mark},\ \mathsf{orig\text{-}ind} + \gamma\,\mathsf{int\text{-}ind})$.
+    \item (\emph{Minimality}) $\PIOPProver$ broadcasts $\mathsf{min}$ to character level as $\mathsf{min}'$ via \cref{piop:broadcast}, and the parties invoke the $\mathsf{NonNeg}$ \cref{piop:sign-check} with width $\alpha$ on the column with activator $\mathsf{sel}$ and data $\mathsf{int\text{-}ind} - \mathsf{min}'$.
+  \end{enumerate}
+\end{DefinePIOP}
+
 \subsection{Keyed Sumcheck}
 The \emph{Keyed Sumcheck} takes two tables $\Left$ and $\Right$, each with a key column $\key$, a value column $\val$, and an activator column $\act$, and proves that for every possible key $\elem \in \F$, the sum of active values in $\Left$ with key $\elem$ equals the sum of active values in $\Right$ with key $\elem$. Define the keyed sums
 \ifsp

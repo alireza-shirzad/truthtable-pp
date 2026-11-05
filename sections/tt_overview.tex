@@ -18,32 +18,7 @@ These parties interact as follows.
 The preprocessing of \cref{sec:preprocessing} lives entirely in the first step: the fingerprint and rank columns are computed and committed by $\DataOwner$ together with the data, before it goes offline.
 
 \parhead{Definition of verifiable databases}
-Formally, a verifiable database system is a commit-carrying SNARK (cc-SNARK)~\cite{CampanelliFQ19} for the following ternary relation:
-{\small
-\begin{displaymath}
- \Relation{\SQL} = \left\{\,
-    (
-        \NPInstance = (\Query, \QueryResult),
-        \NPInstancey = \Database,
-        \NPWitness = \bot
-    )
-  \;\middle|\;
-  \QueryResult \in \ResultSet_\Query(\Database)
-\,\right\},
-\end{displaymath}
-}
-
-\noindent
-where $\ResultSet_\Query(\Database)$ denotes the set of valid query results for the query $\Query$ on the database $\Database$ with respect to SQL semantics.
-In a ternary relation, $\NPInstance$ denotes the explicit instance, $\NPInstancey$ the implicit instance, and $\NPWitness$ the witness; the distinction between explicit and implicit instances separates the parts of the instance that the cc-SNARK verifier reads entirely ($\NPInstance$) from those it reads only in committed form ($\NPInstancey$).
-The cc-SNARK algorithms specialized to this relation are:
-\begin{itemize}[nosep]
-    \item $\Setup(1^\lambda, N) \rightarrow (\pk, \vk, \ck)$, on input a database size $N$ and security parameter $\lambda$, outputs a prover key $\pk$, verifier key $\vk$, and commitment key $\ck$.
-    \item $\Commit(\ck, \Database) \rightarrow \DatabaseCM$, on input a database $\Database$, outputs a commitment $\DatabaseCM$ to the database.
-    \item $\Prove(\pk, \Database, \DatabaseCM, \Query, \QueryResult) \rightarrow \Proof_\Query$, on input a database $\Database$, the database commitment $\DatabaseCM$, a query $\Query$, and the query result $\QueryResult$, outputs a proof $\Proof_\Query$ that $\QueryResult$ is the result of executing $\Query$ on $\Database$.
-    \item $\Verify(\vk, \DatabaseCM, \Query, \QueryResult, \Proof_\Query) \rightarrow \{0,1\}$, on input a database commitment $\DatabaseCM$, a query $\Query$, a query result $\QueryResult$, and a proof $\Proof_\Query$, accepts if the proof is valid.
-\end{itemize}
-These algorithms must satisfy the standard completeness and knowledge-soundness properties of cc-SNARKs~\cite{CampanelliFQ19}; see \cref{sec:extended_preliminaries}.
+Formally, a verifiable database system is a commit-carrying SNARK (cc-SNARK)~\cite{CampanelliFQ19} for the relation $\Relation{\SQL}$ whose explicit instance is a query $\Query$ with a claimed result $\QueryResult$, whose implicit, committed instance is the database $\Database$, and which holds iff $\QueryResult \in \ResultSet_\Query(\Database)$, the set of valid results of $\Query$ on $\Database$ under SQL semantics. \Cref{sec:more-background} recalls the formal definition and the cc-SNARK algorithms specialized to this relation.
 
 \subsection{Construction Strategy}
 \label{sec:background:construction-strategy}
@@ -62,8 +37,7 @@ First, they invoke a parser to transform the query $\Query$ into a \emph{query p
 Next, both invoke the query planner and then the proof engine on the plan (\cref{sec:background-proof-engine}).
 
 A \textbf{query plan} $\QueryPlan$ for a query $\Query$ is a tree whose nodes represent relational operators (e.g.\ filter, join, limit) and whose edges represent the flow of data between them; edges into the leaves carry the input database tables, and the edge leaving the root carries the output table.
-\Cref{fig:example-qp} depicts the query plan obtained by parsing the query in \cref{fig:example-query}.
-The modular nature of plans makes protocol construction and analysis simpler: instead of $\Relation{\SQL}$, $\truthtable$ works with the relation
+Plans are modular, so instead of $\Relation{\SQL}$, $\truthtable$ works with the relation
 {\small
 \begin{displaymath}
  \Relation{\QueryPlan} = \left\{\,
@@ -79,33 +53,7 @@ The modular nature of plans makes protocol construction and analysis simpler: in
 }
 
 \noindent
-which is equivalent to $\Relation{\SQL}$ because a claimed output is the correct result of a query if and only if it is the result of executing the corresponding plan.
-
-\begin{figure}[htbp]
-\centering
-\begin{subfigure}[b]{0.56\linewidth}
-    \centering
-    \begin{lrbox}{\sqlbox}%
-\begin{lstlisting}[style=sql]
-SELECT * FROM users
- JOIN orders
-   ON users.id = orders.id
-WHERE orders.amount > 100;
-\end{lstlisting}
-    \end{lrbox}%
-    \usebox{\sqlbox}
-    \caption{Example SQL query.}
-    \label{fig:example-query}
-\end{subfigure}\hfill
-\begin{subfigure}[b]{0.42\linewidth}
-    \centering
-    \includegraphics[page=3, scale=0.5]{figures/cropped_figs.pdf}
-    \caption{Query plan}
-    \label{fig:example-qp}
-\end{subfigure}
-\caption{Query plan (b) for query (a).}
-\label{fig:pfqp}
-\end{figure}
+which is equivalent to $\Relation{\SQL}$, since a result is correct for a query iff it is correct for its plan.
 
 \subsection{Proof Engine}
 \label{sec:background-proof-engine}
@@ -129,8 +77,7 @@ Throughout, tables and columns are encoded as multilinear polynomials over the B
 A concrete table or column is written plainly as $\Table$ or $\col$, and its \emph{arithmetized} polynomial form carries a hat, $\hat{\Table}$ or $\hat{\col}$. A concrete object is indexed by integers in square brackets, as in $\col[i]$ or $\Table.\key[i]$ for $i \in [|\Table|]$, whereas its arithmetization is evaluated at hypercube points in parentheses, as in $\hat{\Table}.\key(x)$ for $x \in \BoolHCube{\mu}$.
 
 \parhead{Representing table data as field elements}
-$\truthtable$ maps each column into the prime field $\F$ according to its declared type. For all non-string types---integers, booleans, durations, intervals, dates, and timestamps---we follow $\truthtable$~\cite{cryptoeprint:2026/1260}, to which we refer the reader for the encodings.
-The encoding of strings as field elements is the subject of \cref{sec:string-arith}.
+$\truthtable$ maps each column into $\F$ according to its declared type; for all non-string types we follow its encodings~\cite{cryptoeprint:2026/1260}, and the encoding of strings is the subject of \cref{sec:string-arith}.
 
 \parhead{Columns}
 A column $\col$ of $n$ entries lives in $\BoolHCube{\mu}$ for any $\mu \ge \lceil \log_2 n \rceil$, and its arithmetization splits into two multilinear polynomials, $\hat{\col} := (\hat{\col}.\act,\, \hat{\col}.\data)$. The \emph{activator} $\hat{\col}.\act \colon \F^{\mu} \to \{0,1\}$ flags the $n$ \emph{active} indices---those carrying real rows rather than padding---while the \emph{data} polynomial $\hat{\col}.\data \colon \F^{\mu} \to \F$ holds the entries at those indices. Where the column is clear from context, we abbreviate the two to $\act$ and $\data$. Each is the multilinear extension (\cref{sec:prelims}) of the corresponding concrete vector, $\hat{\col}.\act = \MLE{\act}$ and $\hat{\col}.\data = \MLE{\data}$. Throughout, a tilde thus denotes the multilinear extension of a single vector, and a hat the arithmetization of a composite object, i.e.\ the tuple of the multilinear extensions of its parts: a column together with its activator, a table, or the string column of \cref{sec:string-arith}.

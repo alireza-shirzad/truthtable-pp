@@ -4,138 +4,16 @@
 \label{sec:our_techniques}
 
 
-The goal of this paper is to support white-box string operations, such as \texttt{LIKE} predicates and \texttt{ORDER BY} clauses over string columns, in a verifiable database. To give a few examples from the TPC-H benchmark, Q14 keeps the parts whose type starts with \texttt{PROMO} via \texttt{p\_type LIKE 'PROMO\%'}, Q9 keeps those whose name contains \texttt{green} via \texttt{p\_name LIKE '\%green\%'}, and Q2 sorts its result by the string columns \texttt{n\_name} and \texttt{s\_name}.
 
-\textbf{The first barrier is the representation itself:} $\truthtable$ arithmetizes a string column as a column of hashes, and a hash exposes nothing about the string it stands for, so no protocol can reason about the string's contents. Therefore, the first step is to design a new arithmetization that exposes the characters of the strings without losing the structure of the column (\cref{sec:arith-rationale}). Next, we explain how this arithmetization turns white-box string operations into relational operations over the characters, which $\truthtable$ already knows how to prove (\cref{sec:string-ops-relational}). Finally, we introduce two preprocessing techniques, carried out once by the data owner, that accelerate the resulting protocols (\cref{sec:preprocessing-overview}).
-
-\subsection{Towards a String-Friendly Arithmetization}
-\label{sec:arith-rationale}
-
-We keep the hash column of $\truthtable$ as \emph{the main string column}: a hash is a fine handle for equality and inequality, but whatever representation we choose beyond it, the protocols must be able to \emph{access the characters}. We build up such a representation step by step.
-
-\parhead{Exposing the characters} The most direct way to expose the characters is to write them all down: concatenate the strings of the column, in order, into a single column $\mathsf{char}$ of length $M$, the total number of characters. For the four-row column $(\texttt{apple},\texttt{orange},\texttt{cherry},\texttt{banana})$ of \cref{fig:string-arith-example}, $\mathsf{char}$ is the $23$-character column \texttt{appleorangecherrybanana}. Every character is now a field element in a committed column, and the protocols can read it. 
-
-\parhead{More auxiliary columns} What $\mathsf{char}$ alone does not tell is where one string ends and the next begins, or which string a given character belongs to: nothing in \texttt{appleorangecherrybanana} marks that \texttt{orange} starts at the sixth character. We restore this structure with two index columns of the same length $M$. The \emph{origin index} $\mathsf{orig\text{-}ind}$ records, for every character, the index of the string it belongs to, and the \emph{internal index} $\mathsf{int\text{-}ind}$ records its position inside that string, counting from $0$ (see \cref{fig:string-arith-example}). \Cref{sec:string-arith} completes this picture with the few further columns that our protocols need.
-
-\ifsp\begin{figure*}[tp]\else\begin{figure}[h!]\fi
-\centering
-% Text is set at the body font size: the picture is not rescaled; instead
-% the grid unit \u is chosen so the figure fits \textwidth.
-\ifsp\def\u{0.72}\else\def\u{0.67}\fi
-% one colour per string; text uses the full colour, cells a light tint
-\colorlet{applecol}{red!75!black}
-\colorlet{orangecol}{orange!90!black}
-\colorlet{cherrycol}{purple!85!black}
-\colorlet{bananacol}{olive}
-\begin{tikzpicture}[
-    x=\u cm, y=\u cm,
-    cell/.style={draw, minimum size=\u*6mm, inner sep=0pt},
-    rowlab/.style={font=\itshape, anchor=east},
-    hd/.style={font=\bfseries},
-    boxlab/.style={font=\itshape, align=center, anchor=north},
-    idx/.style={font=\scriptsize, gray}
-  ]
-
-  %==================== Panel 1: str-level columns ====================
-  \node[hd, anchor=west] at (-0.9,5.2) {$\mathsf{s}$};
-  \node[hd] at (2.1,5.2) {$\mathsf{a}$};
-  \node[hd] at (2.7,5.2) {$\mathsf{h}$};
-  \node[hd] at (4.4,5.2) {$\mathsf{l}$};
-  \node[hd] at (5.0,5.2) {$\mathsf{rk}$};
-
-  % i / string / length / a_h / rank ; row 2 ("cherry") is inactive.
-  % Ranks are dense ranks in lexicographic order: apple < banana < cherry < orange.
-  \foreach \i/\s/\ll/\ah/\rk/\col in {0/apple/5/1/0/applecol, 1/orange/6/1/3/orangecol, 2/cherry/6/0/2/cherrycol, 3/banana/6/1/1/bananacol}{
-    \pgfmathsetmacro{\yy}{4.6 - \i*0.6}
-    \node[font=\ttfamily, anchor=west, text=\col] at (-0.9,\yy) {\s};
-    \node[cell, fill=\col!15] at (2.1,\yy) {\ah};
-    \node[cell, fill=\col!15] at (2.7,\yy) {$h_{\i}$};
-    \node[cell, fill=\col!15] at (4.4,\yy) {\ll};
-    \node[cell, fill=\col!15] at (5.0,\yy) {\rk};
-  }
-
-  % dotted box bundling the main column (its activator and hash data)
-  \draw[black, thick, densely dotted, rounded corners=2pt] (1.75,5.7) rectangle (3.05,2.2);
-  \node[boxlab, anchor=north east, align=center] at (3.3,2.05) {main\\columns};
-
-  % dotted box around the str-level auxiliary columns (length, rank)
-  \draw[black, thick, densely dotted, rounded corners=2pt] (4.05,5.7) rectangle (5.35,2.2);
-  \node[boxlab, anchor=north west, align=center] at (3.35,2.05) {string-level\\aux.\ columns};
-
-  %==================== Panel 2: char-level columns (placed to the right) ====================
-  \begin{scope}[xshift=8.1*\u cm, yshift=5.2*\u cm]
-  % group (string) labels above the char row
-  \foreach \cx/\nm/\col in {2/apple/applecol, 7.5/orange/orangecol, 13.5/cherry/cherrycol, 19.5/banana/bananacol}{
-    \node[font=\ttfamily, text=\col] at (\cx*0.6, 1.55) {\nm};
-  }
-
-  % row labels
-  \node[rowlab] at (-0.5, 0.00){$\mathsf{char}$};
-  \node[rowlab] at (-0.5,-0.68){$\mathsf{orig\text{-}ind}$};
-  \node[rowlab] at (-0.5,-1.36){$\mathsf{int\text{-}ind}$};
-  \node[rowlab] at (-0.5,-2.04){$\mathsf{char\text{-}act}$};
-  \node[rowlab] at (-0.5,-2.72){$\mathsf{bnd}$};
-
-  % position indices (set smaller than the body text)
-  \foreach \x in {0,...,22}{\node[idx] at (\x*0.6,0.85) {\x};}
-
-  % pos / char / orig / o / a_c / s_b ; cherry (orig 2) is inactive so a_c=0 there.
-  \foreach \x/\ch/\og/\oo/\ac/\sb in {
-     0/a/0/0/1/1,  1/p/0/1/1/0,  2/p/0/2/1/0,  3/l/0/3/1/0,  4/e/0/4/1/0,
-     5/o/1/0/1/1,  6/r/1/1/1/0,  7/a/1/2/1/0,  8/n/1/3/1/0,  9/g/1/4/1/0, 10/e/1/5/1/0,
-    11/c/2/0/0/1, 12/h/2/1/0/0, 13/e/2/2/0/0, 14/r/2/3/0/0, 15/r/2/4/0/0, 16/y/2/5/0/0,
-    17/b/3/0/1/1, 18/a/3/1/1/0, 19/n/3/2/1/0, 20/a/3/3/1/0, 21/n/3/4/1/0, 22/a/3/5/1/0}{
-    \pgfmathsetmacro{\px}{\x*0.6}
-    \edef\gc{\ifcase\og applecol\or orangecol\or cherrycol\or bananacol\fi}
-    \node[cell, fill=\gc!15] at (\px, 0.00) {\texttt{\ch}};
-    \node[cell, fill=\gc!15] at (\px,-0.68) {\og};
-    \node[cell, fill=\gc!15] at (\px,-1.36) {\oo};
-    \node[cell, fill=\gc!15] at (\px,-2.04) {\ac};
-    \node[cell, fill=\gc!15] at (\px,-2.72) {\sb};
-  }
-
-  % padding tail: one padding slot, an ellipsis, then the final index
-  % (31 = last cell of the size-32 hypercube that M=23 pads up to).
-  \node[idx] at (23*0.6,0.85) {23};
-  \foreach \yy in {0.00,-0.68,-1.36,-2.04,-2.72}{
-    \node[cell] at (23*0.6,\yy) {0};
-  }
-  \foreach \yy in {0.00,-0.68,-1.36,-2.04,-2.72}{
-    \node[font=\scriptsize] at (24*0.6,\yy) {$\cdots$};
-  }
-  \node[idx] at (25*0.6,0.85) {31};
-  \foreach \yy in {0.00,-0.68,-1.36,-2.04,-2.72}{
-    \node[cell] at (25*0.6,\yy) {0};
-  }
-
-  % dotted box around the char-level auxiliary columns
-  \draw[black, thick, densely dotted, rounded corners=2pt] (-2.45,0.50) rectangle (15.4,-3.19);
-  \node[boxlab] at (6.25,-3.34) {character-level auxiliary columns};
-  \end{scope}
-
-\end{tikzpicture}
-\caption{String arithmetization of a four-row column
-$\strcol=(\texttt{apple},\texttt{orange},\texttt{cherry},\texttt{banana})$ with
-\texttt{cherry} inactive.}
-\label{fig:string-arith-example}
-\ifsp\end{figure*}\else\end{figure}\fi
 
 \subsection{String Operations as Relational Operations}
 \label{sec:string-ops-relational}
 
-Giving the protocols access to every character is only the first benefit of the encoding of \cref{sec:arith-rationale}. It turns out to be a particularly good encoding for a second reason: it lets us express most string operations as common \emph{relational} operations like \texttt{Filter, Join, GroupBy,etc}, which is exactly what $\truthtable$ knows how to prove.
+
 
 \parhead{Strings as relations} The triple $(\mathsf{orig\text{-}ind}, \mathsf{int\text{-}ind}, \mathsf{char})$ is an ordinary relational table with one row per character, which we call the \emph{auxiliary character table} and write $\strcol.\mathsf{aux\_chars}$; the hash column with the string index forms the \emph{main table} $\strcol.\mathsf{main}$, with one row per string, and the string-level auxiliary columns, such as the length $\mathsf{l}$, form the \emph{auxiliary string table} $\strcol.\mathsf{aux\_strs}$ over the same rows. In the auxiliary character table, $\mathsf{orig\text{-}ind}$ is a foreign key into the main table and $(\mathsf{orig\text{-}ind}, \mathsf{int\text{-}ind})$ is a primary key. Once a string is a set of $(\text{string}, \text{position}, \text{character})$ rows, the operations that are opaque on the hash column become plain SQL. 
 
-\parhead{Pattern matching is a filter and a join} Start with the simplest pattern, the one-character prefix \texttt{a\%}. A string matches iff its first character is an \texttt{a}, that is, iff its character rows contain one with $\mathsf{int\text{-}ind}=0$ and $\mathsf{char}=\texttt{a}$. Over the auxiliary character table this is a plain filter:
-\begin{equation}\label{eq:like-as-filter}
-\begin{array}{@{}l@{}}
-\sqlline{\sqlkw{SELECT} orig\_ind}\\
-\sqlline{\ \ \sqlkw{FROM} s.aux\_chars}\\
-\sqlline{\ \sqlkw{WHERE} int\_ind = 0 \sqlkw{AND} char = 'a';}
-\end{array}
-\end{equation}
-Now make the pattern a little harder: \texttt{a\%b}, a one-character prefix and a one-character suffix with anything in between. The suffix has to know where the string ends, so we record each string's length $\mathsf{l}$ in the auxiliary string table. The two characters live in two different rows of the auxiliary character table, so the query joins two copies of it on the string they belong to, pins the \texttt{a} to the first position and the \texttt{b} to the last one, and asks that the \texttt{b} come strictly after the \texttt{a}:
+\parhead{Pattern matching is a filter and a join} Take the pattern \texttt{a\%b}, a one-character prefix and a one-character suffix with anything in between. A string matches iff its character rows contain an \texttt{a} with $\mathsf{int\text{-}ind}=0$ and a \texttt{b} at the last position; the suffix has to know where the string ends, so we record each string's length $\mathsf{l}$ in the auxiliary string table. The two characters live in two different rows of the auxiliary character table, so the query joins two copies of it on the string they belong to, pins the \texttt{a} to the first position and the \texttt{b} to the last one, and asks that the \texttt{b} come strictly after the \texttt{a}:
 \begin{equation}\label{eq:like-as-join}
 \begin{array}{@{}l@{}}
 \sqlline{\sqlkw{SELECT} m.ind}\\
@@ -146,7 +24,7 @@ Now make the pattern a little harder: \texttt{a\%b}, a one-character prefix and 
 \sqlline{\ \ \ \sqlkw{AND} y.int\_ind > x.int\_ind;}
 \end{array}
 \end{equation}
-The three ingredients of the general case are all visible here. The auxiliary string table supplies the length, which is how a suffix knows where the string ends. Each literal character is one copy of $\strcol.\mathsf{aux\_chars}$, tied to its string by $\mathsf{orig\text{-}ind}$ and pinned to a position by $\mathsf{int\text{-}ind}$; a longer factor such as \texttt{ab\%} just adds a copy for the \texttt{b} pinned to position $1$, and a \_ skips a position, so \texttt{a\_c\%} pins the \texttt{c} to position $2$ and says nothing about position $1$. Finally, the \% is the inequality on the last line: it lets the suffix sit anywhere after the prefix without overlapping it, and with more factors there is one such inequality between each consecutive pair. In every case the result is an equi-join of $\strcol.\mathsf{aux\_chars}$ with one copy per literal character, a filter on the characters, and a projection onto the string index, i.e.\ a \texttt{GROUP BY orig\_ind}, to obtain one bit per string.
+The general case has the same three ingredients. Each literal character is one more copy of $\strcol.\mathsf{aux\_chars}$, tied to its string by $\mathsf{orig\text{-}ind}$ and pinned to a position by $\mathsf{int\text{-}ind}$, so \texttt{ab\%} adds a copy for the \texttt{b} at position $1$ and a \_ simply skips a position; the length lets a suffix find the end of the string; and each \% becomes an inequality between the positions of consecutive factors, as on the last line. The result is always an equi-join of $\strcol.\mathsf{aux\_chars}$ with one copy per literal character, a filter on the characters, and a projection onto the string index, i.e.\ a \texttt{GROUP BY orig\_ind}, to obtain one bit per string. Matching a pattern by joining one copy of a table per symbol of the pattern is the same construction that query engines use, over rows rather than characters, to pre-filter row-pattern queries~\cite{ZhuHC23}.
 
 \parhead{Ordering is a join followed by an aggregate} Two strings compare lexicographically at the first position where they differ. Take \texttt{apple} and \texttt{apricot}, held in rows $i$ and $j$ of the column. Joining their character rows position by position and keeping the pairs whose characters differ leaves positions $2$ (\texttt{p} vs.\ \texttt{r}), $3$ and $4$; the first of them decides:
 \begin{equation}\label{eq:order-as-join}

@@ -1,0 +1,410 @@
+\section{Protocols for Pattern Matching}
+\label{sec:pattern-matching}
+
+In this section we build a protocol for \emph{wild-card} pattern matching, the most common white-box string operation in SQL workloads, where it appears as a predicate written with the \texttt{LIKE} operator. The protocol receives the committed column $\strcol^{\mathsf{old}}$, with its tables $\strcol.\mathsf{main}$, $\strcol.\mathsf{aux\_strs}$ and $\strcol.\mathsf{aux\_chars}$, and a column $\strcol^{\mathsf{new}}$ in which the prover has deactivated exactly the strings that do not match the pattern; it must convince the verifier that no matching string was dropped and no non-matching string was kept. 
+
+In \cref{sec:patterns and factors} we fix the notation for patterns and their factors. In \cref{sec:pm-as-query} we show that matching a pattern is equivalent to running a series of relational queries over the auxiliary tables of the column, each of which $\truthtable$ could prove as is. We do not run those queries, however, in \cref{sec:queries-to-protocols} we apply a sequence of standard query optimizations to them and present the resulting protocol, which executes the same relational operators without materializing a single intermediate table.
+
+
+\subsection{Patterns and Factors}
+\label{sec:patterns and factors}
+A pattern may use two wild-cards, the variable-length \texttt{\%}, which matches any run of zero or more characters (e.g.\ \texttt{ab\%bd\%ef}), and the fixed-length \texttt{\_}, which matches exactly one character (e.g.\ \texttt{a\_c}), alone or combined (e.g.\ \texttt{a\_b\%ef}). Splitting at the \% signs we denote every pattern by $\zeta = p_1 \% p_2 \% \dots \% p_{n_\zeta}$ with $n_\zeta \ge 1$ and $p_i \in (\Sigma \cup \{\text{\_}\})^{+}$, optionally preceded and followed by a further \%; the $p_i$ are the \emph{factors} of $\zeta$. Each factor is a pair $p_j=(\mathsf{str}_j,\mathsf{mode}_j)$: its literal content $\mathsf{str}_j$, of length $\ell_j:=|\mathsf{str}_j|$ counting each \_ as one character, and a mode $\mathsf{mode}_j\in\{\mathsf{prefix},\mathsf{infix},\mathsf{suffix},\mathsf{exact}\}$ recording where it may occur: $\mathsf{exact}$ for the single factor of a \%-free pattern, which must cover the whole string, $\mathsf{prefix}$ for the first factor if the pattern does not begin with \%, $\mathsf{suffix}$ for the last if it does not end with \%, and $\mathsf{infix}$ otherwise.
+
+
+
+
+\ifsp\begin{figure*}[tp]\else\begin{figure}[t]\fi
+\centering
+\ifsp\def\u{0.57}\else\def\u{0.45}\fi
+\colorlet{applecol}{red!75!black}
+\colorlet{orangecol}{orange!90!black}
+\colorlet{cherrycol}{purple!85!black}
+\colorlet{bananacol}{olive}
+\begin{tikzpicture}[
+    x=\u cm, y=\u cm,
+    cell/.style={draw, minimum size=\u*6mm, inner sep=0pt},
+    dim/.style={fill=gray!8, text=gray!55, draw=gray!50},
+    rowlab/.style={font=\itshape, anchor=east},
+    hd/.style={font=\bfseries},
+    ohd/.style={font=\bfseries\scriptsize},
+    rnd/.style={font=\bfseries\small, anchor=west},
+    hit/.style={draw=black, very thick, rounded corners=1pt},
+    arr/.style={-{Latex[length=2mm]}, thick},
+    arrlab/.style={font=\small, align=center},
+    bigbox/.style={draw=black!60, rounded corners=4pt, line width=0.6pt}
+  ]
+
+  %==================== Row 1, left: the string column and the predicate ====================
+  \node[hd] at (0,0) {$\mathsf{ind}$};
+  \node[hd, anchor=west] at (0.6,0) {$\strcol$};
+  \node[hd] at (3.7,0) {$\mathsf{a}$};
+  \foreach \i/\s/\ah/\col in {0/apple/1/applecol, 1/orange/1/orangecol, 2/cherry/0/cherrycol, 3/banana/1/bananacol}{
+    \pgfmathsetmacro{\yy}{-0.7*(\i+1)}
+    \node[cell, fill=\col!15] at (0,\yy) {\i};
+    \node[font=\ttfamily, anchor=west, text=\col] at (0.6,\yy) {\s};
+    \node[cell, fill=\col!15] at (3.7,\yy) {\ah};
+  }
+
+  %==================== Row 1, middle: Anchor_0 ====================
+  \draw[rounded corners=2pt, gray!70] (6.0,0.5) rectangle (8.4,-3.3);
+  \node[ohd] at (6.6,0) {$\mathsf{ind}$};
+  \node[ohd] at (7.8,0) {$\mathsf{start}_0$};
+  \foreach \i/\col/\dd in {0/applecol/0, 1/orangecol/0, 2/cherrycol/1, 3/bananacol/0}{
+    \pgfmathsetmacro{\yy}{-0.7*(\i+1)}
+    \ifnum\dd=1
+      \node[cell, dim] at (6.6,\yy) {\i};
+      \node[cell, dim] at (7.8,\yy) {0};
+    \else
+      \node[cell, fill=\col!15] at (6.6,\yy) {\i};
+      \node[cell, fill=\col!15] at (7.8,\yy) {0};
+    \fi
+  }
+  \node[font=\bfseries\scriptsize, anchor=south west] at (6.0,0.6) {$\Anchor{0}$};
+
+  %==================== Row 1, right: the character table ====================
+  \begin{scope}[xshift=13.4*\u cm, yshift=-0.5*\u cm]
+  \node[font=\bfseries\small, anchor=south west] at (-0.5,0.55) {$\strcol.\mathsf{aux\_chars}$};
+  \draw[rounded corners=2pt, gray!70] (-0.5,0.5) rectangle (13.7,-1.86);
+  \node[rowlab] at (-0.65, 0.00){$\mathsf{orig\_ind}$};
+  \node[rowlab] at (-0.65,-0.68){$\mathsf{int\_ind}$};
+  \node[rowlab] at (-0.65,-1.36){$\mathsf{char}$};
+  \foreach \x/\og/\pp/\ch/\dd in {
+     0/0/0/a/0, 1/0/1/p/0, 2/0/2/p/0, 3/0/3/l/0, 4/0/4/e/0,
+     5/1/0/o/0, 6/1/1/r/0, 7/1/2/a/0, 8/1/3/n/0, 9/1/4/g/0, 10/1/5/e/0,
+     11/2/0/c/1, 12/2/1/h/1, 13/2/2/e/1, 14/2/3/r/1, 15/2/4/r/1, 16/2/5/y/1,
+     17/3/0/b/0, 18/3/1/a/0, 19/3/2/n/0, 20/3/3/a/0, 21/3/4/n/0, 22/3/5/a/0}{
+    \pgfmathsetmacro{\px}{\x*0.6}
+    \edef\gc{\ifcase\og applecol\or orangecol\or cherrycol\or bananacol\fi}
+    \ifnum\dd=1
+      \node[cell, dim] at (\px, 0.00) {\og};
+      \node[cell, dim] at (\px,-0.68) {\pp};
+      \node[cell, dim] at (\px,-1.36) {\texttt{\ch}};
+    \else
+      \node[cell, fill=\gc!15] at (\px, 0.00) {\og};
+      \node[cell, fill=\gc!15] at (\px,-0.68) {\pp};
+      \node[cell, fill=\gc!15] at (\px,-1.36) {\texttt{\ch}};
+    \fi
+  }
+  % greedy placements after the two rounds: an (solid), ana (dashed)
+  \draw[hit] (7*0.6-0.3,-1.06) rectangle (8*0.6+0.3,-1.66);
+  \draw[hit] (18*0.6-0.3,-1.06) rectangle (19*0.6+0.3,-1.66);
+  \draw[hit, densely dashed] (20*0.6-0.3,-1.06) rectangle (22*0.6+0.3,-1.66);
+  \node[font=\small\itshape] at (19.5*0.6,-2.2) {placed: \texttt{an} (solid), \texttt{ana} (dashed)};
+  \end{scope}
+
+
+  %==================== Row 2, left: Round 1 ====================
+  \begin{scope}[xshift=2.6*\u cm, yshift=-6.9*\u cm]
+  \node[font=\bfseries\small, anchor=south west] at (-0.5,0.55) {$W_2$};
+  \draw[rounded corners=2pt, gray!70] (-0.5,0.5) rectangle (11.3,-2.54);
+  \node[rowlab] at (-0.65, 0.00){$\mathsf{orig\_ind}$};
+  \node[rowlab] at (-0.65,-0.68){$\mathsf{int\_ind}$};
+  \node[rowlab] at (-0.65,-1.36){$c_0$};
+  \node[rowlab] at (-0.65,-2.04){$c_1$};
+  % last field: 1 = inactive in this round (dimmed)
+  \foreach \x/\og/\pp/\ca/\cb/\dd in {
+     0/0/0/a/p/0, 1/0/1/p/p/0, 2/0/2/p/l/0, 3/0/3/l/e/0,
+     4/1/0/o/r/0, 5/1/1/r/a/0, 6/1/2/a/n/0, 7/1/3/n/g/0, 8/1/4/g/e/0,
+     9/2/0/c/h/1, 10/2/1/h/e/1, 11/2/2/e/r/1, 12/2/3/r/r/1, 13/2/4/r/y/1,
+     14/3/0/b/a/0, 15/3/1/a/n/0, 16/3/2/n/a/0, 17/3/3/a/n/0, 18/3/4/n/a/0}{
+    \pgfmathsetmacro{\px}{\x*0.6}
+    \edef\gc{\ifcase\og applecol\or orangecol\or cherrycol\or bananacol\fi}
+    \ifnum\dd=1
+      \node[cell, dim] at (\px, 0.00) {\og};
+      \node[cell, dim] at (\px,-0.68) {\pp};
+      \node[cell, dim] at (\px,-1.36) {\texttt{\ca}};
+      \node[cell, dim] at (\px,-2.04) {\texttt{\cb}};
+    \else
+      \node[cell, fill=\gc!15] at (\px, 0.00) {\og};
+      \node[cell, fill=\gc!15] at (\px,-0.68) {\pp};
+      \node[cell, fill=\gc!15] at (\px,-1.36) {\texttt{\ca}};
+      \node[cell, fill=\gc!15] at (\px,-2.04) {\texttt{\cb}};
+    \fi
+  }
+  \foreach \x in {6,15,17}{
+    \pgfmathsetmacro{\px}{\x*0.6}
+    \draw[hit] (\px-0.3,0.3) rectangle (\px+0.3,-2.34);
+    \node[font=\footnotesize] at (\px,-2.85) {$=\texttt{an}$};
+  }
+  \foreach \x in {6,15}{\node[font=\small\itshape] at (\x*0.6,-3.35) {leftmost};}
+  \draw[arr] (0.9,-2.65) -- (0.9,-3.75) node[arrlab, midway, left=2pt] {\cref{eq:round-query}};
+  \begin{scope}[yshift=-4.4*\u cm]
+  \draw[rounded corners=2pt, gray!70] (0.0,0.6) rectangle (2.4,-3.0);
+  \node[font=\bfseries\scriptsize, anchor=north] at (1.2,-3.05) {$\Anchor{1}$};
+  \node[ohd] at (0.6,0.3) {$\mathsf{ind}$};
+  \node[ohd] at (1.8,0.3) {$\mathsf{start}_1$};
+  % fields: i/start/color/inactive/in-anchor
+  \foreach \i/\st/\col/\dd/\ia in {0/\textendash/applecol/0/0, 1/2/orangecol/0/1, 2/\textendash/cherrycol/1/0, 3/1/bananacol/0/1}{
+    \pgfmathsetmacro{\yy}{-0.4-0.7*\i}
+    \ifnum\dd=1
+      \node[cell, dim] at (0.6,\yy) {\i};
+      \node[cell, dim] at (1.8,\yy) {\st};
+    \else
+      \ifnum\ia=1
+        \node[cell, fill=\col!15] at (0.6,\yy) {\i};
+        \node[cell, fill=\col!15] at (1.8,\yy) {\st};
+      \else
+        \node[cell, dim] at (0.6,\yy) {\i};
+        \node[cell, dim] at (1.8,\yy) {\st};
+      \fi
+    \fi
+  }
+  \end{scope}
+  \end{scope}
+
+  %==================== Row 2, right: Round 2 ====================
+  \begin{scope}[xshift=19.6*\u cm, yshift=-6.9*\u cm]
+  \node[font=\bfseries\small, anchor=south west] at (-0.5,0.55) {$W_3$};
+  \draw[rounded corners=2pt, gray!70] (-0.5,0.5) rectangle (8.9,-3.22);
+  \node[rowlab] at (-0.65, 0.00){$\mathsf{orig\_ind}$};
+  \node[rowlab] at (-0.65,-0.68){$\mathsf{int\_ind}$};
+  \node[rowlab] at (-0.65,-1.36){$c_0$};
+  \node[rowlab] at (-0.65,-2.04){$c_1$};
+  \node[rowlab] at (-0.65,-2.72){$c_2$};
+  % last field: 1 = excluded from this round (dimmed)
+  \foreach \x/\og/\pp/\ca/\cb/\cc/\dd in {
+     0/0/0/a/p/p/1, 1/0/1/p/p/l/1, 2/0/2/p/l/e/1,
+     3/1/0/o/r/a/1, 4/1/1/r/a/n/1, 5/1/2/a/n/g/1, 6/1/3/n/g/e/1,
+     7/2/0/c/h/e/1, 8/2/1/h/e/r/1, 9/2/2/e/r/r/1, 10/2/3/r/r/y/1,
+     11/3/0/b/a/n/1, 12/3/1/a/n/a/1, 13/3/2/n/a/n/1, 14/3/3/a/n/a/0}{
+    \pgfmathsetmacro{\px}{\x*0.6}
+    \edef\gc{\ifcase\og applecol\or orangecol\or cherrycol\or bananacol\fi}
+    \ifnum\dd=1
+      \node[cell, dim] at (\px, 0.00) {\og};
+      \node[cell, dim] at (\px,-0.68) {\pp};
+      \node[cell, dim] at (\px,-1.36) {\texttt{\ca}};
+      \node[cell, dim] at (\px,-2.04) {\texttt{\cb}};
+      \node[cell, dim] at (\px,-2.72) {\texttt{\cc}};
+    \else
+      \node[cell, fill=\gc!15] at (\px, 0.00) {\og};
+      \node[cell, fill=\gc!15] at (\px,-0.68) {\pp};
+      \node[cell, fill=\gc!15] at (\px,-1.36) {\texttt{\ca}};
+      \node[cell, fill=\gc!15] at (\px,-2.04) {\texttt{\cb}};
+      \node[cell, fill=\gc!15] at (\px,-2.72) {\texttt{\cc}};
+    \fi
+  }
+  \draw[hit] (14*0.6-0.3,0.3) rectangle (14*0.6+0.3,-3.02);
+  \node[font=\footnotesize] at (14*0.6,-3.55) {$=\texttt{ana}$};
+  \node[font=\small\itshape] at (14*0.6,-4.05) {leftmost};
+  \draw[arr] (1.2,-3.35) -- (1.2,-4.35) node[arrlab, midway, right=2pt] {\cref{eq:round-query}};
+  \begin{scope}[yshift=-5.0*\u cm]
+  \draw[rounded corners=2pt, gray!70] (0.0,0.6) rectangle (2.4,-3.0);
+  \node[font=\bfseries\scriptsize, anchor=north] at (1.2,-3.05) {$\Anchor{2}$};
+  \node[ohd] at (0.6,0.3) {$\mathsf{ind}$};
+  \node[ohd] at (1.8,0.3) {$\mathsf{start}_2$};
+  % fields: i/start/color/inactive/in-anchor
+  \foreach \i/\st/\col/\dd/\ia in {0/\textendash/applecol/1/0, 1/\textendash/orangecol/0/0, 2/\textendash/cherrycol/1/0, 3/3/bananacol/0/1}{
+    \pgfmathsetmacro{\yy}{-0.4-0.7*\i}
+    \ifnum\dd=1
+      \node[cell, dim] at (0.6,\yy) {\i};
+      \node[cell, dim] at (1.8,\yy) {\st};
+    \else
+      \ifnum\ia=1
+        \node[cell, fill=\col!15] at (0.6,\yy) {\i};
+        \node[cell, fill=\col!15] at (1.8,\yy) {\st};
+      \else
+        \node[cell, dim] at (0.6,\yy) {\i};
+        \node[cell, dim] at (1.8,\yy) {\st};
+      \fi
+    \fi
+  }
+  \end{scope}
+  \end{scope}
+
+  %==================== Round 1 -> Round 2 ====================
+
+  %==================== The three big boxes ====================
+  \draw[bigbox] (-0.6,1.3) rectangle (30.3,-3.5);
+  \node[rnd, anchor=south west] at (-0.6,1.35) {Round 0: Input};
+  \draw[bigbox] (-0.6,-5.3) rectangle (14.1,-15.8);
+  \node[rnd, anchor=south west] at (-0.6,-5.25) {Round 1: $p_1=(\texttt{an},\mathsf{infix})$};
+  \draw[bigbox] (15.6,-5.3) rectangle (30.3,-15.8);
+  \node[rnd, anchor=south west] at (15.6,-5.25) {Round 2: $p_2=(\texttt{ana},\mathsf{infix})$};
+
+  %==================== Arrows between the boxes ====================
+  \draw[arr] (6.75,-3.5) -- (6.75,-5.3) node[arrlab, midway, right=2pt] {};
+  \draw[arr] (14.1,-10.55) -- (15.6,-10.55);
+  \node[arrlab, anchor=south, font=\scriptsize] at (14.85,-10.4) {};
+
+\end{tikzpicture}
+\caption{Greedy matching of \texttt{s LIKE '\%an\%ana\%'} on a four-row column, as the queries of \cref{sec:pm-as-query}}
+\label{fig:query-plan-example}
+\ifsp\end{figure*}\else\end{figure}\fi
+
+\subsection{Pattern Matching as a Relational Query}
+\label{sec:pm-as-query}
+
+The character-based string arithmetization introduced in \cref{sec:string-arith} is particularly usefull because it allows us to translate white-box string operations to a series of relational queries over the auxiliary tables. For example, the single-factor pattern \texttt{a\%}, which keeps the strings that start with \texttt{a}, becomes a filter on the character table joined back to the main table,
+\begin{equation}\label{eq:one-factor-filter}
+\begin{array}{@{}l@{}}
+\sqlline{\sqlkw{SELECT} m.*}\\
+\sqlline{\ \ \sqlkw{FROM} s.main m, s.aux\_chars x}\\
+\sqlline{\ \sqlkw{WHERE} x.orig\_ind = m.ind}\\
+\sqlline{\ \ \ \sqlkw{AND} x.int\_ind = 0 \sqlkw{AND} x.char = 'a';}
+\end{array}
+\end{equation}
+
+Crucially, filters, joins and aggregates are exactly the common relational operations that $\truthtable$ already knows how to prove, so every such query comes with a protocol for free.
+
+The relational view on string operations is classical in database theory: \ali{TODO for Ryan}
+
+
+
+
+\parhead{The relational perspective} Pattern matching admits several relational formulations; we adopt the one that is most convenient to prove.
+We view a pattern matching query of the form
+\begin{equation}\label{eq:like-query}
+\begin{array}{@{}l@{}}
+\sqlline{\sqlkw{SELECT} *}\\
+\sqlline{\ \ \sqlkw{FROM} s.main}\\
+\sqlline{\ \sqlkw{WHERE} s \sqlkw{LIKE} '$p_1$\%$p_2$\%$\cdots$\%$p_{n_\zeta}$';}
+\end{array}
+\end{equation}
+as a series of relational queries over the auxiliary tables of \cref{sec:string-arith}, one per factor $p_i$. Each relational query, in turn, tries to place one factor at the leftmost position after the previous factor. If \emph{all} the trials succeed, meaning that every factor is placed, then the string is a match; otherwise, it is not.
+
+\parhead{Anchor Table} The output of the $j$-th turn is an \emph{anchor table} $\Anchor{j}$ that keeps track of the position in that string at which $p_j$ was placed. $\Anchor{j}$ has two columns: $\mathsf{ind}$, the index of the string, and $\mathsf{start}_j$, the position in that string at which $p_j$ was placed. A string appears in $\Anchor{j}$ only if $p_j$ could be placed in it after the position recorded in $\Anchor{j-1}$; if it could not, the string is dropped and never returns in later rounds. $\Anchor{0}$ starts with all $0$ for all the strings.
+\begin{equation}\label{eq:r-zero}
+\begin{array}{@{}l@{}}
+\sqlline{$\Anchor{0}$ :=}\\
+\sqlline{\sqlkw{SELECT} ind, 0 \sqlkw{AS} start$_0$}\\
+\sqlline{\ \ \sqlkw{FROM} s.main;}
+\end{array}
+\end{equation}
+The query to produce $\Anchor{j}$ for factor $p_j=(\mathsf{str}_j,\mathsf{mode}_j)$, of length $\ell_j$ is as follows:
+\begin{equation}\label{eq:round-query}
+\begin{array}{@{}l@{}}
+\sqlline{$\Anchor{j}$ :=}\\
+\sqlline{\sqlkw{SELECT} w.orig\_ind \sqlkw{AS} ind,}\\
+\sqlline{\ \ \ \ \ \ \ \sqlkw{MIN}(w.int\_ind) \sqlkw{AS} start$_j$}\\
+\sqlline{\ \ \sqlkw{FROM} $W_{\ell_j}$ w, $\Anchor{j-1}$ r}\\
+\sqlline{\ \sqlkw{WHERE} r.ind = w.orig\_ind}\\
+\sqlline{\ \ \ \sqlkw{AND} (w.c$_0$,\dots,w.c$_{\ell_j-1}$) = str$_j$}\\
+\sqlline{\ \ \ \sqlkw{AND} w.int\_ind >= r.start$_{j-1}$ + $\ell_{j-1}$}\\
+\sqlline{\ \ \ \sqlkw{AND} $\langle$mode predicate$\rangle$}\\
+\sqlline{\ \sqlkw{GROUP BY} w.orig\_ind;}
+\end{array}
+\end{equation}
+See the sample anchor tables in \cref{fig:query-plan-example}. 
+Notice that a string absent from $\Anchor{j-1}$ is also absent from $\Anchor{j}$ as well; i.e.  on $\mathsf{ind}$, $\Anchor{1}\supseteq \Anchor{2}\supseteq\dots\supseteq \Anchor{n_\zeta}$.
+
+Our recipe for building the anchor tables (\cref{eq:r-zero}) needs \emph{window tables} as an ingredient.
+
+\parhead{Window Table} To find a factor of length $\ell$, we have to look at $\ell$ consecutive characters at a time, so we treat a \emph{window} of $\ell$ characters, rather than a single character, as the unit of comparison. The window table $W_\ell$ lists all such windows: it has one row per position of every string, which records the string index ($\mathsf{orig\_ind}$), the starting position ($\mathsf{int\_ind}$) and the $\ell$ characters that start there ($c_0,\dots,c_{\ell-1}$). A factor occurs at a position iff the window starting there spells it, which is the equality \cref{eq:round-query} tests.
+
+
+
+
+
+In SQL, $W_\ell$ is a self-join of $\strcol.\mathsf{aux\_chars}$ with $\ell$ copies of itself, one per window column, aligned on the string and on consecutive positions (\cref{fig:query-plan-example}):
+\begin{equation}\label{eq:window-table}
+\begin{array}{@{}l@{}}
+\sqlline{\sqlkw{SELECT} x$_0$.orig\_ind, x$_0$.int\_ind,}\\
+\sqlline{\ \ \ \ \ \ \ x$_0$.char \sqlkw{AS} c$_0$, \dots,}\\
+\sqlline{\ \ \ \ \ \ \ x$_{\ell-1}$.char \sqlkw{AS} c$_{\ell-1}$}\\
+\sqlline{\ \ \sqlkw{FROM} s.aux\_chars x$_0$, \dots,}\\
+\sqlline{\ \ \ \ \ \ \ s.aux\_chars x$_{\ell-1}$}\\
+\sqlline{\ \sqlkw{WHERE} x$_\delta$.orig\_ind = x$_0$.orig\_ind}\\
+\sqlline{\ \ \ \sqlkw{AND} x$_\delta$.int\_ind = x$_0$.int\_ind + $\delta$}\\
+\sqlline{\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \text{for all } $\delta=1,\dots,\ell-1$;}
+\end{array}
+\end{equation}
+See the sample window tables in \cref{fig:query-plan-example}.
+
+\parhead{The Final Step} By definition of $\Anchor{j}$, the strings in $\Anchor{n_\zeta}$ are exactly those in which every factor was placed. The final filtered string column is therefore the main table semi-joined with the last output,
+\begin{equation}\label{eq:final-filter}
+\begin{array}{@{}l@{}}
+\sqlline{\sqlkw{SELECT} m.*}\\
+\sqlline{\ \ \sqlkw{FROM} s.main m}\\
+\sqlline{\ \sqlkw{WHERE} m.ind \sqlkw{IN} (\sqlkw{SELECT} ind \sqlkw{FROM} $\Anchor{n_\zeta}$);}
+\end{array}
+\end{equation}
+
+Hence, we converted a pattern matching query like \cref{eq:like-query} to at most $2n_\zeta+2$ queries with common relational operators such as $\texttt{Join}$, $\texttt{Semi-Join}$, $\texttt{GroupBy}$, etc.
+We could stop here because $\truthtable$ supports each of these operators as it is, and chaining the $n_\zeta$ rounds yields a complete and sound protocol for pattern matching with no further work.
+
+\parhead{Cost of the generic approach} 
+The downside of using such a generic approach is the cost.
+TruthTable materializes the output of every \texttt{Join} and \texttt{Group By} as a fresh committed table and proves it against its input, so each round would commit the (a) window table, (b) the result of the join with the factor, and (c) the aggregate, all over the character-level hypercube which can potentially be large.
+The window table is the worst of the three: it is an $\ell_j$-fold self-join of the character table, so building it costs $\ell_j-1$ generic join proofs, each materializing another character-level table, and this repeats for every distinct factor length. Over the whole pattern the black-box route commits $\Theta(n_\zeta\,\ell_{\max})$ intermediate tables and proves each against its predecessor.
+
+\subsection{From Relational Queries to Protocols}
+\label{sec:queries-to-protocols}
+
+Our protocol instead proves the relational queries of \cref{sec:pm-as-query} without materializing a single intermediate table, and adds a few further optimizations that speed up the prover. Its overall flow, however, still follows those queries step by step.
+
+\subsubsection{Main Protocol}
+\Cref{piop:pm-plan} is the entry point of our protocol, and it mirrors the queries of \cref{sec:pm-as-query} one to one: it first forms $\Anchor{0}$ (\cref{eq:r-zero}) in \cref{qp:filter}, then runs the rounds of \cref{eq:round-query} through \cref{piop:rounds-plan} in \cref{qp:rounds}, and finally decides as in \cref{eq:final-filter} in \cref{qp:containment,qp:verdict}, comparing the strings that survived every round with the prover's output column.
+Note that two optimizations are visible in this protocol, which we describe next.
+
+\parhead{Length Filtering} Notice that the difference between the $\Anchor{0}$ of \cref{qp:filter} and the $\Anchor{0}$ of \cref{eq:r-zero} is that ours is filtered by length: it keeps only the strings of length at least $L_\zeta$ (exactly $L_\zeta$ for an exact pattern). We do this because no string shorter than $L_\zeta$ can ever match the pattern, so we do them up front. Moreover, for reasons described in \XXX, our protocol requires the length filtering for soundness.
+
+\parhead{Selection vectors instead of materialization} \Cref{qp:validity,qp:containment,qp:verdict} never touch a table, only activators. Every operator in the plan whose output is a subset of the rows of its input, that is, every filter, including the join with the one-row factor table and the conjunction at the end, outputs a boolean \emph{activator} over the same physical table instead of a new table. This is the selection-vector technique of vectorized engines: rows are never copied, only marked. A filter then costs a single zerocheck for its predicate plus the containment condition $\mathsf{a}^{\mathsf{new}}\cdot(1-\mathsf{a}^{\mathsf{old}})=0$, which says that it only deactivates rows, and consecutive filters compose by multiplying their activators.
+
+\parhead{Activator Consistency} The price of only updating the activators is that the verifier has to check that the str-level and char-level activators are consistent with each other. In other words, a filter that drops a string must drop its characters as well. We develope the helper protocol \hyperref[{piop:data-preserving-update-check}]{Data-Preserving Update Check} for this exact purpose.
+
+
+\begin{DefinePIOP}{Pattern Matching}{pm-plan}[Pattern Matching]
+  \emergencystretch=3em\relax
+  \emph{Inputs:} the pattern $\zeta$; the input column $\Oracle{\hat{\strcol}^{\mathsf{old}}}$ and the output column $\Oracle{\hat{\strcol}^{\mathsf{new}}}$, each with all of its main and auxiliary oracles.
+  \vspace{2mm}
+  \begin{enumerate}[nosep]
+    \item\label[step]{qp:parse} $\PIOPProver$ and $\PIOPVerifier$ parse $\Oracle{\hat{\strcol}^{\mathsf{old}}}$ and $\Oracle{\hat{\strcol}^{\mathsf{new}}}$ into their main and auxiliary oracles.
+    \item \label[step]{qp:filter}To first filter the strings based on their lengths, $\PIOPProver$ sends the length-filtered activators $\mathsf{a^{old'}}$ and $\mathsf{char\text{-}act^{old'}}$, which with the remaining oracles of $\Oracle{\hat{\strcol}^{\mathsf{old}}}$ form the filtered column $\Oracle{\hat{\strcol}^{\mathsf{old'}}}$, and the parties invoke \cref{piop:len-filter} on $(\Oracle{\hat{\strcol}^{\mathsf{old}}}, \Oracle{\hat{\strcol}^{\mathsf{old'}}})$ with threshold $k=L_\zeta$, in its exact variant if $\mathsf{mode}_1=\mathsf{exact}$.
+    \item \label[step]{qp:containment} To check that no new row was introduced in this protocol,  $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:zerocheck} on $\mathsf{a^{new}}\cdot(1-\mathsf{a^{old'}})$.
+    \item\label[step]{qp:rounds}To greedily place the factors one by one, $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:rounds-plan} on $(\zeta,\Oracle{\hat{\strcol}^{\mathsf{old'}}})$, obtaining the final string-level activator $\mathsf{alive_h}$, which marks the strings of $\Anchor{n_\zeta}$.
+    \item \label[step]{qp:verdict} \relq{\cref{eq:final-filter}: $\mathsf{ind}\in \Anchor{n_\zeta}$} $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:zerocheck} on $\mathsf{a^{new}}-\mathsf{alive_h}$.
+    \item \label[step]{qp:validity}  To make sure that the string- and character-level activators are consistent, $\PIOPProver$ and $\PIOPVerifier$ invoke \cref{piop:data-preserving-update-check} on $\strcol^{\mathsf{new}}$.
+  \end{enumerate}
+\end{DefinePIOP}
+
+
+\begin{DefinePIOP}{Rounds}{rounds-plan}[Rounds]
+  \emergencystretch=3em\relax
+  \emph{Inputs:} the pattern $\zeta$ with its factors $p_j=(\mathsf{str}_j,\mathsf{mode}_j)$ of lengths $\ell_j$, and the length-filtered column $\Oracle{\hat{\strcol}^{\mathsf{old'}}}$ with all of its oracles. Throughout, $\mu$ is the dimension of the char-level hypercube, $\alpha_L$ the bit width of the length column, and every \cref{piop:broadcast} is activated by $\mathsf{char\text{-}act^{old'}}$ on the character side.
+  \vspace{2mm}
+  \begin{enumerate}[nosep]
+    \item (\emph{Parse})\label[step]{qr:parse} $\PIOPProver$ and $\PIOPVerifier$ parse $\Oracle{\hat{\strcol}^{\mathsf{old'}}}$ into its main and auxiliary oracles.
+    \item (\emph{Initialization})\label[step]{qr:init} \relq{$\Anchor{0}$ of \cref{eq:r-zero}} $\PIOPProver$ and $\PIOPVerifier$ set $\mathsf{alive_h^{(0)}}:=\mathsf{a^{old'}}$ and $\mathsf{alive_c^{(0)}}:=\mathsf{char\text{-}act^{old'}}$: every string is in $\Anchor{0}$ and, since $\mathsf{start}_0+\ell_0=0$, every one of its characters is an admissible window start. They then prepare the data shared by all rounds:
+    \begin{enumerate}[nosep]
+      \item (\textit{Window tables})\label[step]{qr:rot} \relq{$W_\ell$ of \cref{eq:window-table}, as rotations} writing $\ell_{\max}:=\max_j\ell_j$, $\PIOPProver$ sends the rotated character columns $\mathsf{char}^{(1)},\dots,\mathsf{char}^{(\ell_{\max}-1)}$, where $\mathsf{char}^{(0)}:=\mathsf{char}$ and $\mathsf{char}^{(\delta)}[p]=\mathsf{char}[p+\delta]$, and for $\delta=1,\dots,\ell_{\max}-1$ the parties invoke \cref{piop:rotcheck} on $(\mathsf{char}^{(\delta-1)},\mathsf{char}^{(\delta)},-1)$ with length $2^{\mu}$; column $c_\delta$ of every $W_\ell$ is then $\mathsf{char}^{(\delta)}$. $\PIOPVerifier$ samples $r_0,\dots,r_{\ell_{\max}-1}\samples\F$.
+      \item (\textit{Lengths at character level})\label[step]{qr:len} \relq{join with $\strcol.\mathsf{aux\_strs}$ for $l$} $\PIOPProver$ broadcasts $\mathsf{l}$ to character level as $\mathsf{l}'$ via \cref{piop:broadcast}, for use by the mode predicate.
+    \end{enumerate}
+    \item (\emph{Sweep})\label[step]{qr:sweep} \relq{$\Anchor{j}:=$ \cref{eq:round-query}} for $j=1,\dots,n_\zeta$ in order, $\PIOPProver$ and $\PIOPVerifier$ carry out the following on the region delimited by $\mathsf{alive_h^{(j-1)}}$ and $\mathsf{alive_c^{(j-1)}}$:
+    \begin{enumerate}[nosep]
+      \item (\textit{Round query})\label[step]{qr:round} \relq{body of \cref{eq:round-query}} the parties invoke \cref{piop:round-plan} on $(p_j, \mathsf{alive_h^{(j-1)}}, \mathsf{alive_c^{(j-1)}}, \{\Oracle{\MLE{\mathsf{char}^{(\delta)}}}\}_{\delta<\ell_j},\allowbreak (r_\delta)_{\delta<\ell_j}, \Oracle{\MLE{\mathsf{bnd}}}, \Oracle{\MLE{\mathsf{orig\text{-}ind}}}, \Oracle{\MLE{\mathsf{int\text{-}ind}}}, \Oracle{\MLE{\mathsf{ind}}}, \Oracle{\MLE{\mathsf{l}'}})$, obtaining $\mathsf{match}_j$, the bit that marks the strings of $\Anchor{j}$, and $\mathsf{start}_j$;
+      \item (\textit{Past-placement indicator})\label[step]{qr:past} \relq{$\mathsf{int\_ind}\ge r.\mathsf{start}_j+\ell_j$ of round $j+1$} $\PIOPProver$ broadcasts $\mathsf{start}_j$ to character level as $\mathsf{start}_j'$ via \cref{piop:broadcast} and sends $\mathsf{past}_j$ with $\mathsf{past}_j[c]=\mathbf{1}[\mathsf{int\text{-}ind}[c]\ge\mathsf{start}_j'[c]+\ell_j]$; the parties invoke \cref{piop:cmp-indicator} with width $\alpha_L$ on the column with activator $\mathsf{alive_c^{(j-1)}}$ and data $\mathsf{int\text{-}ind}-\mathsf{start}_j'-\ell_j$, with $\mathsf{past}_j$ as the indicator;
+      \item (\textit{Updating the activators})\label[step]{qr:update} \relq{membership in $\Anchor{j}$: $\mathsf{alive}^{(j)}=\mathsf{alive}^{(j-1)}\cdot\mathsf{match}_j$} $\PIOPProver$ and $\PIOPVerifier$ set $\mathsf{alive_h^{(j)}}:=\mathsf{alive_h^{(j-1)}}\cdot\mathsf{match}_j$, $\PIOPProver$ broadcasts it to character level as $\mathsf{alive_h^{(j)}}'$ via \cref{piop:broadcast} and forms $\mathsf{alive_c^{(j)}}:=\mathsf{alive_c^{(j-1)}}\cdot\mathsf{alive_h^{(j)}}'\cdot\mathsf{past}_j$, and the parties invoke \cref{piop:zerocheck} on $\mathsf{alive_c^{(j)}}-\mathsf{alive_c^{(j-1)}}\cdot\mathsf{alive_h^{(j)}}'\cdot\mathsf{past}_j$.
+    \end{enumerate}
+    \item (\emph{Output})\label[step]{qr:output} after the $n_\zeta$ rounds, $\PIOPProver$ and $\PIOPVerifier$ output $\mathsf{alive_h^{(n_\zeta)}}$.
+  \end{enumerate}
+\end{DefinePIOP}
+
+\parhead{A clustered layout} \Cref{qr:rot} builds no window table. The layout invariant of \cref{sec:layout-check}, which places the active characters of every string in consecutive cells in order of $\mathsf{int\text{-}ind}$, is a \emph{clustered index} on the primary key $(\mathsf{orig\text{-}ind},\mathsf{int\text{-}ind})$. Under a clustered index the $\ell$ columns of $W_\ell$ are not a self-join but a sliding window over the physical order: column $c_\delta$ of the window starting at cell $c$ is the character in cell $c+\delta$, so it is the rotation of $\mathsf{char}$ by $\delta$. The rotated columns $\mathsf{char}^{(\delta)}$ are proven once with a \hyperref[{piop:rotcheck}]{Rotation Check} per shift and shared by all rounds, and no table is materialized. The same index turns the position predicates of \cref{eq:round-query}, in \cref{qr:past} and in \cref{rq:mode} below, into integer arithmetic on $\mathsf{int\text{-}ind}$ and $l$, each proven by one \hyperref[{piop:zero-indicator}]{Zero} or \hyperref[{piop:cmp-indicator}]{Comparison Indicator Check}, a selection with an equality or an inequality predicate. Whenever such a predicate needs a per-string attribute at the character level, the length $l$ in \cref{qr:len} or the placement $\mathsf{start}_j$ in \cref{qr:past}, the plan performs the key--foreign-key join $\strcol.\mathsf{aux\_chars}\bowtie\strcol.\mathsf{main}$ on $\mathsf{orig\text{-}ind}=\mathsf{ind}$; this is the \hyperref[{piop:broadcast}]{Broadcast Check}, the only join the optimized plan executes, and being a key--foreign-key join it costs a single lookup. The index is verified once, by the \hyperref[{piop:layout-check}]{Layout Check}, when a column is committed or rebuilt, and the selection-vector technique guarantees that pattern matching never disturbs it.
+
+\begin{DefinePIOP}{Round Query}{round-plan}[Round Query]
+  \emergencystretch=3em\relax
+  \emph{Inputs:} $p=(\mathsf{str},\mathsf{mode})$ with $\ell=|\mathsf{str}|$ and wild-card offsets $W=\{\delta:\mathsf{str}[\delta]=\text{\_}\}$; the activators $\Oracle{\MLE{\mathsf{a}}}$ and $\Oracle{\MLE{\mathsf{char\text{-}act}}}$ of the current round; the rotated character columns $\{\Oracle{\MLE{\mathsf{char}^{(\delta)}}}\}_{\delta<\ell}$ and coefficients $r_0,\dots,r_{\ell-1}$; $\Oracle{\MLE{\mathsf{bnd}}}, \Oracle{\MLE{\mathsf{orig\text{-}ind}}}, \Oracle{\MLE{\mathsf{int\text{-}ind}}}, \Oracle{\MLE{\mathsf{ind}}}$; and the char-level length column $\Oracle{\MLE{\mathsf{l}'}}$. Every \cref{piop:broadcast} below is activated by $\mathsf{char\text{-}act}$ on the character side, and the indicator and sign checks use the width $\alpha_L$ of \cref{piop:rounds-plan}.
+  \vspace{1mm}
+
+  \noindent\emph{Output:} the string-level match indicator $\mathsf{match}$ and placement $\mathsf{start}$.
+  \vspace{2mm}
+  \begin{enumerate}[nosep]
+    \item (\textit{Join with the previous round})\label[step]{rq:join} \relq{\texttt{FROM} $\Anchor{j-1}$ \texttt{r WHERE r.ind = w.orig\_ind AND w.int\_ind >= r.start$_{j-1}$ + $\ell_{j-1}$}} nothing is proven here: the input activators $\mathsf{a}$ and $\mathsf{char\text{-}act}$ are $\mathsf{alive}^{(j-1)}$, which \cref{qr:update} of the previous round certified to mark exactly the strings of $\Anchor{j-1}$ and, at character level, their cells at or after $\mathsf{start}_{j-1}+\ell_{j-1}$.
+    \item (\textit{Windows})\label[step]{rq:window} \relq{\texttt{FROM} $W_\ell$ \texttt{w}, hashed} the parties form $\mathsf{wf}:=\sum_{\delta\in[0,\ell)\setminus W} r_\delta\,\mathsf{char}^{(\delta)}$, the fingerprint of the window starting at every cell, $\mathsf{pf}:=\sum_{\delta\in[0,\ell)\setminus W} r_\delta\,\mathsf{str}[\delta]$, that of the factor, and $\mathsf{diff}:=\mathsf{wf}-\mathsf{pf}$; these are virtual linear combinations and cost no commitment.
+    \item (\textit{Mode predicate})\label[step]{rq:mode} \relq{$\langle$mode predicate$\rangle$ of \cref{eq:round-query}} the parties form the boolean $\mathsf{att\_mask}$, which is $1$ exactly at the alive characters from which a window of length $\ell$ may start according to $\mathsf{mode}$:
+    \begin{enumerate}[nosep]
+      \item \emph{prefix} and \emph{exact} ($\mathsf{int\_ind}=0$): $\mathsf{att\_mask}:=\mathsf{char\text{-}act}\cdot\mathsf{bnd}$, the first character of every alive string; the length filter of \cref{qp:filter} guarantees that the window fits and, in the exact mode, covers the string;
+      \item \emph{suffix} ($\mathsf{int\_ind}+\ell=l$): $\PIOPProver$ sends $\mathsf{end}$ with $\mathsf{end}[c]=\mathbf{1}[\mathsf{int\text{-}ind}[c]+\ell=\mathsf{l}'[c]]$; the parties invoke \cref{piop:zero-indicator} on the column with activator $\mathsf{char\text{-}act}$ and data $\mathsf{int\text{-}ind}+\ell-\mathsf{l}'$, with $\mathsf{end}$ as the indicator, and set $\mathsf{att\_mask}:=\mathsf{char\text{-}act}\cdot\mathsf{end}$;
+      \item \emph{infix} ($\mathsf{int\_ind}+\ell\le l$): $\PIOPProver$ sends $\mathsf{fits}$ with $\mathsf{fits}[c]=\mathbf{1}[\mathsf{int\text{-}ind}[c]+\ell\le\mathsf{l}'[c]]$; the parties invoke \cref{piop:cmp-indicator} with width $\alpha_L$ on the column with activator $\mathsf{char\text{-}act}$ and data $\mathsf{l}'-\mathsf{int\text{-}ind}-\ell$, with $\mathsf{fits}$ as the indicator, and set $\mathsf{att\_mask}:=\mathsf{char\text{-}act}\cdot\mathsf{fits}$.
+    \end{enumerate}
+    Since the characters of every string occupy consecutive cells in $\mathsf{int\text{-}ind}$ order (\cref{sec:layout-check}), a window starting at a character of $\mathsf{att\_mask}$ reads only characters of that string, and the rotations of \cref{qr:rot} never wrap around for it.
+    \item (\textit{Equality with the factor})\label[step]{rq:occurs} \relq{\texttt{WHERE (w.c$_0$,\dots,w.c$_{\ell-1}$) = str}} $\PIOPProver$ sends $\mathsf{occurs}$, which is $1$ at the start of every occurrence of $\mathsf{str}$ among the admissible windows; the parties invoke \cref{piop:zero-indicator} on the column with activator $\mathsf{att\_mask}$ and data $\mathsf{diff}$, with $\mathsf{occurs}$ as the indicator, and \cref{piop:zerocheck} on $\mathsf{occurs}\cdot(1-\mathsf{att\_mask})$.
+    \item (\textit{Leftmost placement})\label[step]{rq:placement} \relq{\texttt{SELECT orig\_ind, MIN(int\_ind) \dots\ GROUP BY orig\_ind}} $\PIOPProver$ sends the string-level $\mathsf{match}$ and $\mathsf{start}$, and the parties invoke \cref{piop:grp-min} with width $\alpha_L$ on $\Oracle{\hat{\strcol}}$ with selector $\mathsf{occurs}$ and outputs $(\mathsf{match},\mathsf{start})$, which certifies that $\mathsf{match}[i]=1$ iff string $i$ has an occurrence and that $\mathsf{start}[i]$ is the position of its leftmost one.
+  \end{enumerate}
+\end{DefinePIOP}
+
+\parhead{Folding the public pattern} \Cref{rq:window,rq:occurs} perform the join with the factor without a join. The factor table has one public row, so the join is a selection with a constant, and comparing $\ell_j$ characters at once is done by hashing: the verifier samples $r_0,\dots,r_{\ell_j-1}$ and both parties form the \emph{fingerprint} $\mathsf{wf}:=\sum_\delta r_\delta\,\mathsf{char}^{(\delta)}$ of every window and $\mathsf{pf}:=\sum_\delta r_\delta\,\mathsf{str}_j[\delta]$ of the factor, dropping the terms of the \_ positions. This is a hash join whose hash function is the random linear combination, with the Schwartz--Zippel lemma bounding the collision probability. Since the fingerprints are virtual linear combinations of committed columns, the join costs no commitment, and the selection $\mathsf{wf}=\mathsf{pf}$ is one Zero Indicator Check over the windows admitted by the mode predicate.
+
+\parhead{Aggregates by witness} \Cref{rq:placement} is the \texttt{MIN GROUP BY}. Rather than sorting, the prover supplies the answer, the pair $(\mathsf{match}_j,\mathsf{start}_j)$ per string, and proves it as an aggregate is proven in a database audit: a witness row, which a \hyperref[{piop:lookup-check}]{Lookup Check} shows to be a selected character of the right string, i.e.\ a referential-integrity check, and a universal bound, which a \hyperref[{piop:sign-check}]{Sign Check} shows to be respected by every selected character of that string. Together with a \hyperref[{piop:keyedsumcheck}]{Keyed Sumcheck} for the existence bit, this is the \hyperref[{piop:grp-min}]{Grouped Minimum Check} of \cref{sec:grp-min}.
+
+We close with two remarks. First, nothing in the optimized plan is specific to the protocol being a proof system: a vectorized database engine evaluating \cref{eq:round-query} over a clustered character table would run the same operators in the same order, and in fact no engine evaluates a multi-wild-card \texttt{LIKE} as a join, although joins over a pattern's symbols do serve as pre-filters for row-pattern queries~\cite{ZhuHC23}; an engine evaluates it as the chain of correlated leftmost-occurrence subqueries that the rounds implement. The single fact that lives outside relational algebra is that the greedy placement is complete, which we argued above. Second, the savings over the generic plan are structural rather than constant-factor: the generic plan commits $\Theta(n_\zeta\,\ell_{\max})$ intermediate tables over the character-level hypercube and proves each against its predecessor, whereas the optimized plan commits $\ell_{\max}-1$ rotated columns and, per round, a handful of boolean columns, checked by the claims counted in \cref{sec:preprocessing-overview}. The remaining cost is dominated by the size of the character-level hypercube itself, which is what the preprocessing of \cref{sec:preprocessing} removes.

@@ -2,8 +2,114 @@
 \doclearpage
 \section{String Arithmetization}
 \label{sec:string-arith}
+Our goal int this paper is to design protocols for \emph{white-box} string operations and the first barrier that we encounter is that $\truthtable$ arithmetizes a string column as a column of hashes, which are inherently \emph{black-box}. A hash exposes nothing about the string it stands for, so no protocol can reason about the string's contents. Therefore, the first step is to design a new arithmetization that exposes the characters of the string columns.
 
-We now formally describe how we arithmetize a string-typed column, following the intuition of \cref{sec:arith-rationale}. This string arithmetization is a contribution of our work, and is designed so that the PIOP protocols of the following sections can operate directly on the contents of the strings. We keep the hash column $(\act,\mathsf{h})$ of $\truthtable$ as \emph{the main string column}, and view it as the $\strcol.\mathsf{main}$. To this we add \emph{auxiliary string columns}, which come in two types with two different lengths:
+\ifsp\begin{figure*}[tp]\else\begin{figure}[h!]\fi
+\centering
+% Text is set at the body font size: the picture is not rescaled; instead
+% the grid unit \u is chosen so the figure fits \textwidth.
+\ifsp\def\u{0.72}\else\def\u{0.67}\fi
+% one colour per string; text uses the full colour, cells a light tint
+\colorlet{applecol}{red!75!black}
+\colorlet{orangecol}{orange!90!black}
+\colorlet{cherrycol}{purple!85!black}
+\colorlet{bananacol}{olive}
+\begin{tikzpicture}[
+    x=\u cm, y=\u cm,
+    cell/.style={draw, minimum size=\u*6mm, inner sep=0pt},
+    rowlab/.style={font=\itshape, anchor=east},
+    hd/.style={font=\bfseries},
+    boxlab/.style={font=\itshape, align=center, anchor=north},
+    idx/.style={font=\scriptsize, gray}
+  ]
+
+  %==================== Panel 1: str-level columns ====================
+  \node[hd, anchor=west] at (-0.9,5.2) {$\mathsf{s}$};
+  \node[hd] at (2.1,5.2) {$\mathsf{a}$};
+  \node[hd] at (2.7,5.2) {$\mathsf{h}$};
+  \node[hd] at (4.4,5.2) {$\mathsf{l}$};
+  \node[hd] at (5.0,5.2) {$\mathsf{rk}$};
+
+  % i / string / length / a_h / rank ; row 2 ("cherry") is inactive.
+  % Ranks are dense ranks in lexicographic order: apple < banana < cherry < orange.
+  \foreach \i/\s/\ll/\ah/\rk/\col in {0/apple/5/1/0/applecol, 1/orange/6/1/3/orangecol, 2/cherry/6/0/2/cherrycol, 3/banana/6/1/1/bananacol}{
+    \pgfmathsetmacro{\yy}{4.6 - \i*0.6}
+    \node[font=\ttfamily, anchor=west, text=\col] at (-0.9,\yy) {\s};
+    \node[cell, fill=\col!15] at (2.1,\yy) {\ah};
+    \node[cell, fill=\col!15] at (2.7,\yy) {$h_{\i}$};
+    \node[cell, fill=\col!15] at (4.4,\yy) {\ll};
+    \node[cell, fill=\col!15] at (5.0,\yy) {\rk};
+  }
+
+  % dotted box bundling the main column (its activator and hash data)
+  \draw[black, thick, densely dotted, rounded corners=2pt] (1.75,5.7) rectangle (3.05,2.2);
+  \node[boxlab, anchor=north east, align=center] at (3.3,2.05) {main\\columns};
+
+  % dotted box around the str-level auxiliary columns (length, rank)
+  \draw[black, thick, densely dotted, rounded corners=2pt] (4.05,5.7) rectangle (5.35,2.2);
+  \node[boxlab, anchor=north west, align=center] at (3.35,2.05) {string-level\\aux.\ columns};
+
+  %==================== Panel 2: char-level columns (placed to the right) ====================
+  \begin{scope}[xshift=8.1*\u cm, yshift=5.2*\u cm]
+  % group (string) labels above the char row
+  \foreach \cx/\nm/\col in {2/apple/applecol, 7.5/orange/orangecol, 13.5/cherry/cherrycol, 19.5/banana/bananacol}{
+    \node[font=\ttfamily, text=\col] at (\cx*0.6, 1.55) {\nm};
+  }
+
+  % row labels
+  \node[rowlab] at (-0.5, 0.00){$\mathsf{char}$};
+  \node[rowlab] at (-0.5,-0.68){$\mathsf{orig\text{-}ind}$};
+  \node[rowlab] at (-0.5,-1.36){$\mathsf{int\text{-}ind}$};
+  \node[rowlab] at (-0.5,-2.04){$\mathsf{char\text{-}act}$};
+  \node[rowlab] at (-0.5,-2.72){$\mathsf{bnd}$};
+
+  % position indices (set smaller than the body text)
+  \foreach \x in {0,...,22}{\node[idx] at (\x*0.6,0.85) {\x};}
+
+  % pos / char / orig / o / a_c / s_b ; cherry (orig 2) is inactive so a_c=0 there.
+  \foreach \x/\ch/\og/\oo/\ac/\sb in {
+     0/a/0/0/1/1,  1/p/0/1/1/0,  2/p/0/2/1/0,  3/l/0/3/1/0,  4/e/0/4/1/0,
+     5/o/1/0/1/1,  6/r/1/1/1/0,  7/a/1/2/1/0,  8/n/1/3/1/0,  9/g/1/4/1/0, 10/e/1/5/1/0,
+    11/c/2/0/0/1, 12/h/2/1/0/0, 13/e/2/2/0/0, 14/r/2/3/0/0, 15/r/2/4/0/0, 16/y/2/5/0/0,
+    17/b/3/0/1/1, 18/a/3/1/1/0, 19/n/3/2/1/0, 20/a/3/3/1/0, 21/n/3/4/1/0, 22/a/3/5/1/0}{
+    \pgfmathsetmacro{\px}{\x*0.6}
+    \edef\gc{\ifcase\og applecol\or orangecol\or cherrycol\or bananacol\fi}
+    \node[cell, fill=\gc!15] at (\px, 0.00) {\texttt{\ch}};
+    \node[cell, fill=\gc!15] at (\px,-0.68) {\og};
+    \node[cell, fill=\gc!15] at (\px,-1.36) {\oo};
+    \node[cell, fill=\gc!15] at (\px,-2.04) {\ac};
+    \node[cell, fill=\gc!15] at (\px,-2.72) {\sb};
+  }
+
+  % padding tail: one padding slot, an ellipsis, then the final index
+  % (31 = last cell of the size-32 hypercube that M=23 pads up to).
+  \node[idx] at (23*0.6,0.85) {23};
+  \foreach \yy in {0.00,-0.68,-1.36,-2.04,-2.72}{
+    \node[cell] at (23*0.6,\yy) {0};
+  }
+  \foreach \yy in {0.00,-0.68,-1.36,-2.04,-2.72}{
+    \node[font=\scriptsize] at (24*0.6,\yy) {$\cdots$};
+  }
+  \node[idx] at (25*0.6,0.85) {31};
+  \foreach \yy in {0.00,-0.68,-1.36,-2.04,-2.72}{
+    \node[cell] at (25*0.6,\yy) {0};
+  }
+
+  % dotted box around the char-level auxiliary columns
+  \draw[black, thick, densely dotted, rounded corners=2pt] (-2.45,0.50) rectangle (15.4,-3.19);
+  \node[boxlab] at (6.25,-3.34) {character-level auxiliary columns};
+  \end{scope}
+
+\end{tikzpicture}
+\caption{String arithmetization of a four-row column
+$\strcol=(\texttt{apple},\texttt{orange},\texttt{cherry},\texttt{banana})$ with
+\texttt{cherry} inactive.}
+\label{fig:string-arith-example}
+\ifsp\end{figure*}\else\end{figure}\fi
+
+
+
+As shown in \cref{fig:string-arith-example}, we keep the hash column $(\act,\mathsf{h})$ of $\truthtable$ as \emph{the main string column}, and view it as the $\strcol.\mathsf{main}$. To this we add \emph{auxiliary string columns}, which come in two types with two different lengths:
 
 \parhead{Type 1: String-level auxiliary columns} These are columns of length $N$---the length of the main column, with one entry per string. Together with the activator $\mathsf{a}$ and the index column $\mathsf{ind}$ of the main table, which they share, they form the \emph{auxiliary string table} $\strcol.\mathsf{aux\_strs}$:
 \begin{itemize}[nosep]

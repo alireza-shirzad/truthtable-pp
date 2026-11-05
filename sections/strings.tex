@@ -10,8 +10,8 @@ A string matches $\zeta$ iff the factors occur in it \emph{in order} and \emph{w
 
  Each factor $p_j$ is of the form $p_j=(\mathsf{str}_j,\mathsf{mode}_j)$, where $\mathsf{str}_j\in(\Sigma\cup\{\text{\_}\})^{+}$ is its literal content and $\mathsf{mode}_j\in\{\mathsf{prefix},\mathsf{infix},\mathsf{suffix},\mathsf{exact}\}$ records where it may occur in the string. If the pattern contains no \% at all, it consists of a single factor of mode $\mathsf{exact}$, which must cover the entire string. Otherwise, the first factor has mode $\mathsf{prefix}$ if the pattern does not begin with \%, the last factor has mode $\mathsf{suffix}$ if the pattern does not end with \%, and every other factor has mode $\mathsf{infix}$. We write $L_\zeta:=\sum_{j}|\mathsf{str}_j|$ for the length of the pattern, counting each \_ as one character; no string shorter than $L_\zeta$ can match. For example, the mixed pattern ``a\_b\%ef'' has factors $(\text{``a\_b''},\mathsf{prefix})$ and $(\text{``ef''},\mathsf{suffix})$ and $L_\zeta=5$, whereas ``a\_c'' has the single factor $(\text{``a\_c''},\mathsf{exact})$ and $L_\zeta=3$.
 
- \subsection{PIOP Description}
-  \label{sec:pattern-matching-piop-descr}
+\subsection{The Pattern Matching Protocol}
+\label{sec:pattern-matching-piop-descr}
 In this section, we present \cref{piop:multi-char-pattern-matching}, a PIOP that convinces the verifier that the activators were correctly updated from $\Oracle{\MLE{\mathsf{a^{old}}}}$ and $\Oracle{\MLE{\mathsf{char\text{-}act^{old}}}}$ to $\Oracle{\MLE{\mathsf{a^{new}}}}$ and $\Oracle{\MLE{\mathsf{char\text{-}act^{new}}}}$; that is, every string that is kept active satisfies the pattern (no false positives) and every string that is discarded does not (no false negatives).
 
 \begin{DefinePIOP}{Pattern Matching}{multi-char-pattern-matching}[Pattern Matching]
@@ -87,11 +87,11 @@ The formal definition and the security proofs are deferred to \cref{sec:proof-le
 \end{equation}
 which \cref{mc:containment} certifies with a single zerocheck.
 
-\parhead{Sweep \& Verdict} We then sweep through all $n_\zeta$ factors, discarding at each round the strings that do not contain the current factor. Finally, the strings that remain alive are exactly those in which every factor was placed---that is, the strings that satisfy the entire pattern. The sweep records this survival information in the str-level activator $\mathsf{alive_h}$, so $\mathsf{alive_h}$ marks precisely the matching strings. In the honest case it therefore equals $\mathsf{a^{new}}$, which \cref{mc:verdict} verifies with a single zerocheck.
+\parhead{Sweep \& Verdict} We then sweep through the $n_\zeta$ factors, discarding at each round the strings that do not contain the current factor, so that the strings still alive at the end are exactly those that contain all factors in order and without overlap, i.e.\ that satisfy the pattern. The sweep is carried out by \cref{piop:sweep-factors}, the main building block of \cref{piop:multi-char-pattern-matching}, which we discuss next; it returns the final str-level activator $\mathsf{alive_h}$ marking precisely the matching strings. In the honest case $\mathsf{alive_h}$ equals $\mathsf{a^{new}}$, which \cref{mc:verdict} verifies with a single zerocheck.
 
 
-Next we discuss the main building block of \cref{piop:multi-char-pattern-matching}, namely \cref{piop:sweep-factors}, which carries out the entire sweep and returns the final str-level activator $\mathsf{alive_h}$, marking exactly the strings that contain all $n_\zeta$ factors in order and without overlap.
-
+\subsection{Sweeping the Factors}
+\label{sec:sweeping-factors}
 
 \parhead{Easy case: Single Factor} We first explain how to check if a column of strings satisfy a single factor $p=(\mathsf{str},\mathsf{mode})$, then extend it to a multi-factor scenario. Let $\ell=|\mathsf{str}|$, then the prover needs to convince the verifier that (i) there exist \emph{a window of length $\ell$} that has the exact pattern $\mathsf{str}$, and (ii) there does not exist such a window for the discarded strings. Also the start position of this window matters. For $\mathsf{mode}=\mathsf{prefix}$, we want this window to start at the 0th location of the survived strings, for $\mathsf{mode}=\mathsf{suffix}$, we want this window to end at the last location of the survived strings, for $\mathsf{mode}=\mathsf{infix}$, the window can start from anywhere inside the string; and for $\mathsf{mode}=\mathsf{exact}$, the window must start at the 0th location and cover the whole string.
 
@@ -130,9 +130,11 @@ For example, consider the pattern ``\%ab\%bd\%t'' and the string ``kabyabrbdut''
 
 The per-round placement invoked above is carried out by \cref{piop:factor-placement}, which uses the same fingerprinting and attention-mask machinery as the single-factor case, the difference being that it must additionally pin down the \emph{leftmost} occurrence of the factor. To this end, in \cref{fp:occurs} the prover first sends an occurrence column recording \emph{all} occurrences of the factor: the verifier must know every occurrence before it can check that the prover selected the leftmost one among them.
 
-\parhead{Leftmost Occurrence} To confirm that the $\mathsf{start}$ column output by \cref{piop:factor-placement} indeed marks the leftmost occurrence, the verifier checks, in \cref{fp:placement}, that no occurrence precedes the one recorded in $\mathsf{start}$.
+\subsection{Placing a Factor}
+\label{sec:factor-placement}
 
-\ali{keep abstracting away large chunks of psudocode, use meaningful helpers like the codebase}
+\parhead{Relational reading} A round of the sweep is a filter followed by an aggregate over the auxiliary character table. \Cref{fp:occurs} keeps the candidate windows whose fingerprint equals that of the factor, i.e.\ \texttt{SELECT orig\_ind, int\_ind FROM s.aux\_chars WHERE att\_mask = 1 AND wf = pf}; since this is an equality test, it is a \cref{piop:zero-indicator} on $\mathsf{diff}$ under the mask, with $\mathsf{occurs}$ as the resulting row selector. \Cref{fp:placement} then computes, for every string, whether any window survived and the position of the leftmost one, i.e.\ \texttt{SELECT orig\_ind, MIN(int\_ind) \dots\ WHERE occurs = 1 GROUP BY orig\_ind}. We package this aggregate as the \emph{Grouped Minimum Check} (\cref{piop:grp-min}, \cref{sec:grp-min}), which certifies both the existence bit $\mathsf{match}$ and the minimum $\mathsf{start}$; in particular it checks that no occurrence precedes the one recorded in $\mathsf{start}$. The gadget is independent of patterns and is stated for an arbitrary selector.
+
 \begin{DefinePIOP}{Factor Placement}{factor-placement}[Factor Placement]
   \emergencystretch=3em\relax
   \emph{Inputs:} $p=(\mathsf{str},\mathsf{mode})$ with $\ell=|\mathsf{str}|$ and wild-card offsets $W=\{\delta:\mathsf{str}[\delta]=\text{\_}\}$; the input activators $\Oracle{\MLE{\mathsf{a}}}$ and $\Oracle{\MLE{\mathsf{char\text{-}act}}}$; the rotated character columns $\{\Oracle{\MLE{\mathsf{char}^{(\delta)}}}\}_{\delta=0}^{\ell-1}$ and coefficients $r_0,\dots,r_{\ell-1}$; $\Oracle{\MLE{\mathsf{bnd}}}, \Oracle{\MLE{\mathsf{orig\text{-}ind}}}, \Oracle{\MLE{\mathsf{int\text{-}ind}}}, \Oracle{\MLE{\mathsf{ind}}}$; and the char-level length column $\Oracle{\MLE{\mathsf{l}'}}$ of \cref{sf:len}. Every \cref{piop:broadcast} below is activated by $\mathsf{char\text{-}act}$ on the character side, and the indicator and sign checks use the width $\alpha_L$ of \cref{piop:sweep-factors}.
@@ -149,28 +151,8 @@ The per-round placement invoked above is carried out by \cref{piop:factor-placem
       \item \emph{infix}: $\PIOPProver$ sends the indicator $\mathsf{fits}$ with $\mathsf{fits}[c] = \mathbf{1}[\mathsf{int\text{-}ind}[c]+\ell \le \mathsf{l}'[c]]$; the parties invoke \cref{piop:cmp-indicator} with width $\alpha_L$ on the column with activator $\mathsf{char\text{-}act}$ and data $\mathsf{l}'-\mathsf{int\text{-}ind}-\ell$, with $\mathsf{fits}$ as the indicator, and set $\mathsf{att\_mask} := \mathsf{char\text{-}act}\cdot\mathsf{fits}$, the alive characters from which a window stays inside its string.
     \end{enumerate}
     Since the characters of every string occupy consecutive positions in $\mathsf{int\text{-}ind}$ order (\cref{sec:layout-check}), a window that starts at a character of $\mathsf{att\_mask}$ reads only characters of that string, and the rotations of \cref{sf:rot} never wrap around for it.
-    \item (\textit{Occurrence column})\label[step]{fp:occurs} $\PIOPProver$ computes and sends $\mathsf{occurs}$, which is $1$ at the start of every occurrence of $\mathsf{str}$ among the candidate windows, and the parties establish its validity by
-    \begin{enumerate}[nosep]
-      \item a \cref{piop:boolean-check} on $\mathsf{occurs}$ over the whole hypercube;
-      \item a \cref{piop:zerocheck} on $\mathsf{occurs}\cdot(1-\mathsf{att\_mask})$, so every mark is a candidate window;
-      \item a \cref{piop:zerocheck} on $\mathsf{occurs}\cdot\mathsf{diff}$, so every marked window equals $\mathsf{str}$;
-      \item a \cref{piop:nozero-check} on the column with data $\mathsf{diff}$ and activator $\mathsf{att\_mask}\cdot(1-\mathsf{occurs})$, so every unmarked candidate differs from $\mathsf{str}$,
-    \end{enumerate}
-    forcing $\mathsf{occurs}$ to mark exactly the candidate windows equal to $\mathsf{str}$.
-    \item (\textit{Leftmost placement})\label[step]{fp:placement} Writing $O_i:=\{\,\mathsf{int\text{-}ind}[c] : \mathsf{orig\text{-}ind}[c]=i,\ \mathsf{occurs}[c]=1\,\}$ for the occurrence positions in string $i$, $\PIOPProver$ builds and sends
-    \begin{itemize}[nosep]
-      \item the str-level indicator $\mathsf{match}[i]:=\mathbf{1}[\,O_i\neq\emptyset\,]$ (the string carries an occurrence);
-      \item the placement $\mathsf{start}[i]:=\min O_i$ when $\mathsf{match}[i]=1$ (the leftmost occurrence), and $\mathsf{start}[i]:=0$ otherwise;
-      \item the char-level marker $\mathsf{mark}[c]:=\mathbf{1}[\,\mathsf{occurs}[c]=1\ \text{and}\ \mathsf{int\text{-}ind}[c]=\mathsf{start}[\mathsf{orig\text{-}ind}[c]]\,]$ (the character at that leftmost occurrence).
-    \end{itemize}
-    The parties then check
-    \begin{enumerate}[nosep]
-      \item a \cref{piop:boolean-check} on $\mathsf{match}$ and on $\mathsf{mark}$, both over the whole hypercube;
-      \item (\emph{no false negatives}) $\PIOPProver$ broadcasts $\mathsf{match}$ to character level ($\mathsf{match}'$) via \cref{piop:broadcast}, and the parties invoke a \cref{piop:zerocheck} on $\mathsf{occurs}\cdot(1-\mathsf{match}')$, so every occurrence lies in a matched string;
-      \item (\emph{one mark per matched string}) a \cref{piop:zerocheck} on $\mathsf{mark}\cdot(1-\mathsf{occurs})$, so each mark is an occurrence, and a \cref{piop:keyedsumcheck} on the tables $\bigl(\act=\mathbf{1},\,\key=\mathsf{orig\text{-}ind},\,\val=\mathsf{mark}\bigr)$ and $\bigl(\act=\mathbf{1},\,\key=\mathsf{ind},\,\val=\mathsf{match}\bigr)$, which forces $\sum_{c:\,\mathsf{orig\text{-}ind}[c]=i}\mathsf{mark}[c]=\mathsf{match}[i]$ for every $i$: exactly one occurrence is marked in each matched string and none in any other string;
-      \item (\emph{placement}) $\PIOPVerifier$ samples $\gamma\samples\F$ and the parties invoke \cref{piop:lookup-check} on $(\mathsf{match},\ \mathsf{ind}+\gamma\,\mathsf{start}) \lookup (\mathsf{mark},\ \mathsf{orig\text{-}ind}+\gamma\,\mathsf{int\text{-}ind})$, i.e.\ with $\mathsf{match}$ activating the str-level column $\mathsf{ind}+\gamma\,\mathsf{start}$ and $\mathsf{mark}$ activating the char-level column $\mathsf{orig\text{-}ind}+\gamma\,\mathsf{int\text{-}ind}$. This ties the $\mathsf{start}$ of each matched string to the $\mathsf{int\text{-}ind}$ of its unique mark, which is an occurrence;
-      \item (\emph{leftmost}) $\PIOPProver$ broadcasts $\mathsf{start}$ to character level ($\mathsf{start}'$) via \cref{piop:broadcast}, and the parties invoke the $\mathsf{NonNeg}$ \cref{piop:sign-check} with width $\alpha_L$ on the column with activator $\mathsf{occurs}$ and data $\mathsf{int\text{-}ind}-\mathsf{start}'$, so no occurrence precedes the marked one.
-    \end{enumerate}
+    \item (\textit{Occurrence column})\label[step]{fp:occurs} $\PIOPProver$ computes and sends $\mathsf{occurs}$, which is $1$ at the start of every occurrence of $\mathsf{str}$ among the candidate windows. The parties invoke \cref{piop:zero-indicator} on the column with activator $\mathsf{att\_mask}$ and data $\mathsf{diff}$, with $\mathsf{occurs}$ as the indicator, and a \cref{piop:zerocheck} on $\mathsf{occurs}\cdot(1-\mathsf{att\_mask})$, so that $\mathsf{occurs}$ marks exactly the candidate windows equal to $\mathsf{str}$ and nothing else.
+    \item (\textit{Leftmost placement})\label[step]{fp:placement} $\PIOPProver$ sends the str-level indicator $\mathsf{match}$ and placement $\mathsf{start}$, and the parties invoke \cref{piop:grp-min} with width $\alpha_L$ on $\Oracle{\hat{\strcol}}$ with selector $\mathsf{occurs}$ and outputs $(\mathsf{match}, \mathsf{start})$, which certifies that $\mathsf{match}[i] = 1$ iff string $i$ carries an occurrence and that $\mathsf{start}[i]$ is the position of its leftmost one.
   \end{enumerate}
 \end{DefinePIOP}
 

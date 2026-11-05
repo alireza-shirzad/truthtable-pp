@@ -1,0 +1,32 @@
+% !TEX root = ../paper.tex
+\section{More Background from \texorpdfstring{$\truthtable$}{TruthTable}}
+\label{sec:more-background}
+
+This appendix recalls the formal definition of a verifiable database system from $\truthtable$~\cite{cryptoeprint:2026/1260}, which \cref{sec:background} summarizes.
+
+Formally, a verifiable database system is a commit-carrying SNARK (cc-SNARK)~\cite{CampanelliFQ19} for the following ternary relation:
+{\small
+\begin{displaymath}
+ \Relation{\SQL} = \left\{\,
+    (
+        \NPInstance = (\Query, \QueryResult),
+        \NPInstancey = \Database,
+        \NPWitness = \bot
+    )
+  \;\middle|\;
+  \QueryResult \in \ResultSet_\Query(\Database)
+\,\right\},
+\end{displaymath}
+}
+
+\noindent
+where $\ResultSet_\Query(\Database)$ denotes the set of valid query results for the query $\Query$ on the database $\Database$ with respect to SQL semantics.
+In a ternary relation, $\NPInstance$ denotes the explicit instance, $\NPInstancey$ the implicit instance, and $\NPWitness$ the witness; the distinction between explicit and implicit instances separates the parts of the instance that the cc-SNARK verifier reads entirely ($\NPInstance$) from those it reads only in committed form ($\NPInstancey$).
+The cc-SNARK algorithms specialized to this relation are:
+\begin{itemize}[nosep]
+    \item $\Setup(1^\lambda, N) \rightarrow (\pk, \vk, \ck)$, on input a database size $N$ and security parameter $\lambda$, outputs a prover key $\pk$, verifier key $\vk$, and commitment key $\ck$.
+    \item $\Commit(\ck, \Database) \rightarrow \DatabaseCM$, on input a database $\Database$, outputs a commitment $\DatabaseCM$ to the database.
+    \item $\Prove(\pk, \Database, \DatabaseCM, \Query, \QueryResult) \rightarrow \Proof_\Query$, on input a database $\Database$, the database commitment $\DatabaseCM$, a query $\Query$, and the query result $\QueryResult$, outputs a proof $\Proof_\Query$ that $\QueryResult$ is the result of executing $\Query$ on $\Database$.
+    \item $\Verify(\vk, \DatabaseCM, \Query, \QueryResult, \Proof_\Query) \rightarrow \{0,1\}$, on input a database commitment $\DatabaseCM$, a query $\Query$, a query result $\QueryResult$, and a proof $\Proof_\Query$, accepts if the proof is valid.
+\end{itemize}
+These algorithms must satisfy the standard completeness and knowledge-soundness properties of cc-SNARKs~\cite{CampanelliFQ19}; see \cref{sec:extended_preliminaries}.
